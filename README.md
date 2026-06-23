@@ -122,9 +122,9 @@ Planned and partially scaffolded integration surfaces:
 
 - CLI
 - Git hooks
-- VS Code
-- Cursor
-- Claude Code
 - Codex
-- Cline
-- MCP-compatible agents
+- MCP-style stdio server for Codex-driven workflows
+- VS Code scaffold, deferred
+- Cursor, deferred
+- Claude Code, deferred
+- Cline, deferred

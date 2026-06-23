@@ -42,15 +42,27 @@ Available tools:
 - `summarize_pr`
 - `detect_github`
 
-## Cursor, Claude Code, Codex, and Cline
+## Codex
 
-Use the CLI directly from the agent tool runner, or connect through the MCP-style stdio server. The important rule is that integrations must not bypass `.vibeguard.yaml`.
+Codex is the current priority integration target.
+
+Use the CLI directly from the Codex tool runner, or connect through the MCP-style stdio server. The important rule is that Codex must not bypass `.vibeguard.yaml`.
+
+See `docs/CODEX.md` for the focused Codex workflow.
+
+## Deferred Agent Integrations
+
+These integrations are intentionally deferred until the Codex flow is stable:
+
+- Cursor
+- Claude Code
+- Cline
 
 ## VS Code
 
 The repository includes a minimal extension scaffold in `integrations/vscode`.
 
-The extension calls the local CLI and renders JSON results in a VS Code output channel. The CLI remains the source of truth for policy decisions.
+The extension calls the local CLI and renders JSON results in a VS Code output channel. This is not the current priority; Codex comes first. The CLI remains the source of truth for policy decisions.
 
 ## GitHub
 
