@@ -20,6 +20,16 @@ export async function generateDebugPatch(context, env = process.env) {
   }
 
   if (provider === "fixture") {
+    if (env.VIBEGUARD_FIXTURE_PATCH_MAP) {
+      const patchMap = JSON.parse(env.VIBEGUARD_FIXTURE_PATCH_MAP);
+      const key = context.summary?.type || context.summary?.message || "default";
+      const mapped = patchMap[key] || patchMap.default || "";
+      return {
+        status: mapped ? "ok" : "empty",
+        patch: mapped
+      };
+    }
+
     const patch = env.VIBEGUARD_FIXTURE_PATCH_FILE
       ? fs.readFileSync(env.VIBEGUARD_FIXTURE_PATCH_FILE, "utf8")
       : env.VIBEGUARD_FIXTURE_PATCH || "";

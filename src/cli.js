@@ -16,6 +16,7 @@ import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { createPullRequestWithGh, detectGitHubRepository } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
+import { evaluateFixFixtures } from "./eval/fixtures.js";
 
 function printHelp() {
   console.log(`VibeGuard AI Dev Agent
@@ -36,6 +37,7 @@ Usage:
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
+  vibeguard eval fixtures [--fixture <id>] [--apply]
   vibeguard mcp
 
 Options:
@@ -212,6 +214,17 @@ function githubCommand(parsed, root, subcommand) {
   throw new Error(`Unknown github command: ${subcommand || ""}`);
 }
 
+async function evalCommand(parsed, root, subcommand) {
+  if (subcommand === "fixtures") {
+    return evaluateFixFixtures({
+      root,
+      fixture: parsed.fixture,
+      apply: Boolean(parsed.apply)
+    });
+  }
+  throw new Error(`Unknown eval command: ${subcommand || ""}`);
+}
+
 async function dispatch(parsed) {
   const root = parsed.root ? String(parsed.root) : process.cwd();
   const [command, subcommand] = parsed._;
@@ -246,6 +259,7 @@ async function dispatch(parsed) {
   if (command === "pr" && subcommand === "summary") return buildPrSummary(diffInput(parsed, root));
   if (command === "github") return githubCommand(parsed, root, subcommand);
   if (command === "run") return runCommand(parsed, root);
+  if (command === "eval") return evalCommand(parsed, root, subcommand);
   if (command === "mcp") {
     await startMcpServer({ root });
     return null;
@@ -270,5 +284,6 @@ export const cliInternals = {
   policyCommand,
   debugCommand,
   fixCommand,
+  evalCommand,
   reviewCommand
 };

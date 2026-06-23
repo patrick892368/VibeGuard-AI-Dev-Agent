@@ -8,6 +8,7 @@ import { analyzeTestTargets } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
 import { detectGitHubRepository } from "../integrations/github.js";
+import { evaluateFixFixtures } from "../eval/fixtures.js";
 
 const tools = [
   {
@@ -41,6 +42,10 @@ const tools = [
   {
     name: "detect_github",
     description: "Detect the GitHub origin repository for the current repo."
+  },
+  {
+    name: "eval_fixtures",
+    description: "Evaluate the configured LLM provider against Python and Node fix fixtures."
   }
 ];
 
@@ -93,6 +98,7 @@ function callTool(name, args, root) {
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
+  if (name === "eval_fixtures") return evaluateFixFixtures({ root, fixture: args.fixture, apply: Boolean(args.apply) });
   throw new Error(`Unknown tool: ${name}`);
 }
 

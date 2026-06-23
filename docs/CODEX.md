@@ -50,6 +50,23 @@ node ./bin/vibeguard.js --root fixtures/python-bug fix --log error.log --patch f
 node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fixes/reference-error.patch --test "npm test" --dry-run --json
 ```
 
+Evaluate the configured LLM provider against both fixtures:
+
+```bash
+node ./bin/vibeguard.js eval fixtures --json
+```
+
+With a real provider:
+
+```bash
+export VIBEGUARD_LLM_PROVIDER=openai-compatible
+export OPENAI_API_KEY=...
+export VIBEGUARD_MODEL=...
+node ./bin/vibeguard.js eval fixtures --json
+```
+
+Codex should inspect `summary.successRate`, each fixture `outcome`, and any `policyStatus`, `stage`, or `patchSourceReason` before deciding whether to apply a generated patch.
+
 Run tests through policy:
 
 ```bash

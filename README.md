@@ -18,6 +18,7 @@ The core design rule is simple: every agent must pass through Policy-as-Code bef
 - `vibeguard pr summary` creates a GitHub-ready PR body from a diff.
 - `vibeguard github` detects GitHub remotes and can create PRs through `gh`.
 - `vibeguard run` executes commands only after command policy checks.
+- `vibeguard eval fixtures` evaluates the configured LLM provider against Python and Node fix fixtures.
 - `vibeguard mcp` starts a small JSON-RPC MCP-style stdio server for agent integrations.
 
 This repository is intentionally dependency-light at the start. The CLI runs on Node.js built-ins so the project can be tested immediately after clone.
@@ -59,6 +60,7 @@ vibeguard pr summary --diff change.diff
 vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 vibeguard run --command "npm test" --dry-run
+vibeguard eval fixtures --json
 vibeguard mcp
 ```
 
@@ -90,6 +92,17 @@ node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fix
 ```
 
 `fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present.
+
+To evaluate a real OpenAI-compatible provider against both fixtures:
+
+```bash
+export VIBEGUARD_LLM_PROVIDER=openai-compatible
+export OPENAI_API_KEY=...
+export VIBEGUARD_MODEL=...
+node ./bin/vibeguard.js eval fixtures --json
+```
+
+The evaluation reports success rate, patch validation failures, policy denials, patch check failures, and blocked provider calls.
 
 Optional Codex orchestration:
 
@@ -144,6 +157,7 @@ The test suite covers:
 - Path and command policy checks.
 - Patch file safety checks.
 - Safe fix workflow over Python and Node.js fixture projects.
+- Fixture evaluation for AI patch dry-runs.
 - Python and Node.js stack trace parsing.
 - Review diff analysis.
 - Repository scanning.

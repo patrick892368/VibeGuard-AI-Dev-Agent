@@ -42,6 +42,7 @@ Available tools:
 - `review_pr`
 - `summarize_pr`
 - `detect_github`
+- `eval_fixtures`
 
 ## Codex
 
