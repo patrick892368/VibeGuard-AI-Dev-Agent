@@ -1,0 +1,8 @@
+node_modules/
+coverage/
+.vibeguard-cache/
+.DS_Store
+Thumbs.db
+
+# Local planning notes, not part of the shipped project.
+ROADMAP.md

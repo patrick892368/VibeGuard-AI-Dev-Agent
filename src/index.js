@@ -1,0 +1,14 @@
+export { runCli } from "./cli.js";
+export { loadConfig } from "./config/loadConfig.js";
+export { defaultConfig } from "./config/defaultConfig.js";
+export { PolicyEngine } from "./policy/engine.js";
+export { parsePatchFiles } from "./patch/parsePatch.js";
+export { analyzeDebugLog } from "./agents/debug.js";
+export { analyzeRepository } from "./agents/onboard.js";
+export { analyzeTestTargets } from "./agents/testWriter.js";
+export { analyzeReviewDiff } from "./agents/review.js";
+export { buildPrSummary } from "./agents/pr.js";
+export { applyPatchWithPolicy } from "./patch/safeApply.js";
+export { generateDebugPatch } from "./llm/provider.js";
+export { runCommandWithPolicy } from "./runner/safeCommand.js";
+export { parseGitHubRemote, detectGitHubRepository, createPullRequestWithGh } from "./integrations/github.js";

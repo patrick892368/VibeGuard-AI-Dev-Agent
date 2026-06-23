@@ -1,0 +1,25 @@
+{
+  "name": "vibeguard-ai-dev-agent",
+  "version": "0.1.0",
+  "description": "Policy-bound AI developer agent for debugging, repo onboarding, test writing, and PR review.",
+  "type": "module",
+  "bin": {
+    "vibeguard": "./bin/vibeguard.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check bin/vibeguard.js && node --check src/cli.js && node --test"
+  },
+  "keywords": [
+    "ai-agent",
+    "developer-tools",
+    "debugging",
+    "policy-as-code",
+    "mcp",
+    "cli"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  }
+}

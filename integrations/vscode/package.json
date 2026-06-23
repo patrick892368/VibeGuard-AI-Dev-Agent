@@ -1,0 +1,40 @@
+{
+  "name": "vibeguard-vscode",
+  "displayName": "VibeGuard",
+  "description": "Run VibeGuard AI Dev Agent commands from VS Code.",
+  "version": "0.1.0",
+  "publisher": "vibeguard",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:vibeguard.debug",
+    "onCommand:vibeguard.review",
+    "onCommand:vibeguard.onboard",
+    "onCommand:vibeguard.policyCheck"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vibeguard.debug",
+        "title": "VibeGuard: Debug Error Log"
+      },
+      {
+        "command": "vibeguard.review",
+        "title": "VibeGuard: Review Current Diff"
+      },
+      {
+        "command": "vibeguard.onboard",
+        "title": "VibeGuard: Generate Onboarding Docs"
+      },
+      {
+        "command": "vibeguard.policyCheck",
+        "title": "VibeGuard: Check Policy"
+      }
+    ]
+  }
+}
