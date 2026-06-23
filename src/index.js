@@ -14,3 +14,4 @@ export { validateUnifiedDiff } from "./patch/validatePatch.js";
 export { generateDebugPatch } from "./llm/provider.js";
 export { runCommandWithPolicy } from "./runner/safeCommand.js";
 export { parseGitHubRemote, detectGitHubRepository, createPullRequestWithGh } from "./integrations/github.js";
+export { buildFixGitPlan } from "./integrations/gitPlan.js";

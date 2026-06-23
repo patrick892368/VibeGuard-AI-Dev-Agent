@@ -31,6 +31,18 @@ node ./bin/vibeguard.js fix --log error.log --test "npm test" --dry-run --json
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
 ```
 
+Write a generated patch artifact after validation and policy checks:
+
+```bash
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --output-patch patches/fix.diff --dry-run --json
+```
+
+Ask VibeGuard for the branch, commit, and PR dry-run plan:
+
+```bash
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --pr-dry-run --pr-body-file patches/pr-body.md --dry-run --json
+```
+
 Run deterministic fixture demos:
 
 ```bash
@@ -57,6 +69,7 @@ node ./bin/vibeguard.js pr summary --diff change.diff --json
 - Do not modify denied paths.
 - Use `--check-only` before applying patches.
 - Prefer `fix --dry-run` before `fix --apply`.
+- Treat `gitPlan` output as a reviewable plan, not an executed operation.
 - Use `run --command` for commands that should go through policy.
 - Keep `ROADMAP.md` local and uncommitted.
 

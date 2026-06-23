@@ -51,6 +51,8 @@ Use the CLI directly from the Codex tool runner, or connect through the MCP-styl
 
 See `docs/CODEX.md` for the focused Codex workflow.
 
+The current Codex flow supports patch artifact output and Git/PR dry-run planning. It does not execute branch creation, commits, pushes, or PR creation from `fix`.
+
 ## Deferred Agent Integrations
 
 These integrations are intentionally deferred until the Codex flow is stable:

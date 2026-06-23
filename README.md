@@ -43,6 +43,8 @@ vibeguard policy check --patch fix.diff
 
 vibeguard debug --log error.log
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --dry-run
+vibeguard fix --log error.log --patch fix.diff --test "npm test" --output-patch patches/fix.diff --dry-run
+vibeguard fix --log error.log --patch fix.diff --test "npm test" --create-branch --commit --pr-dry-run --dry-run
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --apply
 vibeguard test
 vibeguard test --write --limit 1
@@ -88,6 +90,15 @@ node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fix
 ```
 
 `fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present.
+
+Optional Codex orchestration:
+
+```bash
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --output-patch patches/fix.diff --dry-run --json
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --pr-dry-run --pr-body-file patches/pr-body.md --dry-run --json
+```
+
+The Git/PR workflow is dry-run only at this stage. It returns structured commands for Codex to review before any branch, commit, push, or PR action is executed.
 
 ## Policy-as-Code
 

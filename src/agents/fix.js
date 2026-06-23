@@ -5,7 +5,9 @@ import { buildPrSummary } from "./pr.js";
 import { generateDebugPatch } from "../llm/provider.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { validateUnifiedDiff } from "../patch/validatePatch.js";
+import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
+import { buildFixGitPlan } from "../integrations/gitPlan.js";
 
 function buildFixTitle(debug) {
   const type = debug.summary?.type || "bug";
@@ -125,10 +127,49 @@ export async function runFixWorkflow(options = {}) {
     pr
   };
 
+  let outputPatch = null;
+  if (options.outputPatch) {
+    const outputPatchPolicy = engine.checkPath(options.outputPatch, "write_patch_artifact");
+    if (outputPatchPolicy.status !== "allow" && !(outputPatchPolicy.status === "require_confirmation" && options.confirmed)) {
+      return {
+        status: outputPatchPolicy.status,
+        stage: "output_patch",
+        ...base,
+        outputPatch: {
+          path: options.outputPatch,
+          policy: outputPatchPolicy
+        }
+      };
+    }
+    outputPatch = writeFileWithPolicy(root, options.outputPatch, patchSource.patch, engine, {
+      confirmed: Boolean(options.confirmed)
+    });
+  }
+
+  const gitPlan = (options.createBranch || options.commit || options.prDryRun)
+    ? buildFixGitPlan({
+      patch: patchSource.patch,
+      branch: pr.branch,
+      commitMessage: pr.commitMessage,
+      title: pr.title,
+      body: pr.body,
+      bodyFile: options.prBodyFile,
+      createBranch: Boolean(options.createBranch),
+      commit: Boolean(options.commit),
+      prDryRun: Boolean(options.prDryRun)
+    })
+    : null;
+
+  const plannedBase = {
+    ...base,
+    outputPatch,
+    gitPlan
+  };
+
   if (options.dryRun || !options.apply) {
     return {
       status: options.dryRun ? "dry_run" : "ready",
-      ...base
+      ...plannedBase
     };
   }
 
@@ -142,7 +183,7 @@ export async function runFixWorkflow(options = {}) {
     return {
       status: "failed",
       stage: "patch_apply",
-      ...base,
+      ...plannedBase,
       error: error.message
     };
   }
@@ -164,7 +205,7 @@ export async function runFixWorkflow(options = {}) {
 
   return {
     status: tests && tests.status !== "passed" ? "failed" : "passed",
-    ...base,
+    ...plannedBase,
     applyResult,
     tests
   };

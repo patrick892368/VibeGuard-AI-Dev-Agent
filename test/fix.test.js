@@ -27,12 +27,17 @@ function copyFixture(name) {
   return target;
 }
 
-function runCli(args) {
-  const output = execFileSync(process.execPath, [bin, ...args], {
-    cwd: process.cwd(),
-    encoding: "utf8"
-  });
-  return JSON.parse(output);
+function runCli(args, options = {}) {
+  try {
+    const output = execFileSync(process.execPath, [bin, ...args], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+    return JSON.parse(output);
+  } catch (error) {
+    if (!options.allowFailure) throw error;
+    return JSON.parse(error.stdout);
+  }
 }
 
 test("validateUnifiedDiff rejects empty and non-diff patch text", () => {
@@ -125,6 +130,84 @@ test("fix CLI dry-run checks Node fixture patch without modifying files", () => 
   assert.equal(result.status, "dry_run");
   assert.equal(result.applyCheck.status, "checked");
   assert.equal(fs.readFileSync(path.join(root, "src", "user.js"), "utf8"), before);
+});
+
+test("fix CLI writes output patch artifact through policy", () => {
+  const root = copyFixture("node-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--test",
+    "npm test",
+    "--output-patch",
+    "fixes/generated.patch",
+    "--dry-run",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.outputPatch.path, "fixes/generated.patch");
+  assert.equal(result.outputPatch.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, "fixes", "generated.patch"), "utf8"), /user\.firstName/);
+});
+
+test("fix CLI blocks output patch artifact on denied path", () => {
+  const root = copyFixture("node-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--output-patch",
+    ".env",
+    "--dry-run",
+    "--json"
+  ], { allowFailure: true });
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "output_patch");
+  assert.equal(result.outputPatch.policy.status, "deny");
+  assert.equal(fs.existsSync(path.join(root, ".env")), false);
+});
+
+test("fix CLI returns branch commit PR dry-run plan", () => {
+  const root = copyFixture("node-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--create-branch",
+    "--commit",
+    "--pr-dry-run",
+    "--pr-body-file",
+    "patches/pr-body.md",
+    "--dry-run",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.gitPlan.status, "dry_run");
+  assert.equal(result.gitPlan.branch, "codex/fix-referenceerror");
+  assert.deepEqual(result.gitPlan.changedFiles, ["src/user.js"]);
+  assert.deepEqual(result.gitPlan.commands.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.ok(result.gitPlan.commands.at(-1).argv.includes("--body-file"));
 });
 
 test("fix CLI applies Node fixture patch and runs tests", () => {

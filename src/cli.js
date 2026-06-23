@@ -23,7 +23,7 @@ function printHelp() {
 Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file>
-  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--dry-run] [--apply]
+  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--dry-run] [--apply] [--output-patch <file>]
   vibeguard test
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
@@ -126,6 +126,11 @@ async function fixCommand(parsed, root) {
     logFile: parsed.log,
     patchFile: parsed.patch,
     testCommand: parsed.test,
+    outputPatch: parsed["output-patch"],
+    createBranch: Boolean(parsed["create-branch"]),
+    commit: Boolean(parsed.commit),
+    prDryRun: Boolean(parsed["pr-dry-run"]),
+    prBodyFile: parsed["pr-body-file"],
     dryRun: Boolean(parsed["dry-run"]),
     apply: Boolean(parsed.apply),
     confirmed: Boolean(parsed.confirm)

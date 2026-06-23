@@ -78,6 +78,11 @@ function callTool(name, args, root) {
       logText: args.log || "",
       patchText: args.patch,
       testCommand: args.testCommand,
+      outputPatch: args.outputPatch,
+      createBranch: Boolean(args.createBranch),
+      commit: Boolean(args.commit),
+      prDryRun: Boolean(args.prDryRun),
+      prBodyFile: args.prBodyFile,
       dryRun: args.dryRun !== false,
       apply: Boolean(args.apply),
       confirmed: Boolean(args.confirmed)
