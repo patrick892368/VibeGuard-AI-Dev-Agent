@@ -6,6 +6,7 @@ paths:
     - "bin/**"
     - "test/**"
     - "tests/**"
+    - "fixtures/**"
     - "docs/**"
     - "README.md"
     - "package.json"

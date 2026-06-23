@@ -24,12 +24,18 @@ Analyze an error log:
 node ./bin/vibeguard.js debug --log error.log --json
 ```
 
-Generate and validate a patch:
+Run the full safe fix workflow:
 
 ```bash
-node ./bin/vibeguard.js debug --log error.log --ai-patch --json
-node ./bin/vibeguard.js patch check --file fix.diff --json
-node ./bin/vibeguard.js patch apply --file fix.diff --check-only --json
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --dry-run --json
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
+```
+
+Run deterministic fixture demos:
+
+```bash
+node ./bin/vibeguard.js --root fixtures/python-bug fix --log error.log --patch fixes/name-error.patch --test "python -m unittest discover -s tests" --dry-run --json
+node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fixes/reference-error.patch --test "npm test" --dry-run --json
 ```
 
 Run tests through policy:
@@ -50,6 +56,7 @@ node ./bin/vibeguard.js pr summary --diff change.diff --json
 - Do not bypass `.vibeguard.yaml`.
 - Do not modify denied paths.
 - Use `--check-only` before applying patches.
+- Prefer `fix --dry-run` before `fix --apply`.
 - Use `run --command` for commands that should go through policy.
 - Keep `ROADMAP.md` local and uncommitted.
 

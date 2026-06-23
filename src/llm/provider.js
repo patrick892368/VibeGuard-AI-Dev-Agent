@@ -1,3 +1,5 @@
+import fs from "node:fs";
+
 function extractResponsesText(data) {
   if (typeof data.output_text === "string") return data.output_text;
   if (!Array.isArray(data.output)) return "";
@@ -14,6 +16,16 @@ export async function generateDebugPatch(context, env = process.env) {
     return {
       status: "unavailable",
       reason: "Set VIBEGUARD_LLM_PROVIDER=openai-compatible, OPENAI_API_KEY, and VIBEGUARD_MODEL to enable AI patch generation."
+    };
+  }
+
+  if (provider === "fixture") {
+    const patch = env.VIBEGUARD_FIXTURE_PATCH_FILE
+      ? fs.readFileSync(env.VIBEGUARD_FIXTURE_PATCH_FILE, "utf8")
+      : env.VIBEGUARD_FIXTURE_PATCH || "";
+    return {
+      status: patch ? "ok" : "empty",
+      patch
     };
   }
 

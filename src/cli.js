@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { loadConfig } from "./config/loadConfig.js";
 import { PolicyEngine } from "./policy/engine.js";
@@ -7,7 +8,9 @@ import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "./agents/testWriter.js";
 import { analyzeReviewDiff } from "./agents/review.js";
 import { buildPrSummary } from "./agents/pr.js";
+import { runFixWorkflow } from "./agents/fix.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
+import { validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { createPullRequestWithGh, detectGitHubRepository } from "./integrations/github.js";
@@ -20,6 +23,7 @@ function printHelp() {
 Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file>
+  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--dry-run] [--apply]
   vibeguard test
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
@@ -77,13 +81,17 @@ function readStdinIfAvailable() {
   return fs.readFileSync(0, "utf8");
 }
 
+function resolveInputPath(root, filePath) {
+  return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
+}
+
 function policyCommand(parsed, root) {
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
 
   if (parsed.path) return engine.checkPath(parsed.path);
   if (parsed.command) return engine.checkCommand(parsed.command);
-  if (parsed.patch) return engine.checkPatch(fs.readFileSync(parsed.patch, "utf8"));
+  if (parsed.patch) return engine.checkPatch(fs.readFileSync(resolveInputPath(root, parsed.patch), "utf8"));
 
   const stdin = readStdinIfAvailable();
   if (stdin.trim()) return engine.checkPatch(stdin);
@@ -91,7 +99,7 @@ function policyCommand(parsed, root) {
 }
 
 async function debugCommand(parsed, root) {
-  const logText = parsed.log ? fs.readFileSync(parsed.log, "utf8") : readStdinIfAvailable();
+  const logText = parsed.log ? fs.readFileSync(resolveInputPath(root, parsed.log), "utf8") : readStdinIfAvailable();
   if (!logText.trim()) throw new Error("debug requires --log <file> or error text on stdin");
   const result = analyzeDebugLog(logText, { root });
   if (parsed["ai-patch"]) {
@@ -100,16 +108,34 @@ async function debugCommand(parsed, root) {
     const ai = await generateDebugPatch({ ...result, log: logText });
     result.aiPatch = ai;
     if (ai.patch) {
-      result.aiPatch.policy = engine.checkPatch(ai.patch);
+      result.aiPatch.validation = validateUnifiedDiff(ai.patch);
+      result.aiPatch.policy = result.aiPatch.validation.valid
+        ? engine.checkPatch(ai.patch)
+        : { status: "deny", reason: result.aiPatch.validation.reason, files: result.aiPatch.validation.files };
     }
   }
   return result;
 }
 
+async function fixCommand(parsed, root) {
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  return runFixWorkflow({
+    root,
+    engine,
+    logFile: parsed.log,
+    patchFile: parsed.patch,
+    testCommand: parsed.test,
+    dryRun: Boolean(parsed["dry-run"]),
+    apply: Boolean(parsed.apply),
+    confirmed: Boolean(parsed.confirm)
+  });
+}
+
 function reviewCommand(parsed, root) {
   let diffText = "";
   if (parsed.diff) {
-    diffText = fs.readFileSync(parsed.diff, "utf8");
+    diffText = fs.readFileSync(resolveInputPath(root, parsed.diff), "utf8");
   } else {
     try {
       diffText = execFileSync("git", ["diff", "--cached"], { cwd: root, encoding: "utf8" });
@@ -123,14 +149,14 @@ function reviewCommand(parsed, root) {
 }
 
 function diffInput(parsed, root) {
-  if (parsed.diff) return fs.readFileSync(parsed.diff, "utf8");
+  if (parsed.diff) return fs.readFileSync(resolveInputPath(root, parsed.diff), "utf8");
   const stdin = readStdinIfAvailable();
   if (stdin.trim()) return stdin;
   return execFileSync("git", ["diff"], { cwd: root, encoding: "utf8" });
 }
 
 function patchCommand(parsed, root, subcommand) {
-  const patchText = parsed.file ? fs.readFileSync(parsed.file, "utf8") : readStdinIfAvailable();
+  const patchText = parsed.file ? fs.readFileSync(resolveInputPath(root, parsed.file), "utf8") : readStdinIfAvailable();
   if (!patchText.trim()) throw new Error("patch command requires --file <patch> or patch text on stdin");
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
@@ -192,6 +218,7 @@ async function dispatch(parsed) {
 
   if (command === "policy" && subcommand === "check") return policyCommand(parsed, root);
   if (command === "debug") return debugCommand(parsed, root);
+  if (command === "fix") return fixCommand(parsed, root);
   if (command === "test") {
     if (parsed.write) {
       const { config } = loadConfig(root);
@@ -237,5 +264,6 @@ export const cliInternals = {
   parseArgs,
   policyCommand,
   debugCommand,
+  fixCommand,
   reviewCommand
 };

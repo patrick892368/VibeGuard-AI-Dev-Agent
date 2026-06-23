@@ -2,6 +2,7 @@ import readline from "node:readline";
 import { loadConfig } from "../config/loadConfig.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { analyzeDebugLog } from "../agents/debug.js";
+import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
@@ -16,6 +17,10 @@ const tools = [
   {
     name: "debug_error",
     description: "Parse an error log and return likely files, stack frames, and fix hints."
+  },
+  {
+    name: "fix_error",
+    description: "Run the safe fix workflow: debug log, patch validation, policy check, optional apply, tests, and PR summary."
   },
   {
     name: "onboard_repo",
@@ -64,6 +69,20 @@ function callTool(name, args, root) {
     throw new Error("check_policy requires path, command, or patch");
   }
   if (name === "debug_error") return analyzeDebugLog(args.log || "", { root });
+  if (name === "fix_error") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return runFixWorkflow({
+      root,
+      engine,
+      logText: args.log || "",
+      patchText: args.patch,
+      testCommand: args.testCommand,
+      dryRun: args.dryRun !== false,
+      apply: Boolean(args.apply),
+      confirmed: Boolean(args.confirmed)
+    });
+  }
   if (name === "onboard_repo") return analyzeRepository({ root });
   if (name === "write_tests") return analyzeTestTargets({ root });
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");

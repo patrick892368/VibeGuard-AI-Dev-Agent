@@ -29,6 +29,15 @@ test("generateDebugPatch is unavailable without provider env", async () => {
   assert.equal(result.status, "unavailable");
 });
 
+test("generateDebugPatch fixture provider returns local patch text", async () => {
+  const result = await generateDebugPatch({ summary: { type: "Error" } }, {
+    VIBEGUARD_LLM_PROVIDER: "fixture",
+    VIBEGUARD_FIXTURE_PATCH: "not a diff"
+  });
+  assert.equal(result.status, "ok");
+  assert.equal(result.patch, "not a diff");
+});
+
 test("parseGitHubRemote supports https and ssh remotes", () => {
   assert.deepEqual(parseGitHubRemote("https://github.com/patrick892368/VibeGuard-AI-Dev-Agent.git"), {
     owner: "patrick892368",

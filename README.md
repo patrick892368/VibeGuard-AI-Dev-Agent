@@ -8,6 +8,7 @@ The core design rule is simple: every agent must pass through Policy-as-Code bef
 
 - `vibeguard policy check` checks paths, commands, and unified diff patches against `.vibeguard.yaml`.
 - `vibeguard debug` parses Python and Node.js error logs, finds likely source files, and explains the failure context.
+- `vibeguard fix` orchestrates debug analysis, patch validation, policy checks, safe patch apply, test execution, and PR summary generation.
 - `vibeguard test` scans Python and JavaScript source files for test candidates.
 - `vibeguard test --write` writes minimal import/export tests after policy checks.
 - `vibeguard review` analyzes a git diff for risky changes, security smells, missing tests, and policy concerns.
@@ -41,6 +42,8 @@ vibeguard policy check --command "npm test"
 vibeguard policy check --patch fix.diff
 
 vibeguard debug --log error.log
+vibeguard fix --log error.log --patch fix.diff --test "npm test" --dry-run
+vibeguard fix --log error.log --patch fix.diff --test "npm test" --apply
 vibeguard test
 vibeguard test --write --limit 1
 vibeguard review
@@ -68,6 +71,23 @@ export VIBEGUARD_MODEL=...
 ```
 
 The generated patch is not applied automatically. It is checked by the Policy Engine first.
+
+## Codex Fix Workflow
+
+The current priority workflow is Codex-driven:
+
+```bash
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --dry-run --json
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
+```
+
+For deterministic local demos and tests, pass a known patch file:
+
+```bash
+node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fixes/reference-error.patch --test "npm test" --dry-run --json
+```
+
+`fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present.
 
 ## Policy-as-Code
 
@@ -112,6 +132,7 @@ The test suite covers:
 - YAML config parsing.
 - Path and command policy checks.
 - Patch file safety checks.
+- Safe fix workflow over Python and Node.js fixture projects.
 - Python and Node.js stack trace parsing.
 - Review diff analysis.
 - Repository scanning.

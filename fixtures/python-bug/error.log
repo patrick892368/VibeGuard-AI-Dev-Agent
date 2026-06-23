@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "tests/test_greeter.py", line 12, in test_greet_normalizes_name
+    self.assertEqual(greet(" Ada "), "hello ada")
+  File "src/greeter.py", line 2, in greet
+    return f"hello {user_name.strip().lower()}"
+NameError: name 'user_name' is not defined

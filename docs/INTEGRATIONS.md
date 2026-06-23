@@ -36,6 +36,7 @@ Available tools:
 
 - `check_policy`
 - `debug_error`
+- `fix_error`
 - `onboard_repo`
 - `write_tests`
 - `review_pr`

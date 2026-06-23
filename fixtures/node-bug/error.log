@@ -1,0 +1,3 @@
+ReferenceError: firstName is not defined
+    at fullName (src/user.js:2:13)
+    at TestContext.<anonymous> (tests/user.case.js:6:16)

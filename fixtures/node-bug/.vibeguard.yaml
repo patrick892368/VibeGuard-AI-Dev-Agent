@@ -1,0 +1,26 @@
+version: 1
+
+paths:
+  allow:
+    - "src/**"
+    - "tests/**"
+    - "fixes/**"
+    - "error.log"
+    - "package.json"
+    - ".vibeguard.yaml"
+
+  deny:
+    - ".env"
+    - ".env.*"
+    - ".git/**"
+    - "node_modules/**"
+
+  require_confirmation: []
+
+commands:
+  deny:
+    - "rm -rf"
+    - "git reset --hard"
+    - "git push --force"
+
+  require_confirmation: []

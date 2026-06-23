@@ -7,8 +7,8 @@
     "vibeguard": "./bin/vibeguard.js"
   },
   "scripts": {
-    "test": "node --test",
-    "check": "node --check bin/vibeguard.js && node --check src/cli.js && node --test"
+    "test": "node --test \"test/*.test.js\"",
+    "check": "node --check bin/vibeguard.js && node --check src/cli.js && node --test \"test/*.test.js\""
   },
   "keywords": [
     "ai-agent",

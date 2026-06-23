@@ -1,0 +1,7 @@
+diff --git a/src/greeter.py b/src/greeter.py
+--- a/src/greeter.py
++++ b/src/greeter.py
+@@ -1,2 +1,2 @@
+ def greet(name):
+-    return f"hello {user_name.strip().lower()}"
++    return f"hello {name.strip().lower()}"
