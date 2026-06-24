@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { scanRepository } from "../src/repo/scan.js";
-import { analyzeTestTargets } from "../src/agents/testWriter.js";
+import { analyzeTestTargets, parseCoverageReport } from "../src/agents/testWriter.js";
 import { analyzeRepository, buildOnboardingMarkdown } from "../src/agents/onboard.js";
 
 function tempRepo() {
@@ -35,6 +35,70 @@ test("analyzeTestTargets finds source functions without likely tests", () => {
   assert.equal(result.candidates.length, 1);
   assert.equal(result.candidates[0].sourceFile, "src/math.js");
   assert.deepEqual(result.candidates[0].functions, ["add"]);
+});
+
+test("parseCoverageReport parses coverage.py JSON", () => {
+  const root = tempRepo();
+  const report = parseCoverageReport(JSON.stringify({
+    files: {
+      "src/math.py": {
+        missing_lines: [3, 4],
+        summary: {
+          covered_lines: 2,
+          num_statements: 4,
+          percent_covered: 50
+        }
+      }
+    }
+  }), { root });
+
+  assert.equal(report.format, "coverage.py-json");
+  assert.equal(report.summary.totalFiles, 1);
+  assert.equal(report.files[0].file, "src/math.py");
+  assert.deepEqual(report.files[0].missingLines, [3, 4]);
+  assert.equal(report.files[0].percentCovered, 50);
+});
+
+test("parseCoverageReport parses LCOV", () => {
+  const root = tempRepo();
+  const report = parseCoverageReport(`TN:
+SF:src/math.js
+DA:1,1
+DA:2,0
+LF:2
+LH:1
+end_of_record
+`, { root });
+
+  assert.equal(report.format, "lcov");
+  assert.equal(report.files[0].file, "src/math.js");
+  assert.deepEqual(report.files[0].missingLines, [2]);
+  assert.equal(report.files[0].percentCovered, 50);
+});
+
+test("analyzeTestTargets prioritizes uncovered coverage files", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "covered.js"), "export function covered() { return true; }\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "uncovered.js"), "export function uncovered() { return false; }\n", "utf8");
+  const coveragePath = path.join(root, "coverage.json");
+  fs.writeFileSync(coveragePath, JSON.stringify({
+    files: {
+      "src/covered.js": {
+        missing_lines: [],
+        summary: { percent_covered: 100 }
+      },
+      "src/uncovered.js": {
+        missing_lines: [1],
+        summary: { percent_covered: 0 }
+      }
+    }
+  }), "utf8");
+
+  const result = analyzeTestTargets({ root, coverageFile: coveragePath });
+  assert.equal(result.coverage.summary.filesWithMissingLines, 1);
+  assert.equal(result.candidates[0].sourceFile, "src/uncovered.js");
+  assert.equal(result.candidates[0].coverage.missingLineCount, 1);
 });
 
 test("analyzeTestTargets finds Java methods and suggested JUnit path", () => {

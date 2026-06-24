@@ -118,7 +118,7 @@ function callTool(name, args, root) {
     });
   }
   if (name === "onboard_repo") return analyzeRepository({ root });
-  if (name === "write_tests") return analyzeTestTargets({ root });
+  if (name === "write_tests") return analyzeTestTargets({ root, coverageFile: args.coverageFile, coverageText: args.coverageText });
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);

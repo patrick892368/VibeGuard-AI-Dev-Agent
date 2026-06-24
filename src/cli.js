@@ -27,7 +27,7 @@ Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file>
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
-  vibeguard test
+  vibeguard test [--coverage <coverage.json|lcov.info>]
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
@@ -319,9 +319,13 @@ async function dispatch(parsed) {
     if (parsed.write) {
       const { config } = loadConfig(root);
       const engine = new PolicyEngine(config, { root });
-      return writeSuggestedTests(root, engine, { limit: parsed.limit || 1, confirmed: Boolean(parsed.confirm) });
+      return writeSuggestedTests(root, engine, {
+        limit: parsed.limit || 1,
+        coverageFile: parsed.coverage,
+        confirmed: Boolean(parsed.confirm)
+      });
     }
-    return analyzeTestTargets({ root });
+    return analyzeTestTargets({ root, coverageFile: parsed.coverage });
   }
   if (command === "review") return reviewCommand(parsed, root);
   if (command === "onboard") {

@@ -45,6 +45,28 @@ NameError: name 'missing' is not defined`, "utf8");
   assert.deepEqual(parsed.likelyFiles, ["src/app.py"]);
 });
 
+test("CLI test command accepts coverage report", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-coverage-"));
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  fs.writeFileSync(path.join(root, "coverage.json"), JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [1],
+        summary: { percent_covered: 0 }
+      }
+    }
+  }), "utf8");
+
+  const output = execFileSync(process.execPath, [bin, "--root", root, "test", "--coverage", "coverage.json", "--json"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+  assert.equal(parsed.coverage.format, "coverage.py-json");
+  assert.equal(parsed.candidates[0].coverage.missingLineCount, 1);
+});
+
 test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-ai-"));
   fs.writeFileSync(path.join(root, ".vibeguard.yaml"), "version: 1\n", "utf8");

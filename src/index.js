@@ -6,7 +6,7 @@ export { parsePatchFiles } from "./patch/parsePatch.js";
 export { analyzeDebugLog } from "./agents/debug.js";
 export { runFixWorkflow } from "./agents/fix.js";
 export { analyzeRepository } from "./agents/onboard.js";
-export { analyzeTestTargets } from "./agents/testWriter.js";
+export { analyzeTestTargets, parseCoverageReport } from "./agents/testWriter.js";
 export { analyzeReviewDiff } from "./agents/review.js";
 export { buildPrSummary } from "./agents/pr.js";
 export { runDoctor } from "./agents/doctor.js";

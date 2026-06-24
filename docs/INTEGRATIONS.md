@@ -9,6 +9,8 @@ VibeGuard 采用 CLI-first 内核，因此所有集成都复用同一套 policy 
 ```bash
 vibeguard debug --log error.log
 vibeguard test --write
+vibeguard test --coverage coverage.json
+vibeguard test --coverage coverage/lcov.info
 vibeguard review
 vibeguard onboard --write
 vibeguard policy check --path src/index.js

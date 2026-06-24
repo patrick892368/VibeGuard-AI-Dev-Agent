@@ -131,6 +131,15 @@ Run tests through command policy:
 node ./bin/vibeguard.js run --command "npm test" --json
 ```
 
+Find test targets with coverage reports:
+
+结合 coverage report 查找测试候选：
+
+```bash
+node ./bin/vibeguard.js test --coverage coverage.json --json
+node ./bin/vibeguard.js test --coverage coverage/lcov.info --json
+```
+
 Review changes:
 
 审查变更：
