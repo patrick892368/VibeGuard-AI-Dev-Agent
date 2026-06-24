@@ -16,6 +16,10 @@ test("analyzeReviewDiff reports risky source changes without tests", () => {
   assert.ok(result.findings.some((finding) => finding.category === "security" && finding.file === "src/db.js"));
   assert.ok(result.findings.some((finding) => finding.category === "security" && finding.line === 2));
   assert.ok(result.findings.some((finding) => finding.category === "testing"));
+  assert.ok(result.findings.some((finding) => /parameterized queries/.test(finding.recommendation)));
+  assert.ok(result.actionItems.some((item) => item.file === "src/db.js" && /parameterized queries/.test(item.action)));
+  assert.equal(result.summaryBySeverity.high, 1);
+  assert.equal(result.summaryBySeverity.medium, 1);
 });
 
 test("analyzeReviewDiff flags sensitive and deployment files", () => {
@@ -54,4 +58,5 @@ test("analyzeReviewDiff flags secret literals, html sinks, and sync filesystem c
   assert.ok(result.findings.some((finding) => finding.message.includes("Secret-looking literal") && finding.line === 11));
   assert.ok(result.findings.some((finding) => finding.message.includes("HTML injection") && finding.line === 12));
   assert.ok(result.findings.some((finding) => finding.category === "performance" && finding.line === 13));
+  assert.ok(result.actionItems.some((item) => /HTML sink/.test(item.action)));
 });

@@ -212,9 +212,9 @@ node ./bin/vibeguard.js review --json
 node ./bin/vibeguard.js pr summary --diff change.diff --json
 ```
 
-Review findings include `file`, `line`, `severity`, `category`, and `message` when line information is available.
+Review findings include `file`, `line`, `severity`, `category`, `message`, and `recommendation` when line information is available. Codex can use `actionItems` for PR comments.
 
-Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category` 和 `message`。
+Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category`、`message` 和 `recommendation`。Codex 可以使用 `actionItems` 生成 PR 评论。
 
 Read GitHub Actions status:
 

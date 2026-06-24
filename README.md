@@ -24,7 +24,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff 和 hunk count。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, and hunk counts.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
 - `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块，会为简单纯函数、明确分支、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并输出失败分类和结构化 `repairPlan`。Writes basic tests after policy checks, supports ESM/CommonJS Node modules, generates behavior assertions for simple pure functions, clear branches, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, and returns failed-run categories plus a structured `repairPlan`.
-- `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings.
+- `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings、recommendations 和 actionItems。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings, recommendations, and actionItems.
 - `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档和结构化 firstTasks 新人任务建议。Scans a repository and can generate bilingual onboarding / architecture docs plus structured firstTasks for newcomer work.
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
@@ -279,7 +279,7 @@ The test suite covers:
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
 - Python / Django / Node / Java / Spring Boot 报错解析。Python / Django / Node / Java / Spring Boot error parsing.
-- Review diff 分析。Review diff analysis.
+- Review diff 分析、严重度汇总和可执行 actionItems。Review diff analysis, severity summaries, and actionable actionItems.
 - 仓库扫描。Repository scanning.
 - 本地 branch / commit / push 的受保护执行。Confirmed protected local branch / commit / push flows.
 - PR 创建调度和 PR comment dry-run。PR creation dispatch and PR comment dry-run.

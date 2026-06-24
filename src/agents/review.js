@@ -36,14 +36,48 @@ function changedEntries(diffText) {
   return entries;
 }
 
+function recommendationFor(category, message) {
+  if (message.includes("Secret-looking")) return "Remove the literal and load it from a secret manager or environment variable.";
+  if (message.includes("Dynamic code execution")) return "Replace dynamic execution with explicit dispatch or a sandboxed interpreter with strict input validation.";
+  if (message.includes("Shell/process execution")) return "Route commands through a policy-gated runner and validate every user-controlled argument.";
+  if (message.includes("SQL string concatenation")) return "Use parameterized queries or the framework query builder for every dynamic value.";
+  if (message.includes("HTML injection")) return "Render text safely or sanitize trusted markup before assigning it to an HTML sink.";
+  if (message.includes("Unsafe deserialization")) return "Use safe loaders and reject untrusted serialized input.";
+  if (message.includes("Synchronous filesystem")) return "Move blocking I/O out of request or hot paths, or use async APIs.";
+  if (category === "testing") return "Add or update a focused test that covers the changed source behavior.";
+  if (category === "database") return "Document rollback, migration order, and deployment coordination before merge.";
+  if (category === "deployment") return "Confirm CI/deploy blast radius and require an explicit reviewer for infrastructure changes.";
+  if (category === "security") return "Review the changed file for secret exposure and remove sensitive data from the diff.";
+  if (category === "maintainability") return "Link the TODO/FIXME to a tracked issue or complete it before merge.";
+  return "Inspect this finding and add a concrete fix or justification before merge.";
+}
+
 function finding(severity, file, category, message, addition = null) {
   return {
     severity,
     file,
     line: addition?.line ?? null,
     category,
-    message
+    message,
+    recommendation: recommendationFor(category, message)
   };
+}
+
+function summarizeBySeverity(findings) {
+  return findings.reduce((summary, item) => {
+    summary[item.severity] = (summary[item.severity] || 0) + 1;
+    return summary;
+  }, { high: 0, medium: 0, low: 0 });
+}
+
+function actionItems(findings) {
+  return findings.map((item) => ({
+    severity: item.severity,
+    file: item.file,
+    line: item.line,
+    category: item.category,
+    action: item.recommendation
+  }));
 }
 
 export function analyzeReviewDiff(diffText, options = {}) {
@@ -103,6 +137,8 @@ export function analyzeReviewDiff(diffText, options = {}) {
   return {
     files,
     summary: `${files.length} changed file(s), ${findings.length} finding(s).`,
+    summaryBySeverity: summarizeBySeverity(findings),
+    actionItems: actionItems(findings),
     findings
   };
 }
