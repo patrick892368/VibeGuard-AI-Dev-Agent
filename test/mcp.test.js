@@ -143,6 +143,39 @@ test("MCP github_pr returns a dry-run PR command", async () => {
   assert.match(response.result.structuredContent.command, /--draft/);
 });
 
+test("MCP write_tests can repair generated Python test imports", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "helper.py"), "VALUE = 'Ada'\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "greeting.py"), `from helper import VALUE
+
+def greeting():
+    return VALUE
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 10,
+    method: "tools/call",
+    params: {
+      name: "write_tests",
+      arguments: {
+        write: true,
+        run: true,
+        repair: true,
+        limit: 1
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.initialTestRuns[0].status, "failed");
+  assert.equal(result.initialTestRuns[0].failureAnalysis.category, "python_local_import_path");
+  assert.equal(result.repairRuns[0].status, "repaired");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.testRuns[0].repaired, true);
+});
+
 test("MCP apply_patch_safely checks a patch without modifying files", async () => {
   const root = tempGitRepo();
   const patch = `diff --git a/src/app.js b/src/app.js

@@ -126,6 +126,10 @@ Available tools:
 
 `write_tests` 可以分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的 JavaScript 生成测试（包含 CommonJS bracket export）和 stdlib `unittest` Python 测试，并包含简单行为、对象属性/字典字段 fallback 和异常断言；也可以通过 command policy 执行这些测试、为失败运行返回 `failureAnalysis.repairPlan`、通过 `repair` 做一轮安全的 test-only 修复重试、准备 Git/PR dry-run plan，并且只会在最终生成测试通过后执行已确认的本地 branch/commit plan。
 
+The MCP `write_tests` tool exposes the same `repair` boolean as the CLI.
+
+MCP `write_tests` tool 暴露与 CLI 相同的 `repair` 布尔参数。
+
 `doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 
 `doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥。
