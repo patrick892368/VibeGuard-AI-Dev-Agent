@@ -54,6 +54,7 @@ Evaluate the configured LLM provider against both fixtures:
 
 ```bash
 node ./bin/vibeguard.js eval fixtures --json
+node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
 ```
 
 With a real provider:
@@ -66,6 +67,7 @@ node ./bin/vibeguard.js eval fixtures --json
 ```
 
 Codex should inspect `summary.successRate`, each fixture `outcome`, and any `policyStatus`, `stage`, or `patchSourceReason` before deciding whether to apply a generated patch.
+When `--output` is used, VibeGuard writes the report through `.vibeguard.yaml` path policy.
 
 Run tests through policy:
 

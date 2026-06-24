@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -60,4 +61,44 @@ test("CLI eval fixtures supports selecting one fixture", () => {
   assert.equal(result.summary.total, 1);
   assert.equal(result.summary.counts.passed, 1);
   assert.equal(result.results[0].id, "node-bug");
+});
+
+test("CLI eval fixtures writes report output through policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-eval-output-"));
+  fs.cpSync(path.resolve("."), root, {
+    recursive: true,
+    filter: (source) => !source.includes(`${path.sep}.git${path.sep}`) && !source.endsWith(`${path.sep}.git`)
+  });
+  const outputPath = "reports/eval-fixtures.json";
+
+  const output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "fixtures", "--output", outputPath, "--json"], {
+    cwd: root,
+    encoding: "utf8"
+  });
+  const result = JSON.parse(output);
+  const reportText = fs.readFileSync(path.join(root, outputPath), "utf8");
+  const report = JSON.parse(reportText);
+
+  assert.equal(result.output.path, outputPath);
+  assert.equal(result.output.policy.status, "allow");
+  assert.equal(report.summary.total, 2);
+  assert.equal(report.summary.successRate, 0);
+});
+
+test("CLI eval fixtures blocks report output on denied path", () => {
+  let output;
+  try {
+    output = execFileSync(process.execPath, [bin, "eval", "fixtures", "--output", ".env", "--json"], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const result = JSON.parse(output);
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "output_report");
+  assert.equal(result.output.policy.status, "deny");
+  assert.equal(fs.existsSync(path.resolve(".env")), false);
 });

@@ -61,6 +61,7 @@ vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 vibeguard run --command "npm test" --dry-run
 vibeguard eval fixtures --json
+vibeguard eval fixtures --output reports/eval-fixtures.json --json
 vibeguard mcp
 ```
 
@@ -100,9 +101,11 @@ export VIBEGUARD_LLM_PROVIDER=openai-compatible
 export OPENAI_API_KEY=...
 export VIBEGUARD_MODEL=...
 node ./bin/vibeguard.js eval fixtures --json
+node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
 ```
 
 The evaluation reports success rate, patch validation failures, policy denials, patch check failures, and blocked provider calls.
+Report output is written through Policy-as-Code, so denied paths such as `.env` are blocked.
 
 Optional Codex orchestration:
 

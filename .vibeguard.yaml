@@ -9,6 +9,7 @@ paths:
     - "fixtures/**"
     - "docs/**"
     - "patches/**"
+    - "reports/**"
     - "README.md"
     - "package.json"
     - ".vibeguard.yaml"

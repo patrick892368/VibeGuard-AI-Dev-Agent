@@ -37,7 +37,7 @@ Usage:
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
-  vibeguard eval fixtures [--fixture <id>] [--apply]
+  vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>]
   vibeguard mcp
 
 Options:
@@ -219,7 +219,9 @@ async function evalCommand(parsed, root, subcommand) {
     return evaluateFixFixtures({
       root,
       fixture: parsed.fixture,
-      apply: Boolean(parsed.apply)
+      apply: Boolean(parsed.apply),
+      output: parsed.output,
+      confirmed: Boolean(parsed.confirm)
     });
   }
   throw new Error(`Unknown eval command: ${subcommand || ""}`);

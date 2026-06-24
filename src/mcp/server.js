@@ -98,7 +98,15 @@ function callTool(name, args, root) {
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
-  if (name === "eval_fixtures") return evaluateFixFixtures({ root, fixture: args.fixture, apply: Boolean(args.apply) });
+  if (name === "eval_fixtures") {
+    return evaluateFixFixtures({
+      root,
+      fixture: args.fixture,
+      apply: Boolean(args.apply),
+      output: args.output,
+      confirmed: Boolean(args.confirmed)
+    });
+  }
   throw new Error(`Unknown tool: ${name}`);
 }
 
