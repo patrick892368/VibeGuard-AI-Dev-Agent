@@ -9,6 +9,7 @@ VibeGuard 采用 CLI-first 内核，因此所有集成都复用同一套 policy 
 ```bash
 vibeguard debug --log error.log
 vibeguard debug --log django-error.log
+vibeguard debug --log spring-error.log
 vibeguard test --write
 vibeguard test --write --run --limit 1
 vibeguard test --coverage coverage.json
@@ -98,6 +99,10 @@ Grok 是当前优先模型 provider。其他 agent/provider 集成等 Codex + Gr
 Django support is exposed through the same CLI and MCP-style paths; integrations should inspect `frameworkContext` and must still honor `.vibeguard.yaml`.
 
 Django 支持通过同一套 CLI 和 MCP-style 路径暴露；集成侧应检查 `frameworkContext`，并且仍必须遵守 `.vibeguard.yaml`。
+
+Spring Boot support uses the same flow and returns Spring-specific `frameworkContext` / `frameworkContexts` for dependency injection, configuration, web, and data-layer failures.
+
+Spring Boot 支持也使用同一流程，并针对依赖注入、配置、Web 和数据层失败返回 Spring 专用的 `frameworkContext` / `frameworkContexts`。
 
 The current Codex flow supports patch artifact output, Git/PR dry-run planning, confirmed branch/commit/push/PR execution, fixture evaluation history, and environment diagnosis.
 

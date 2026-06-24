@@ -5,7 +5,7 @@ import { listRepoFiles } from "../repo/files.js";
 
 const PYTHON_FRAME = /^\s*File "([^"]+)", line (\d+), in (.+)$/;
 const NODE_FRAME = /^\s*at (?:(.*?) \()?(.+?):(\d+):(\d+)\)?$/;
-const JAVA_FRAME = /^\s*at\s+([\w.$]+)\(([^:()]+\.java):(\d+)\)$/;
+const JAVA_FRAME = /^\s*at\s+([\w.$<>]+)\(([^:()]+\.java):(\d+)\)$/;
 const DJANGO_ERROR_WORDS = /DoesNotExist|DisallowedHost|NoReverseMatch|ImproperlyConfigured|PermissionDenied|SuspiciousOperation|TemplateDoesNotExist/;
 
 function normalizeFramePath(framePath, root) {
@@ -107,6 +107,20 @@ function djangoProjectFiles(repoFiles) {
   };
 }
 
+function springProjectFiles(repoFiles) {
+  return {
+    configs: repoFiles.filter((file) =>
+      /(^|\/)(application|bootstrap)(-[\w-]+)?\.(properties|ya?ml)$/.test(file) ||
+      /(Config|Configuration)\.java$/.test(file)
+    ),
+    controllers: repoFiles.filter((file) => /(Controller|Resource)\.java$/.test(file)),
+    services: repoFiles.filter((file) => /(Service|Manager)\.java$/.test(file)),
+    repositories: repoFiles.filter((file) => /(Repository|Dao)\.java$/.test(file)),
+    entities: repoFiles.filter((file) => /(Entity|Model)\.java$/.test(file)),
+    entrypoints: repoFiles.filter((file) => file.endsWith("Application.java") || file.endsWith("SpringBootApplication.java"))
+  };
+}
+
 function firstFew(values, limit = 5) {
   return values.slice(0, limit);
 }
@@ -150,6 +164,46 @@ function djangoDebugContext(summary, logText, repo) {
     likelyFiles: [...new Set(likelyFiles)],
     hints,
     suggestedCommands: ["python manage.py check", "python manage.py test"]
+  };
+}
+
+function springDebugContext(summary, logText, repo) {
+  const isSpring = repo.frameworks.includes("Spring Boot") || /org\.springframework|springframework/i.test(logText);
+  if (!isSpring) return null;
+
+  const projectFiles = springProjectFiles(repo.files);
+  const likelyFiles = [];
+  const hints = [];
+
+  if (/NoSuchBeanDefinitionException|UnsatisfiedDependencyException|BeanCreationException/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.services), ...firstFew(projectFiles.repositories), ...firstFew(projectFiles.configs), ...firstFew(projectFiles.entrypoints, 2));
+    hints.push("For Spring dependency injection failures, inspect bean annotations, constructor dependencies, component scanning, profiles, and configuration classes.");
+  }
+  if (/BindException|ConfigurationProperties|IllegalStateException/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.configs), ...firstFew(projectFiles.entrypoints, 2));
+    hints.push("For Spring configuration binding or startup failures, verify application properties, active profiles, and configuration property names/types.");
+  }
+  if (/HttpMessageNotReadableException|MethodArgument|MissingServletRequest|ServletException/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.controllers), ...firstFew(projectFiles.services));
+    hints.push("For Spring web request failures, inspect controller method signatures, request body DTOs, validation annotations, and route mappings.");
+  }
+  if (/DataIntegrityViolationException|JpaSystemException|ConstraintViolationException|SQL|SQLException/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.repositories), ...firstFew(projectFiles.entities), ...firstFew(projectFiles.configs, 2));
+    hints.push("For Spring data failures, inspect entity mappings, repository queries, transaction boundaries, and datasource configuration.");
+  }
+
+  if (likelyFiles.length === 0) {
+    likelyFiles.push(...firstFew(projectFiles.controllers), ...firstFew(projectFiles.services), ...firstFew(projectFiles.configs), ...firstFew(projectFiles.entrypoints, 2));
+  }
+  if (hints.length === 0) {
+    hints.push("Start with the first in-repository Spring frame, then inspect the related controller, service, repository, configuration, or application entrypoint.");
+  }
+
+  return {
+    framework: "Spring Boot",
+    likelyFiles: [...new Set(likelyFiles)],
+    hints,
+    suggestedCommands: repo.suggestedCommands.filter((command) => command === "mvn test" || command === "./gradlew test")
   };
 }
 
@@ -203,7 +257,9 @@ export function analyzeDebugLog(logText, options = {}) {
   const frames = [...pythonFrames, ...nodeFrames, ...javaFrames];
   const summary = detectErrorSummary(logText);
   const djangoContext = djangoDebugContext(summary, logText, repo);
-  const uniqueFiles = [...new Set([...frames.map((frame) => frame.file), ...(djangoContext?.likelyFiles || [])])];
+  const springContext = springDebugContext(summary, logText, repo);
+  const frameworkContexts = [djangoContext, springContext].filter(Boolean);
+  const uniqueFiles = [...new Set([...frames.map((frame) => frame.file), ...frameworkContexts.flatMap((context) => context.likelyFiles)])];
   const snippets = frames.slice(0, 5).map((frame) => sourceSnippet(root, frame.file, frame.line)).filter(Boolean);
 
   return {
@@ -211,8 +267,9 @@ export function analyzeDebugLog(logText, options = {}) {
     frames,
     likelyFiles: uniqueFiles,
     snippets,
-    hints: [...likelyFixHints(summary), ...(djangoContext?.hints || [])],
-    suggestedTestCommands: [...new Set([...repo.suggestedCommands, ...(djangoContext?.suggestedCommands || [])])],
-    frameworkContext: djangoContext
+    hints: [...likelyFixHints(summary), ...frameworkContexts.flatMap((context) => context.hints)],
+    suggestedTestCommands: [...new Set([...repo.suggestedCommands, ...frameworkContexts.flatMap((context) => context.suggestedCommands)])],
+    frameworkContext: frameworkContexts[0] || null,
+    frameworkContexts
   };
 }

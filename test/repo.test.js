@@ -38,6 +38,25 @@ test("scanRepository detects Django project commands", () => {
   assert.ok(scan.suggestedCommands.includes("python manage.py test"));
 });
 
+test("scanRepository detects Spring Boot from dependencies and annotation", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
+  fs.writeFileSync(path.join(root, "pom.xml"), "<dependency><artifactId>spring-boot-starter-web</artifactId></dependency>\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "DemoApplication.java"), `package com.example;
+
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoApplication {}
+`, "utf8");
+
+  const scan = scanRepository(root);
+  assert.ok(scan.frameworks.includes("Spring Boot"));
+  assert.ok(scan.frameworks.includes("Maven"));
+  assert.ok(scan.entrypoints.includes("src/main/java/com/example/DemoApplication.java"));
+  assert.ok(scan.suggestedCommands.includes("mvn test"));
+});
+
 test("analyzeTestTargets finds source functions without likely tests", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

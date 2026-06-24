@@ -34,7 +34,16 @@ export function scanRepository(root = process.cwd()) {
   const packageJson = readTextIfExists(root, "package.json") || "";
   const pyproject = readTextIfExists(root, "pyproject.toml") || "";
   const requirements = readTextIfExists(root, "requirements.txt") || "";
+  const pomText = files.filter((file) => file.endsWith("pom.xml")).map((file) => readTextIfExists(root, file)).join("\n");
+  const gradleText = files
+    .filter((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"))
+    .map((file) => readTextIfExists(root, file))
+    .join("\n");
+  const springBootEntrypoints = files.filter((file) =>
+    file.endsWith(".java") && /@SpringBootApplication/.test(readTextIfExists(root, file) || "")
+  );
   const isDjango = /django/i.test(pyproject + requirements) || files.includes("manage.py");
+  const isSpringBoot = /spring-boot/i.test(pomText + gradleText) || springBootEntrypoints.length > 0;
 
   if (/express/i.test(packageJson)) frameworks.push("Express");
   if (/react/i.test(packageJson)) frameworks.push("React");
@@ -44,7 +53,7 @@ export function scanRepository(root = process.cwd()) {
   if (/fastapi/i.test(pyproject + requirements)) frameworks.push("FastAPI");
   if (files.some((file) => file.endsWith("pom.xml"))) frameworks.push("Maven");
   if (files.some((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"))) frameworks.push("Gradle");
-  if (files.some((file) => file.endsWith("SpringBootApplication.java"))) frameworks.push("Spring Boot");
+  if (isSpringBoot) frameworks.push("Spring Boot");
 
   const packageManagers = [];
   if (hasFile(files, "package.json")) packageManagers.push("npm");
@@ -57,7 +66,8 @@ export function scanRepository(root = process.cwd()) {
 
   const entrypoints = files.filter((file) =>
     ["src/index.js", "src/main.js", "src/index.ts", "src/main.ts", "index.js", "server.js", "app.js", "main.py", "manage.py"].includes(file) ||
-    file.endsWith("Application.java")
+    file.endsWith("Application.java") ||
+    springBootEntrypoints.includes(file)
   );
 
   const testFiles = files.filter((file) =>

@@ -92,3 +92,33 @@ django.template.exceptions.TemplateDoesNotExist: home.html`;
   assert.ok(result.hints.some((hint) => hint.includes("TemplateDoesNotExist")));
   assert.ok(!result.frameworkContext.hints.some((hint) => hint.includes("model/query")));
 });
+
+test("analyzeDebugLog adds Spring Boot context for dependency injection errors", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
+  fs.mkdirSync(path.join(root, "src", "main", "resources"), { recursive: true });
+  fs.writeFileSync(path.join(root, "pom.xml"), "<dependency><artifactId>spring-boot-starter</artifactId></dependency>\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "resources", "application.properties"), "spring.profiles.active=test\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "DemoApplication.java"), `package com.example;
+
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class DemoApplication {}
+`, "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "UserService.java"), "class UserService {}\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "UserRepository.java"), "interface UserRepository {}\n", "utf8");
+  const log = `org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'userService'
+    at com.example.UserService.<init>(UserService.java:12)
+Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.example.UserRepository' available`;
+
+  const result = analyzeDebugLog(log, { root });
+  assert.equal(result.summary.type, "org.springframework.beans.factory.NoSuchBeanDefinitionException");
+  assert.equal(result.frames[0].file, "src/main/java/com/example/UserService.java");
+  assert.equal(result.frameworkContext.framework, "Spring Boot");
+  assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserService.java"));
+  assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserRepository.java"));
+  assert.ok(result.likelyFiles.includes("src/main/resources/application.properties"));
+  assert.ok(result.suggestedTestCommands.includes("mvn test"));
+  assert.ok(result.hints.some((hint) => hint.includes("dependency injection")));
+});

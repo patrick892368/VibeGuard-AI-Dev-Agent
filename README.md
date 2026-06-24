@@ -19,7 +19,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 ## 当前能力 / Current Capabilities
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
-- `vibeguard debug`: 解析 Python、Django、Node.js、Java 报错日志，定位可能文件并解释失败上下文。Parses Python, Django, Node.js, and Java errors, finds likely files, and explains context.
+- `vibeguard debug`: 解析 Python、Django、Node.js、Java/Spring Boot 报错日志，定位可能文件并解释失败上下文。Parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and explains context.
 - `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
 - `vibeguard test --write`: 经过 policy 后写入基础测试，可用 `--run` 继续通过 command policy 执行生成的测试。Writes basic tests after policy checks and can use `--run` to execute generated tests through command policy.
@@ -269,7 +269,7 @@ The test suite covers:
 - Patch 安全检查。Patch file safety checks.
 - Python / Node fixture 的 safe fix 工作流。Safe fix workflow over Python and Node fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
-- Python / Django / Node / Java 报错解析。Python / Django / Node / Java error parsing.
+- Python / Django / Node / Java / Spring Boot 报错解析。Python / Django / Node / Java / Spring Boot error parsing.
 - Review diff 分析。Review diff analysis.
 - 仓库扫描。Repository scanning.
 - 本地 branch / commit / push 的受保护执行。Confirmed protected local branch / commit / push flows.

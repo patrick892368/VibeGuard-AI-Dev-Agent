@@ -46,6 +46,10 @@ For Django tracebacks, Codex should inspect `frameworkContext`, `likelyFiles`, `
 
 Django traceback 场景下，Codex 应检查 `frameworkContext`、`likelyFiles`、`hints` 和 `suggestedTestCommands`。Django 项目会在 policy 允许时给出 `python manage.py check` 和 `python manage.py test`。
 
+For Spring Boot stack traces, Codex should inspect `frameworkContext`, `frameworkContexts`, controller/service/repository/config likely files, and Maven/Gradle test commands before asking for a patch.
+
+Spring Boot stack trace 场景下，Codex 应检查 `frameworkContext`、`frameworkContexts`、controller/service/repository/config 相关文件，以及 Maven/Gradle 测试命令，再决定是否要求生成 patch。
+
 Run the safe fix workflow:
 
 运行安全修复工作流：
