@@ -242,6 +242,7 @@ export function summarizeEvalHistory(options = {}) {
     .map((entry) => entry.summary?.successRate)
     .filter((rate) => typeof rate === "number");
   const outcomeCounts = {};
+  const fixtureOutcomeCounts = {};
   const providers = {};
   const models = {};
 
@@ -250,6 +251,11 @@ export function summarizeEvalHistory(options = {}) {
     increment(models, entry.model);
     for (const [outcome, count] of Object.entries(entry.summary?.counts || {})) {
       increment(outcomeCounts, outcome, count);
+    }
+    for (const result of entry.results || []) {
+      if (!result.id) continue;
+      fixtureOutcomeCounts[result.id] ||= {};
+      increment(fixtureOutcomeCounts[result.id], result.outcome || "unknown");
     }
   }
 
@@ -267,6 +273,7 @@ export function summarizeEvalHistory(options = {}) {
       bestSuccessRate: rates.length === 0 ? null : Math.max(...rates),
       worstSuccessRate: rates.length === 0 ? null : Math.min(...rates),
       outcomeCounts,
+      fixtureOutcomeCounts,
       providers,
       models
     },

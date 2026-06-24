@@ -207,7 +207,10 @@ test("CLI eval history summarizes JSONL success trends", () => {
         successRate: 0.5,
         counts: { passed: 1, blocked: 1 }
       },
-      results: []
+      results: [
+        { id: "python-bug", outcome: "passed" },
+        { id: "node-bug", outcome: "blocked" }
+      ]
     }),
     JSON.stringify({
       timestamp: "2026-06-24T00:01:00.000Z",
@@ -219,7 +222,10 @@ test("CLI eval history summarizes JSONL success trends", () => {
         successRate: 1,
         counts: { passed: 2 }
       },
-      results: []
+      results: [
+        { id: "python-bug", outcome: "passed" },
+        { id: "node-bug", outcome: "passed" }
+      ]
     })
   ].join("\n") + "\n", "utf8");
 
@@ -238,6 +244,10 @@ test("CLI eval history summarizes JSONL success trends", () => {
   assert.equal(result.summary.latestSuccessRate, 1);
   assert.equal(result.summary.averageSuccessRate, 0.75);
   assert.deepEqual(result.summary.outcomeCounts, { passed: 3, blocked: 1 });
+  assert.deepEqual(result.summary.fixtureOutcomeCounts, {
+    "python-bug": { passed: 2 },
+    "node-bug": { blocked: 1, passed: 1 }
+  });
 });
 
 test("CLI eval history blocks denied read paths", () => {

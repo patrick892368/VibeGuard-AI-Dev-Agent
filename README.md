@@ -33,7 +33,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
-- `vibeguard eval fixtures`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures.
+- `vibeguard eval fixtures` / `eval history`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider，并按 fixture 汇总历史结果。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures, with per-fixture history summaries.
 - `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, `gh`, and GitHub token presence without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema 和 structured tool output。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, and structured tool output.
 
@@ -285,6 +285,7 @@ The test suite covers:
 - PR 创建调度和 PR comment dry-run。PR creation dispatch and PR comment dry-run.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
+- fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
 - Policy-gated JSONL 审计日志。Policy-gated JSONL audit logs.
 - coverage.py JSON / LCOV 解析、未覆盖文件排序、missing line 到函数映射、before/after coverage delta，以及生成测试后的 policy-gated test run。coverage.py JSON / LCOV parsing, uncovered file prioritization, missing-line-to-function mapping, before/after coverage deltas, and policy-gated test runs after generating tests.
 - 简单纯函数行为断言生成。Simple pure-function behavior assertion generation.

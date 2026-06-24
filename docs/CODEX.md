@@ -146,6 +146,10 @@ Codex should inspect `summary.successRate`, fixture `outcome`, `policyStatus`, `
 
 Codex 应该先检查 `summary.successRate`、fixture `outcome`、`policyStatus`、`stage` 和 `patchSourceReason`，再决定是否应用生成的 patch。
 
+For trend checks, inspect `summary.fixtureOutcomeCounts` from `eval history` to identify which fixture is regressing.
+
+查看趋势时，应检查 `eval history` 的 `summary.fixtureOutcomeCounts`，定位具体哪个 fixture 在退化。
+
 Run tests through command policy:
 
 通过 command policy 运行测试：
