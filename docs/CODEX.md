@@ -15,6 +15,10 @@ The integration is CLI-first:
 3. VibeGuard checks `.vibeguard.yaml` before writes, patches, and risky commands. / VibeGuard 在写文件、patch 和风险命令前检查 `.vibeguard.yaml`。
 4. Codex reads JSON output and decides the next action. / Codex 根据 JSON 输出决定下一步。
 
+The optional MCP-style server supports `initialize`, `tools/list` with JSON schemas, `tools/call`, text content, and `structuredContent`. Codex should prefer `structuredContent` when available.
+
+可选的 MCP-style server 支持 `initialize`、带 JSON schema 的 `tools/list`、`tools/call`、text content 和 `structuredContent`。Codex 可用时应优先读取 `structuredContent`。
+
 ## Project Constraints / 项目约束
 
 - Every completed work part must update relevant docs. / 每完成一个可交付部分，都必须同步更新相关文档。

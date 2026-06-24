@@ -33,7 +33,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard eval fixtures`: 用 Python / Node fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python and Node fixtures.
 - `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote 和 `gh`，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, and `gh` without printing secrets.
-- `vibeguard mcp`: 启动 MCP-style stdio server。Starts an MCP-style stdio server.
+- `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema 和 structured tool output。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, and structured tool output.
 
 项目当前保持 dependency-light，CLI 基于 Node.js built-ins，clone 后即可测试。
 

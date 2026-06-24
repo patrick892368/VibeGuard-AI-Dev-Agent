@@ -12,58 +12,145 @@ import { buildPrSummary } from "../agents/pr.js";
 import { commentPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 
+const stringSchema = { type: "string" };
+const booleanSchema = { type: "boolean" };
+const numberSchema = { type: "number" };
+
+function objectSchema(properties = {}, required = []) {
+  return {
+    type: "object",
+    properties,
+    required,
+    additionalProperties: false
+  };
+}
+
 const tools = [
   {
     name: "check_policy",
-    description: "Check a file path, command, or patch against .vibeguard.yaml policy."
+    description: "Check a file path, command, or patch against .vibeguard.yaml policy.",
+    inputSchema: objectSchema({
+      path: stringSchema,
+      command: stringSchema,
+      patch: stringSchema
+    })
   },
   {
     name: "debug_error",
-    description: "Parse an error log and return likely files, stack frames, and fix hints."
+    description: "Parse an error log and return likely files, stack frames, and fix hints.",
+    inputSchema: objectSchema({
+      log: stringSchema
+    })
   },
   {
     name: "fix_error",
-    description: "Run the safe fix workflow: debug log, patch validation, policy check, optional apply, tests, and PR summary."
+    description: "Run the safe fix workflow: debug log, patch validation, policy check, optional apply, tests, and PR summary.",
+    inputSchema: objectSchema({
+      log: stringSchema,
+      patch: stringSchema,
+      testCommand: stringSchema,
+      autoTest: booleanSchema,
+      outputPatch: stringSchema,
+      writePrBody: stringSchema,
+      createBranch: booleanSchema,
+      commit: booleanSchema,
+      push: booleanSchema,
+      prDryRun: booleanSchema,
+      createPr: booleanSchema,
+      executeGitPlan: booleanSchema,
+      prBodyFile: stringSchema,
+      dryRun: booleanSchema,
+      apply: booleanSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    })
   },
   {
     name: "onboard_repo",
-    description: "Scan the repository and return onboarding documentation."
+    description: "Scan the repository and return onboarding documentation.",
+    inputSchema: objectSchema()
   },
   {
     name: "write_tests",
-    description: "Find source files that are good candidates for new tests, and optionally write/run generated tests through policy."
+    description: "Find source files that are good candidates for new tests, and optionally write/run generated tests through policy.",
+    inputSchema: objectSchema({
+      write: booleanSchema,
+      limit: numberSchema,
+      coverageFile: stringSchema,
+      coverageText: stringSchema,
+      coverageAfterFile: stringSchema,
+      coverageAfterText: stringSchema,
+      run: booleanSchema,
+      testCommand: stringSchema,
+      dryRun: booleanSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    })
   },
   {
     name: "review_pr",
-    description: "Analyze a unified diff for review findings."
+    description: "Analyze a unified diff for review findings.",
+    inputSchema: objectSchema({
+      diff: stringSchema
+    })
   },
   {
     name: "summarize_pr",
-    description: "Build a GitHub-ready PR summary from a unified diff."
+    description: "Build a GitHub-ready PR summary from a unified diff.",
+    inputSchema: objectSchema({
+      diff: stringSchema
+    })
   },
   {
     name: "detect_github",
-    description: "Detect the GitHub origin repository for the current repo."
+    description: "Detect the GitHub origin repository for the current repo.",
+    inputSchema: objectSchema()
   },
   {
     name: "github_checks",
-    description: "Read recent GitHub Actions workflow run status through gh run list."
+    description: "Read recent GitHub Actions workflow run status through gh run list.",
+    inputSchema: objectSchema({
+      branch: stringSchema,
+      workflow: stringSchema,
+      limit: numberSchema,
+      execute: booleanSchema
+    })
   },
   {
     name: "github_comment",
-    description: "Create a GitHub PR comment through gh pr comment. Dry-run by default."
+    description: "Create a GitHub PR comment through gh pr comment. Dry-run by default.",
+    inputSchema: objectSchema({
+      pr: stringSchema,
+      bodyFile: stringSchema,
+      body: stringSchema,
+      execute: booleanSchema,
+      confirmed: booleanSchema
+    })
   },
   {
     name: "eval_fixtures",
-    description: "Evaluate the configured LLM provider against Python and Node fix fixtures."
+    description: "Evaluate the configured LLM provider against Python and Node fix fixtures.",
+    inputSchema: objectSchema({
+      fixture: stringSchema,
+      apply: booleanSchema,
+      output: stringSchema,
+      history: stringSchema,
+      confirmed: booleanSchema
+    })
   },
   {
     name: "eval_history",
-    description: "Summarize compact JSONL fixture evaluation history."
+    description: "Summarize compact JSONL fixture evaluation history.",
+    inputSchema: objectSchema({
+      file: stringSchema,
+      limit: numberSchema,
+      confirmed: booleanSchema
+    })
   },
   {
     name: "doctor",
-    description: "Check local VibeGuard runtime, policy, provider, git, gh, and proxy readiness without exposing secrets."
+    description: "Check local VibeGuard runtime, policy, provider, git, gh, and proxy readiness without exposing secrets.",
+    inputSchema: objectSchema()
   }
 ];
 
@@ -82,7 +169,32 @@ function fail(id, error) {
   };
 }
 
-function callTool(name, args, root) {
+function toolContent(result) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(result, null, 2)
+      }
+    ],
+    structuredContent: result
+  };
+}
+
+function initializeResult(params = {}) {
+  return {
+    protocolVersion: params.protocolVersion || "2024-11-05",
+    capabilities: {
+      tools: {}
+    },
+    serverInfo: {
+      name: "vibeguard-ai-dev-agent",
+      version: "0.1.0"
+    }
+  };
+}
+
+async function callTool(name, args, root) {
   if (name === "check_policy") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
@@ -95,7 +207,7 @@ function callTool(name, args, root) {
   if (name === "fix_error") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    return runFixWorkflow({
+    return await runFixWorkflow({
       root,
       engine,
       logText: args.log || "",
@@ -205,6 +317,17 @@ function callTool(name, args, root) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
+export async function handleMcpRequest(request, root = process.cwd()) {
+  if (request.method === "notifications/initialized") return null;
+  if (request.method === "initialize") return ok(request.id, initializeResult(request.params || {}));
+  if (request.method === "tools/list") return ok(request.id, { tools });
+  if (request.method === "tools/call") {
+    const result = await callTool(request.params?.name, request.params?.arguments || {}, root);
+    return ok(request.id, toolContent(result));
+  }
+  return fail(request.id, new Error(`Unsupported method: ${request.method}`));
+}
+
 export async function startMcpServer(options = {}) {
   const root = options.root || process.cwd();
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
@@ -214,16 +337,17 @@ export async function startMcpServer(options = {}) {
     let request;
     try {
       request = JSON.parse(line);
-      if (request.method === "tools/list") {
-        console.log(JSON.stringify(ok(request.id, { tools })));
-      } else if (request.method === "tools/call") {
-        const result = callTool(request.params?.name, request.params?.arguments || {}, root);
-        console.log(JSON.stringify(ok(request.id, { content: [{ type: "json", json: result }] })));
-      } else {
-        console.log(JSON.stringify(fail(request.id, new Error(`Unsupported method: ${request.method}`))));
-      }
+      const response = await handleMcpRequest(request, root);
+      if (response) console.log(JSON.stringify(response));
     } catch (error) {
       console.log(JSON.stringify(fail(request?.id ?? null, error)));
     }
   }
 }
+
+export const mcpInternals = {
+  tools,
+  initializeResult,
+  toolContent,
+  callTool
+};

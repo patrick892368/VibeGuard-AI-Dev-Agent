@@ -45,6 +45,10 @@ vibeguard hooks install pre-commit --allow-git-dir
 vibeguard mcp
 ```
 
+The MCP-style server supports `initialize`, `tools/list` with `inputSchema`, `tools/call`, text content, and `structuredContent`.
+
+MCP-style server 支持 `initialize`、带 `inputSchema` 的 `tools/list`、`tools/call`、text content 和 `structuredContent`。
+
 Available tools:
 
 可用 tools：
