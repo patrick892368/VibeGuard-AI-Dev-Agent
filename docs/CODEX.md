@@ -36,6 +36,7 @@ Run the full safe fix workflow:
 ```bash
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --dry-run --json
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
+node ./bin/vibeguard.js fix --log error.log --auto-test --apply --json
 ```
 
 Write a generated patch artifact after validation and policy checks:
@@ -113,6 +114,7 @@ node ./bin/vibeguard.js pr summary --diff change.diff --json
 - Do not modify denied paths.
 - Use `--check-only` before applying patches.
 - Prefer `fix --dry-run` before `fix --apply`.
+- Use `--auto-test` only when the suggested repository test command is acceptable for the current change.
 - Treat `gitPlan` output as a reviewable plan until `--execute-git-plan --confirm --apply` is present.
 - Execute remote `--push --create-pr` only after local branch, commit, tests, and PR body are reviewed.
 - Use `run --command` for commands that should go through policy.

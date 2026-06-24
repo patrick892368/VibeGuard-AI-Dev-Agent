@@ -88,6 +88,7 @@ function callTool(name, args, root) {
       logText: args.log || "",
       patchText: args.patch,
       testCommand: args.testCommand,
+      autoTest: Boolean(args.autoTest),
       outputPatch: args.outputPatch,
       writePrBody: args.writePrBody,
       createBranch: Boolean(args.createBranch),

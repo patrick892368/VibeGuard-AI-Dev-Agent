@@ -44,6 +44,7 @@ vibeguard policy check --patch fix.diff
 
 vibeguard debug --log error.log
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --dry-run
+vibeguard fix --log error.log --patch fix.diff --auto-test --apply
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --output-patch patches/fix.diff --dry-run
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --create-branch --commit --pr-dry-run --dry-run
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --create-branch --commit --execute-git-plan --confirm --apply
@@ -99,6 +100,7 @@ The current priority workflow is Codex-driven:
 ```bash
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --dry-run --json
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
+node ./bin/vibeguard.js fix --log error.log --auto-test --apply --json
 ```
 
 For deterministic local demos and tests, pass a known patch file:
@@ -108,6 +110,7 @@ node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fix
 ```
 
 `fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present.
+`--auto-test` runs the first test command suggested by repository analysis, after patch apply and through command policy.
 
 To evaluate a real OpenAI-compatible provider against both fixtures:
 
@@ -199,6 +202,7 @@ The test suite covers:
 - Confirmed Codex Git plan execution for local branch and commit flows.
 - Confirmed push plan execution against a local bare Git remote.
 - Confirmed PR create command dispatch through the protected runner.
+- Auto-test selection from debug repository analysis.
 - Compact fixture evaluation history output.
 
 ## Integration Targets

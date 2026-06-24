@@ -345,3 +345,24 @@ test("fix CLI applies Node fixture patch and runs tests", () => {
   assert.equal(result.tests.status, "passed");
   assert.match(fs.readFileSync(path.join(root, "src", "user.js"), "utf8"), /user\.firstName/);
 });
+
+test("fix CLI auto-test runs the first suggested test command", () => {
+  const root = copyFixture("node-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--auto-test",
+    "--apply",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.selectedTestCommand, "npm test");
+  assert.equal(result.decision.selectedTestCommand, "npm test");
+  assert.equal(result.tests.status, "passed");
+});

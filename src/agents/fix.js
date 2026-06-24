@@ -28,7 +28,7 @@ function buildBranchName(debug) {
   return `codex/fix-${type}`;
 }
 
-function buildDecisionSummary({ status, stage = null, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan, gitPolicy, gitExecution }) {
+function buildDecisionSummary({ status, stage = null, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan, gitPolicy, gitExecution, selectedTestCommand }) {
   const nextActions = [];
   if (status === "dry_run" || status === "ready") {
     nextActions.push("review_patch");
@@ -58,6 +58,7 @@ function buildDecisionSummary({ status, stage = null, validation, policy, applyC
     policyStatus: policy?.status || null,
     applyCheckStatus: applyCheck?.status || null,
     testStatus: tests?.status || null,
+    selectedTestCommand: selectedTestCommand || null,
     outputPatchPath: outputPatch?.path || null,
     prBodyPath: prBody?.path || null,
     hasGitPlan: Boolean(gitPlan),
@@ -102,6 +103,7 @@ export async function runFixWorkflow(options = {}) {
   }
 
   const debug = analyzeDebugLog(logText, { root });
+  const selectedTestCommand = options.testCommand || (options.autoTest ? debug.suggestedTestCommands?.[0] : null);
   const providedPatch = patchFromOptions(options);
   const patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
 
@@ -112,7 +114,7 @@ export async function runFixWorkflow(options = {}) {
       stage: "patch_generation",
       debug,
       patchSource,
-      decision: buildDecisionSummary({ status, stage: "patch_generation" })
+      decision: buildDecisionSummary({ status, stage: "patch_generation", selectedTestCommand })
     };
   }
 
@@ -126,7 +128,7 @@ export async function runFixWorkflow(options = {}) {
       debug,
       patchSource: { ...patchSource, patch: undefined },
       validation,
-      decision: buildDecisionSummary({ status, stage: "patch_validation", validation })
+      decision: buildDecisionSummary({ status, stage: "patch_validation", validation, selectedTestCommand })
     };
   }
 
@@ -139,7 +141,7 @@ export async function runFixWorkflow(options = {}) {
       debug,
       validation,
       policy,
-      decision: buildDecisionSummary({ status, stage: "policy", validation, policy })
+      decision: buildDecisionSummary({ status, stage: "policy", validation, policy, selectedTestCommand })
     };
   }
 
@@ -158,7 +160,7 @@ export async function runFixWorkflow(options = {}) {
       validation,
       policy,
       error: error.message,
-      decision: buildDecisionSummary({ status, stage: "patch_check", validation, policy })
+      decision: buildDecisionSummary({ status, stage: "patch_check", validation, policy, selectedTestCommand })
     };
   }
 
@@ -172,7 +174,8 @@ export async function runFixWorkflow(options = {}) {
     validation,
     policy,
     applyCheck,
-    pr
+    pr,
+    selectedTestCommand
   };
 
   let outputPatch = null;
@@ -187,7 +190,7 @@ export async function runFixWorkflow(options = {}) {
           path: options.outputPatch,
           policy: outputPatchPolicy
         },
-        decision: buildDecisionSummary({ status: outputPatchPolicy.status, stage: "output_patch", validation, policy, applyCheck })
+        decision: buildDecisionSummary({ status: outputPatchPolicy.status, stage: "output_patch", validation, policy, applyCheck, selectedTestCommand })
       };
     }
     outputPatch = writeFileWithPolicy(root, options.outputPatch, patchSource.patch, engine, {
@@ -209,7 +212,7 @@ export async function runFixWorkflow(options = {}) {
           path: options.writePrBody,
           policy: prBodyPolicy
         },
-        decision: buildDecisionSummary({ status, stage: "pr_body", validation, policy, applyCheck, outputPatch })
+        decision: buildDecisionSummary({ status, stage: "pr_body", validation, policy, applyCheck, outputPatch, selectedTestCommand })
       };
     }
     prBody = writeFileWithPolicy(root, options.writePrBody, pr.body, engine, {
@@ -247,7 +250,7 @@ export async function runFixWorkflow(options = {}) {
         prBody,
         gitPlan,
         gitPolicy,
-        decision: buildDecisionSummary({ status, stage: "git_plan_policy", validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy })
+        decision: buildDecisionSummary({ status, stage: "git_plan_policy", validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy, selectedTestCommand })
       };
     }
   }
@@ -265,7 +268,7 @@ export async function runFixWorkflow(options = {}) {
     return {
       status,
       ...plannedBase,
-      decision: buildDecisionSummary({ status, validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy })
+      decision: buildDecisionSummary({ status, validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy, selectedTestCommand })
     };
   }
 
@@ -281,20 +284,20 @@ export async function runFixWorkflow(options = {}) {
       stage: "patch_apply",
       ...plannedBase,
       error: error.message,
-      decision: buildDecisionSummary({ status: "failed", stage: "patch_apply", validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy })
+      decision: buildDecisionSummary({ status: "failed", stage: "patch_apply", validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy, selectedTestCommand })
     };
   }
 
   let tests = null;
-  if (options.testCommand) {
+  if (selectedTestCommand) {
     try {
-      tests = runCommandWithPolicy(root, options.testCommand, engine, {
+      tests = runCommandWithPolicy(root, selectedTestCommand, engine, {
         confirmed: Boolean(options.confirmed)
       });
     } catch (error) {
       tests = {
         status: "failed",
-        command: options.testCommand,
+        command: selectedTestCommand,
         error: error.message
       };
     }
@@ -319,6 +322,7 @@ export async function runFixWorkflow(options = {}) {
     applyResult,
     tests,
     gitExecution,
+    selectedTestCommand,
     decision: buildDecisionSummary({
       status,
       stage: gitExecution && gitExecution.status !== "executed" ? gitExecution.stage : null,
@@ -330,7 +334,8 @@ export async function runFixWorkflow(options = {}) {
       prBody,
       gitPlan,
       gitPolicy,
-      gitExecution
+      gitExecution,
+      selectedTestCommand
     })
   };
 }
