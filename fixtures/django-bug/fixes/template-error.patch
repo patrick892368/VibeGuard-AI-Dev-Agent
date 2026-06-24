@@ -1,0 +1,9 @@
+diff --git a/accounts/views.py b/accounts/views.py
+--- a/accounts/views.py
++++ b/accounts/views.py
+@@ -1,4 +1,4 @@
+-PROFILE_TEMPLATE = "profiles/detail.html"
++PROFILE_TEMPLATE = "accounts/detail.html"
+ 
+ 
+ def profile_template():

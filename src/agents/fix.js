@@ -94,10 +94,10 @@ function testCommandForFile(root, repo, testFile) {
   if (extension === ".py") {
     const absolute = path.join(root, testFile);
     const text = fs.existsSync(absolute) ? fs.readFileSync(absolute, "utf8") : "";
+    if (/unittest/.test(text)) return `python -m unittest ${quoteCommandPart(testFile)}`;
     if (repo.frameworks.includes("Django") && repo.files.includes("manage.py")) {
       return `python manage.py test ${pythonModuleName(testFile)}`;
     }
-    if (/unittest/.test(text)) return `python -m unittest ${quoteCommandPart(testFile)}`;
     if (repo.files.includes("pytest.ini") || /pytest/.test(text)) return `python -m pytest ${quoteCommandPart(testFile)}`;
     return `python -m unittest ${quoteCommandPart(testFile)}`;
   }

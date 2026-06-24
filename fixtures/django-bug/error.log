@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "tests/test_views.py", line 13, in test_profile_template_matches_existing_template
+    self.assertEqual(profile_template(), "accounts/detail.html")
+  File "accounts/views.py", line 8, in render_profile
+    return profile_template()
+django.template.exceptions.TemplateDoesNotExist: profiles/detail.html

@@ -386,3 +386,26 @@ test("fix CLI auto-test prioritizes the traceback test file for Python", () => {
   assert.equal(result.selectedTestCommand, "python -m unittest tests/test_greeter.py");
   assert.equal(result.tests.status, "passed");
 });
+
+test("fix CLI applies Django-style fixture patch and runs traceback test", () => {
+  const root = copyFixture("django-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/template-error.patch",
+    "--auto-test",
+    "--apply",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.debug.frameworkContext.framework, "Django");
+  assert.ok(result.debug.hints.some((hint) => hint.includes("TemplateDoesNotExist")));
+  assert.equal(result.selectedTestCommand, "python -m unittest tests/test_views.py");
+  assert.equal(result.tests.status, "passed");
+  assert.match(fs.readFileSync(path.join(root, "accounts", "views.py"), "utf8"), /accounts\/detail\.html/);
+});

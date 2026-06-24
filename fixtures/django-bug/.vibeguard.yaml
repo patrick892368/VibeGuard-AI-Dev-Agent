@@ -1,0 +1,33 @@
+version: 1
+
+paths:
+  allow:
+    - "accounts/**"
+    - "project/**"
+    - "templates/**"
+    - "tests/**"
+    - "fixes/**"
+    - "error.log"
+    - "manage.py"
+    - ".vibeguard.yaml"
+
+  deny:
+    - ".env"
+    - ".env.*"
+    - ".git/**"
+    - "node_modules/**"
+
+  require_confirmation: []
+
+commands:
+  deny:
+    - "rm -rf"
+    - "git reset --hard"
+    - "git push --force"
+
+  require_confirmation:
+    - "git switch -c"
+    - "git commit"
+    - "git push"
+    - "gh pr create"
+    - "gh pr comment"
