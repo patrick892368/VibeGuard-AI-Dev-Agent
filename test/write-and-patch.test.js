@@ -123,6 +123,43 @@ test("writeSuggestedTests writes simple Python behavior assertions", () => {
   assert.match(generated, /assert module\.add\(2, 3\) == 5/);
 });
 
+test("writeSuggestedTests writes simple JavaScript branch assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.js"), `export function normalizeName(name) {
+  if (name == null) {
+    return "unknown";
+  }
+  return name.trim().toLowerCase();
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "user.test.js"), "utf8");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /assert\.equal\(mod\.normalizeName\(null\), "unknown"\)/);
+  assert.match(generated, /assert\.equal\(mod\.normalizeName\(" Ada "\), "ada"\)/);
+});
+
+test("writeSuggestedTests writes simple Python branch assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.py"), `def display_name(name):
+    if name is None:
+        return "unknown"
+    return name.strip()
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_user.py"), "utf8");
+  assert.equal(result.written.length, 1);
+  assert.match(generated, /assert module\.display_name\(None\) == "unknown"/);
+  assert.match(generated, /assert module\.display_name\(" Ada "\) == "Ada"/);
+});
+
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");

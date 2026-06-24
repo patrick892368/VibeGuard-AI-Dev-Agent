@@ -183,6 +183,10 @@ Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `un
 
 Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr` 和 `failureAnalysis`。
 
+Generated tests may include behavior assertions for simple pure functions and clear branches such as null/None checks or numeric lower-bound branches. More complex IO, database, dependency injection, and mock-heavy cases still require review.
+
+生成的测试可能包含简单纯函数和明确分支的行为断言，例如 null/None 检查或数值下界分支。更复杂的 IO、数据库、依赖注入和重 mock 场景仍需要人工 review。
+
 Generate bilingual onboarding and architecture docs:
 
 生成中英双语 onboarding 和 architecture 文档：

@@ -96,6 +96,57 @@ function pythonLiteral(value) {
   return JSON.stringify(value);
 }
 
+function literalValue(expression) {
+  const normalized = expression.trim().replace(/;$/, "");
+  if (/^["'][^"']*["']$/.test(normalized)) return normalized.slice(1, -1);
+  if (/^-?\d+(?:\.\d+)?$/.test(normalized)) return Number(normalized);
+  if (normalized === "true" || normalized === "True") return true;
+  if (normalized === "false" || normalized === "False") return false;
+  if (normalized === "null" || normalized === "None") return null;
+  return undefined;
+}
+
+function expectedFromExpression(param, expression, sample) {
+  const normalized = expression.trim().replace(/;$/, "");
+  const literal = literalValue(normalized);
+  if (literal !== undefined) return literal;
+  if (normalized === param) return sample;
+  if (typeof sample === "string" && (normalized === `${param}.trim()` || normalized === `${param}.strip()`)) {
+    return sample.trim();
+  }
+  if (typeof sample === "string" && (normalized === `${param}.trim().toLowerCase()` || normalized === `${param}.strip().lower()`)) {
+    return sample.trim().toLowerCase();
+  }
+  if (typeof sample === "number" && normalized === `-${param}`) return -sample;
+  return undefined;
+}
+
+function branchAssertions(name, params, condition, trueExpression, falseExpression) {
+  if (params.length !== 1) return [];
+  const [param] = params;
+  const normalized = condition.trim();
+  const cases = [];
+
+  if ([`${param} == null`, `${param} === null`, `${param} is None`].includes(normalized)) {
+    cases.push({ args: [null], expression: trueExpression });
+    cases.push({ args: [" Ada "], expression: falseExpression });
+  } else if ([`${param} < 0`, `${param} <= 0`].includes(normalized)) {
+    cases.push({ args: [-2], expression: trueExpression });
+    cases.push({ args: [3], expression: falseExpression });
+  } else if ([`${param} == ""`, `${param} === ""`].includes(normalized)) {
+    cases.push({ args: [""], expression: trueExpression });
+    cases.push({ args: ["Ada"], expression: falseExpression });
+  }
+
+  return cases
+    .map((item) => ({
+      name,
+      args: item.args,
+      expected: expectedFromExpression(param, item.expression, item.args[0])
+    }))
+    .filter((item) => item.expected !== undefined);
+}
+
 function simpleAssertion(name, params, expression) {
   const normalized = expression.trim().replace(/;$/, "");
   if (params.length === 0) {
@@ -129,6 +180,10 @@ function inferPythonAssertions(text) {
     const hint = simpleAssertion(match[1], splitParams(match[2]), match[3]);
     if (hint) hints.push(hint);
   }
+  const branchPattern = /^def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\):\s*\n\s+if\s+(.+):\s*\n\s+return\s+(.+)\s*\n\s+return\s+(.+)$/gm;
+  for (const match of text.matchAll(branchPattern)) {
+    hints.push(...branchAssertions(match[1], splitParams(match[2]), match[3], match[4], match[5]));
+  }
   return hints;
 }
 
@@ -143,6 +198,10 @@ function inferJavaScriptAssertions(text) {
       const hint = simpleAssertion(match[1], splitParams(match[2]), match[3]);
       if (hint) hints.push(hint);
     }
+  }
+  const branchPattern = /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*if\s*\(([^)]*)\)\s*(?:{\s*)?return\s+([^;{}]+);?\s*(?:}\s*)?return\s+([^;{}]+);?\s*}/g;
+  for (const match of text.matchAll(branchPattern)) {
+    hints.push(...branchAssertions(match[1], splitParams(match[2]), match[3], match[4], match[5]));
   }
   return hints;
 }
