@@ -267,14 +267,18 @@ function patchFromOptions(options, engine) {
 
 export async function runFixWorkflow(options = {}) {
   const root = options.root || process.cwd();
-  const logText = options.logText || (options.logFile ? fs.readFileSync(resolveRootPath(root, options.logFile), "utf8") : "");
-  if (!logText.trim()) {
-    throw new Error("fix requires --log <file> or logText");
-  }
-
   const engine = options.engine;
   if (!engine) {
     throw new Error("runFixWorkflow requires a PolicyEngine");
+  }
+  const logText = options.logText || (options.logFile
+    ? readFileWithPolicy(root, options.logFile, engine, {
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
+    }).content
+    : "");
+  if (!logText.trim()) {
+    throw new Error("fix requires --log <file> or logText");
   }
 
   const debug = analyzeDebugLog(logText, { root, engine });

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { PolicyEngine } from "../src/policy/engine.js";
+import { defaultConfig } from "../src/config/defaultConfig.js";
 
 const config = {
   paths: {
@@ -23,6 +24,13 @@ test("PolicyEngine denies sensitive paths", () => {
   const engine = new PolicyEngine(config, { root: process.cwd() });
   assert.equal(engine.checkPath(".env").status, "deny");
   assert.equal(engine.checkPath(".git/config").status, "deny");
+});
+
+test("default policy allows log artifacts but still denies .env", () => {
+  const engine = new PolicyEngine(defaultConfig, { root: process.cwd() });
+  assert.equal(engine.checkPath("error.log", "read").status, "allow");
+  assert.equal(engine.checkPath("logs/error.log", "read").status, "allow");
+  assert.equal(engine.checkPath(".env", "read").status, "deny");
 });
 
 test("PolicyEngine requires confirmation for configured paths", () => {

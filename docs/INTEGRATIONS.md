@@ -36,6 +36,10 @@ vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 
 `debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。源码片段只有在 path policy 允许读取该文件时才会返回。
 
+`debug --log <file>` and `fix --log <file>` read log input files through path policy before parsing.
+
+`debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。
+
 `review` returns line-level findings, recommendations, severity summaries, actionItems, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, and `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`.
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`。

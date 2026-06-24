@@ -166,10 +166,15 @@ function policyCommand(parsed, root) {
 }
 
 async function debugCommand(parsed, root) {
-  const logText = parsed.log ? fs.readFileSync(resolveInputPath(root, parsed.log), "utf8") : readStdinIfAvailable();
-  if (!logText.trim()) throw new Error("debug requires --log <file> or error text on stdin");
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
+  const logText = parsed.log
+    ? readFileWithPolicy(root, parsed.log, engine, {
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    }).content
+    : readStdinIfAvailable();
+  if (!logText.trim()) throw new Error("debug requires --log <file> or error text on stdin");
   const result = analyzeDebugLog(logText, { root, engine });
   if (parsed["ai-patch"]) {
     const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));

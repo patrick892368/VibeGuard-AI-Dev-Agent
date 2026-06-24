@@ -163,6 +163,24 @@ NameError: name 'missing' is not defined`, "utf8");
   assert.deepEqual(parsed.likelyFiles, ["src/app.py"]);
 });
 
+test("CLI debug blocks denied log input files", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-debug-denied-"));
+  fs.writeFileSync(path.join(root, ".env"), "NameError: secret_log should not be read", "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "debug",
+    "--log",
+    ".env",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
+});
+
 test("CLI test command accepts coverage report", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-coverage-"));
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

@@ -158,6 +158,26 @@ test("fix CLI applies Python fixture patch and runs tests", () => {
   assert.match(fs.readFileSync(path.join(root, "src", "greeter.py"), "utf8"), /name\.strip/);
 });
 
+test("fix CLI blocks denied log input files", () => {
+  const root = copyFixture("node-bug");
+  fs.writeFileSync(path.join(root, ".env"), "ReferenceError: secret_log should not be read", "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "fix",
+    "--log",
+    ".env",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
+});
+
 test("fix CLI dry-run checks Node fixture patch without modifying files", () => {
   const root = copyFixture("node-bug");
   const before = fs.readFileSync(path.join(root, "src", "user.js"), "utf8");

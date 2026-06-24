@@ -19,9 +19,9 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 ## 当前能力 / Current Capabilities
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
-- `vibeguard debug`: 解析 Python、Django、Node.js、Java/Spring Boot 报错日志，定位可能文件，并输出结构化 `explanation` 解释为什么失败。Parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and returns a structured `explanation` for why the failure happened.
+- `vibeguard debug`: 通过 read policy 读取报错日志，解析 Python、Django、Node.js、Java/Spring Boot 报错，定位可能文件，并输出结构化 `explanation` 解释为什么失败。Reads error logs through read policy, parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and returns a structured `explanation` for why the failure happened.
 - Debug snippets 会先经过 path policy，再包含 stack frame 和 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件但不读取 denied 路径。Debug snippets pass through path policy before including stack frames and short previews of framework-related likely files, so AI patch generation can see likely targets without reading denied paths.
-- `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
+- `vibeguard fix`: 通过 read policy 读取日志和 patch 文件，编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Reads log and patch files through read policy, orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
 - `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块（包含 `exports["name"]` bracket export）和 stdlib `unittest` Python 测试，会为简单纯函数、明确分支、对象属性/字典字段 fallback、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，`--repair` 可对安全的生成测试失败做一轮 test-only 修复，并可生成 branch/commit/PR dry-run plan；只有最终生成测试通过且 `--execute-git-plan --confirm` 通过策略后才执行本地 Git plan。Writes basic tests after policy checks, supports ESM/CommonJS Node modules including `exports["name"]` bracket exports and stdlib `unittest` Python tests, generates behavior assertions for simple pure functions, clear branches, object-property/dictionary-field fallbacks, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, `--repair` can run one safe test-only repair retry for generated-test failures, can generate a branch/commit/PR dry-run plan, and only executes the local Git plan after final generated tests pass and `--execute-git-plan --confirm` passes policy.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings、recommendations、actionItems 和 PR comment Markdown；可用 `--write-comment` 经过 policy 写出评论正文文件。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings, recommendations, actionItems, and PR-comment Markdown; `--write-comment` can write the comment body file through policy.
@@ -240,11 +240,17 @@ Default policy requires confirmation for `git switch -c`, `git commit`, `git pus
 
 `.vibeguard.yaml` defines the repository safety boundary:
 
+默认策略允许 `*.log` 和 `logs/**` 作为错误日志 artifact，但 `.env` 等 deny 路径仍然优先拒绝。
+
+The default policy allows `*.log` and `logs/**` as error-log artifacts, while deny paths such as `.env` still take priority.
+
 ```yaml
 paths:
   allow:
     - "src/**"
     - "test/**"
+    - "*.log"
+    - "logs/**"
   deny:
     - ".env"
     - ".git/**"
@@ -291,7 +297,7 @@ The test suite covers:
 - 路径和命令 policy。Path and command policy checks.
 - Policy Engine 和 policy-gated 文件操作的仓库 root containment。Repository-root containment for the Policy Engine and policy-gated file operations.
 - Patch 安全检查。Patch file safety checks.
-- Patch 输入文件读取的 Policy-as-Code 边界。Policy-as-Code boundaries for reading patch input files.
+- Debug/fix 日志输入和 patch 输入文件读取的 Policy-as-Code 边界。Policy-as-Code boundaries for reading debug/fix log inputs and patch input files.
 - Patch 输出规范化和生成补丁失败后的 Django fallback 恢复。Patch output normalization and Django fallback recovery after generated patch-check failures.
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
