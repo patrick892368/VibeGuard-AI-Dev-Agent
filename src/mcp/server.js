@@ -10,7 +10,7 @@ import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
-import { buildPrSummary } from "../agents/pr.js";
+import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 
@@ -113,7 +113,10 @@ const tools = [
     name: "summarize_pr",
     description: "Build a GitHub-ready PR summary from a unified diff.",
     inputSchema: objectSchema({
-      diff: stringSchema
+      diff: stringSchema,
+      writeBody: stringSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
@@ -321,7 +324,17 @@ async function callTool(name, args, root) {
     }
     return analyzeReviewDiff(args.diff || "");
   }
-  if (name === "summarize_pr") return buildPrSummary(args.diff || "");
+  if (name === "summarize_pr") {
+    if (args.writeBody) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      return writePrSummaryBody(root, args.diff || "", args.writeBody, engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      });
+    }
+    return buildPrSummary(args.diff || "");
+  }
   if (name === "detect_github") return detectGitHubRepository(root);
   if (name === "github_pr") {
     const env = loadRuntimeEnv(root);

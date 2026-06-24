@@ -8,7 +8,7 @@ import { analyzeDebugLog } from "./agents/debug.js";
 import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "./agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "./agents/review.js";
-import { buildPrSummary } from "./agents/pr.js";
+import { buildPrSummary, writePrSummaryBody } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
 import { runDoctor } from "./agents/doctor.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
@@ -39,7 +39,7 @@ Usage:
   vibeguard hooks list
   vibeguard hooks print <pre-commit|pre-push|commit-msg>
   vibeguard hooks install <hook> --allow-git-dir
-  vibeguard pr summary [--diff <file>]
+  vibeguard pr summary [--diff <file>] [--write-body <file>]
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm]
@@ -454,7 +454,18 @@ async function dispatch(parsed) {
   }
   if (command === "patch") return patchCommand(parsed, root, subcommand);
   if (command === "hooks") return hooksCommand(parsed, root, subcommand);
-  if (command === "pr" && subcommand === "summary") return buildPrSummary(diffInput(parsed, root));
+  if (command === "pr" && subcommand === "summary") {
+    const diffText = diffInput(parsed, root);
+    if (parsed["write-body"]) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      return writePrSummaryBody(root, diffText, parsed["write-body"], engine, {
+        confirmed: Boolean(parsed.confirm),
+        auditLog: parsed["audit-log"]
+      });
+    }
+    return buildPrSummary(diffText);
+  }
   if (command === "github") return githubCommand(parsed, root, subcommand);
   if (command === "run") return runCommand(parsed, root);
   if (command === "eval") return evalCommand(parsed, root, subcommand);

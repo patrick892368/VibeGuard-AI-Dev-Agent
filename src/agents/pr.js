@@ -1,4 +1,5 @@
 import { analyzeReviewDiff } from "./review.js";
+import { writeFileWithPolicy } from "../policy/safeWrite.js";
 
 export function buildPrSummary(diffText) {
   const review = analyzeReviewDiff(diffText);
@@ -43,5 +44,13 @@ ${actionItems}
 - [ ] Policy check passed
 `,
     review
+  };
+}
+
+export function writePrSummaryBody(root, diffText, outputPath, engine, options = {}) {
+  const summary = buildPrSummary(diffText);
+  return {
+    ...summary,
+    writtenBody: writeFileWithPolicy(root, outputPath, summary.body, engine, options)
   };
 }

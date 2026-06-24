@@ -259,3 +259,37 @@ test("CLI review blocks denied diff input paths", () => {
     encoding: "utf8"
   }), /Path matches deny policy/);
 });
+
+test("CLI pr summary can write a policy-gated body file", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-body-"));
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  const diff = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), diff, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "pr",
+    "summary",
+    "--diff",
+    "reports/change.diff",
+    "--write-body",
+    "reports/pr-body.md",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.writtenBody.path, "reports/pr-body.md");
+  assert.equal(parsed.writtenBody.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
+});

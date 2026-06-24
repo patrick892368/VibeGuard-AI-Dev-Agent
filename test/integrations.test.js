@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, buildGhPrCommentArgs, buildGhRunListArgs, commentPullRequestWithGh, createPullRequestWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
-import { buildPrSummary } from "../src/agents/pr.js";
+import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
 
@@ -40,6 +40,27 @@ test("buildPrSummary returns GitHub-ready body", () => {
   assert.match(result.body, /Findings by severity/);
   assert.match(result.body, /Add or update a focused test/);
   assert.equal(result.review.files[0], "src/app.js");
+});
+
+test("writePrSummaryBody writes a GitHub-ready body through policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-pr-body-"));
+  const engine = new PolicyEngine({
+    paths: { allow: ["reports/**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+  const diff = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+
+  const result = writePrSummaryBody(root, diff, "reports/pr-body.md", engine);
+
+  assert.equal(result.writtenBody.path, "reports/pr-body.md");
+  assert.equal(result.writtenBody.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
 });
 
 test("generateDebugPatch is unavailable without provider env", async () => {

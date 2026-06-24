@@ -37,9 +37,9 @@ vibeguard audit summary --file reports/audit.jsonl
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`。
 
-`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes.
+`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes. `writeBody` writes that body through policy for GitHub PR creation.
 
-`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems 和验证 checklist。
+`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems 和验证 checklist。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
 
 ## Git Hooks / Git Hooks
 
@@ -104,6 +104,10 @@ Available tools:
 `review_pr` can return structured findings and, when `writeComment` is provided, write the PR comment body through policy.
 
 `review_pr` 可以返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
+
+`summarize_pr` can return a GitHub-ready PR body and, when `writeBody` is provided, write that body through policy.
+
+`summarize_pr` 可以返回 GitHub-ready PR body；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
 
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution.
 
