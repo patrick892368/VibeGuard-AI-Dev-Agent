@@ -30,7 +30,7 @@ Usage:
   vibeguard debug --log <file> [--ai-patch] [--output-patch <file>]
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
   vibeguard review [--diff <file>] [--write-comment <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
@@ -450,6 +450,7 @@ async function dispatch(parsed) {
         coverageFile: parsed.coverage,
         coverageAfterFile: parsed["coverage-after"],
         runTests: Boolean(parsed.run),
+        repairFailures: Boolean(parsed.repair),
         testCommand: parsed["test-command"],
         createBranch: Boolean(parsed["create-branch"]),
         commit: Boolean(parsed.commit),

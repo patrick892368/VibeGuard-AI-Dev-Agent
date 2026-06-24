@@ -230,6 +230,38 @@ test("CLI test --write blocks git plan execution without confirmation", () => {
   assert.equal(parsed.gitExecution.stage, "git_plan_policy");
 });
 
+test("CLI test --write --run --repair repairs Python generated test imports", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-test-repair-"));
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "helper.py"), "VALUE = 'Ada'\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "greeting.py"), `from helper import VALUE
+
+def greeting():
+    return VALUE
+`, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "test",
+    "--write",
+    "--run",
+    "--repair",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.initialTestRuns[0].status, "failed");
+  assert.equal(parsed.initialTestRuns[0].failureAnalysis.category, "python_local_import_path");
+  assert.equal(parsed.repairRuns[0].status, "repaired");
+  assert.equal(parsed.testRuns[0].status, "passed");
+  assert.equal(parsed.testRuns[0].repaired, true);
+});
+
 test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-ai-"));
   fs.writeFileSync(path.join(root, ".vibeguard.yaml"), "version: 1\n", "utf8");

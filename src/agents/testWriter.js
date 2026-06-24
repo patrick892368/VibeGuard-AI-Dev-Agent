@@ -514,7 +514,7 @@ function jsBehaviorAssertion(hint) {
   return `  assert.equal(${call}, ${jsLiteral(hint.expected)});`;
 }
 
-export function generateTestContent(candidate) {
+export function generateTestContent(candidate, options = {}) {
   const sourceFile = candidate.sourceFile.replace(/\\/g, "/");
   const testFile = candidate.suggestedTestFile.replace(/\\/g, "/");
   const functions = testTargetFunctions(candidate);
@@ -522,16 +522,21 @@ export function generateTestContent(candidate) {
 
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
+    const sourcePathSetup = Boolean(options.pythonSourcePathSetup);
     const assertions = functions.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`).join("\n");
     const behaviorAssertions = assertionHints.map(pythonBehaviorAssertion).join("\n");
     return `import importlib.util
 import pathlib
-import unittest
+${sourcePathSetup ? "import sys\n" : ""}import unittest
 
 
 def load_module():
     source = pathlib.Path(__file__).resolve().parent / "${relativeSource}"
     source = source.resolve()
+${sourcePathSetup ? `    source_dir = str(source.parent)
+    if source_dir not in sys.path:
+        sys.path.insert(0, source_dir)
+` : ""}    spec = importlib.util.spec_from_file_location("target_module", source)
     spec = importlib.util.spec_from_file_location("target_module", source)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -635,6 +640,14 @@ function buildRepairPlan(category, result, evidence) {
         command ? `Rerun ${command} after regenerating the test file.` : "Rerun the smallest generated test command after regenerating the test file."
       ]
     },
+    python_local_import_path: {
+      safeToAutoRetry: true,
+      actions: [
+        "Regenerate only the generated Python test file with the source directory added to sys.path before loading the target module.",
+        "Do not modify production code or install dependencies for this retry.",
+        command ? `Rerun ${command} after regenerating the generated test file.` : "Rerun the generated Python unittest after regenerating the test file."
+      ]
+    },
     missing_module_or_bad_import: {
       actions: [
         "Verify the generated relative import path from the test file to the source file.",
@@ -678,10 +691,16 @@ function buildRepairPlan(category, result, evidence) {
   };
 }
 
-function analyzeTestFailure(result) {
+function analyzeTestFailure(result, candidate = null) {
   if (result.status !== "failed" && result.status !== "blocked") return null;
   const output = `${result.error || ""}\n${result.stderr || ""}\n${result.stdout || ""}`;
   const rules = [
+    {
+      pattern: /ModuleNotFoundError:\s+No module named ['"][^'"]+['"]/i,
+      category: "python_local_import_path",
+      nextAction: "Regenerate the generated Python test with the source directory on sys.path before loading the target module.",
+      matches: () => candidate?.sourceFile?.endsWith(".py")
+    },
     {
       pattern: /Cannot use import statement outside a module|Unexpected token 'export'|require is not defined in ES module scope/i,
       category: "module_system_mismatch",
@@ -708,7 +727,7 @@ function analyzeTestFailure(result) {
       nextAction: "Inspect the stack trace and inputs used by the generated test; the source may have import-time side effects or missing setup."
     }
   ];
-  const matched = rules.find((rule) => rule.pattern.test(output));
+  const matched = rules.find((rule) => rule.pattern.test(output) && (!rule.matches || rule.matches(output, result, candidate)));
   const category = matched?.category || "unknown_failure";
   const lines = output.split(/\r?\n/);
   const evidence = (matched
@@ -738,7 +757,7 @@ function runGeneratedTest(root, candidate, engine, repo, options = {}) {
       };
       return {
         ...result,
-        failureAnalysis: analyzeTestFailure(result)
+        failureAnalysis: analyzeTestFailure(result, candidate)
       };
     }
 
@@ -760,7 +779,7 @@ function runGeneratedTest(root, candidate, engine, repo, options = {}) {
     };
     return {
       ...result,
-      failureAnalysis: analyzeTestFailure(result)
+      failureAnalysis: analyzeTestFailure(result, candidate)
     };
   } catch (error) {
     const argv = options.testCommand ? null : defaultTestArgv(candidate, repo);
@@ -772,9 +791,98 @@ function runGeneratedTest(root, candidate, engine, repo, options = {}) {
     };
     return {
       ...result,
-      failureAnalysis: analyzeTestFailure(result)
+      failureAnalysis: analyzeTestFailure(result, candidate)
     };
   }
+}
+
+function moduleSystemRepairCandidate(candidate, failedRun) {
+  const output = `${failedRun.error || ""}\n${failedRun.stderr || ""}\n${failedRun.stdout || ""}`;
+  const moduleSystem = /require is not defined in ES module scope/i.test(output) ? "esm" : "commonjs";
+  return {
+    ...candidate,
+    metadata: {
+      ...(candidate.metadata || {}),
+      moduleSystem
+    }
+  };
+}
+
+function repairGeneratedTest(root, candidate, failedRun, engine, repo, options = {}) {
+  if (!failedRun || (failedRun.status !== "failed" && failedRun.status !== "blocked")) return null;
+  const analysis = failedRun.failureAnalysis;
+  const category = analysis?.category || "unknown_failure";
+  const base = {
+    sourceFile: candidate.sourceFile,
+    testFile: candidate.suggestedTestFile,
+    initialStatus: failedRun.status,
+    category,
+    evidence: analysis?.evidence || null
+  };
+
+  if (!analysis?.repairPlan?.safeToAutoRetry) {
+    return {
+      ...base,
+      status: "skipped",
+      reason: "repair_plan_not_safe"
+    };
+  }
+
+  try {
+    if (category === "python_local_import_path") {
+      const written = writeFileWithPolicy(root, candidate.suggestedTestFile, generateTestContent(candidate, {
+        pythonSourcePathSetup: true
+      }), engine, options);
+      const testRun = runGeneratedTest(root, candidate, engine, repo, options);
+      return {
+        ...base,
+        status: testRun.status === "passed" ? "repaired" : "failed",
+        strategy: "python_source_dir_sys_path",
+        written,
+        testRun
+      };
+    }
+
+    if (category === "module_system_mismatch") {
+      const repairedCandidate = moduleSystemRepairCandidate(candidate, failedRun);
+      const written = writeFileWithPolicy(root, candidate.suggestedTestFile, generateTestContent(repairedCandidate), engine, options);
+      const testRun = runGeneratedTest(root, repairedCandidate, engine, repo, options);
+      return {
+        ...base,
+        status: testRun.status === "passed" ? "repaired" : "failed",
+        strategy: `regenerate_${repairedCandidate.metadata.moduleSystem}_test`,
+        written,
+        testRun
+      };
+    }
+  } catch (error) {
+    return {
+      ...base,
+      status: "blocked",
+      reason: error.message
+    };
+  }
+
+  return {
+    ...base,
+    status: "skipped",
+    reason: "unsupported_repair_category"
+  };
+}
+
+function mergeRepairedRuns(initialRuns, repairRuns) {
+  return initialRuns.map((run, index) => {
+    const repair = repairRuns[index];
+    if (!repair?.testRun) return run;
+    const { testRun, ...repairSummary } = repair;
+    return {
+      ...testRun,
+      repaired: repair.status === "repaired",
+      initialStatus: run.status,
+      initialFailureAnalysis: run.failureAnalysis,
+      repair: repairSummary
+    };
+  });
 }
 
 function coverageTargets(candidates) {
@@ -939,15 +1047,23 @@ export function writeSuggestedTests(root, engine, options = {}) {
   const written = writable.map((candidate) =>
     writeFileWithPolicy(root, candidate.suggestedTestFile, generateTestContent(candidate), engine, options)
   );
-  const testRuns = options.runTests
-    ? writable.map((candidate) => runGeneratedTest(root, candidate, engine, { suggestedCommands: analysis.frameworkHints }, options))
+  const repo = { suggestedCommands: analysis.frameworkHints };
+  const initialTestRuns = options.runTests
+    ? writable.map((candidate) => runGeneratedTest(root, candidate, engine, repo, options))
     : [];
+  const repairRuns = options.runTests && options.repairFailures
+    ? writable.map((candidate, index) => repairGeneratedTest(root, candidate, initialTestRuns[index], engine, repo, options))
+    : [];
+  const hasRepairRuns = repairRuns.some(Boolean);
+  const testRuns = hasRepairRuns
+    ? mergeRepairedRuns(initialTestRuns, repairRuns)
+    : initialTestRuns;
   const gitPlan = buildTestWriterGitPlan(written, testRuns, options);
   const gitPolicy = gitPlan
     ? checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) })
     : null;
   const gitExecution = buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine, options);
-  return {
+  const result = {
     ...analysis,
     written,
     testRuns,
@@ -955,4 +1071,9 @@ export function writeSuggestedTests(root, engine, options = {}) {
     gitPolicy,
     gitExecution
   };
+  if (hasRepairRuns) {
+    result.initialTestRuns = initialTestRuns;
+    result.repairRuns = repairRuns;
+  }
+  return result;
 }

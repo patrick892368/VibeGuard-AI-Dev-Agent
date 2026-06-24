@@ -216,17 +216,22 @@ node ./bin/vibeguard.js test --coverage coverage.json --json
 node ./bin/vibeguard.js test --coverage coverage/lcov.info --json
 node ./bin/vibeguard.js test --coverage coverage-before.json --coverage-after coverage-after.json --json
 node ./bin/vibeguard.js test --write --coverage coverage.json --run --limit 1 --json
+node ./bin/vibeguard.js test --write --run --repair --limit 1 --json
 node ./bin/vibeguard.js test --write --create-branch --commit --pr-dry-run --json
 node ./bin/vibeguard.js test --write --run --create-branch --commit --execute-git-plan --confirm --json
 ```
 
-Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `uncoveredFunctions`, and JavaScript `metadata.moduleSystem` before asking VibeGuard to write new tests. If before/after reports are available, inspect `coverageDelta.summary.averagePercentDelta`, `coverageDelta.summary.missingLinesReduced`, and file-level `status`. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, `stderr`, `failureAnalysis`, and `failureAnalysis.repairPlan` before proposing a commit. When asking for a test PR, inspect `gitPlan`, `gitPolicy`, and `gitExecution`; Git state changes and PR creation still require policy confirmation, and local branch/commit execution is blocked unless generated tests have passed.
+Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `uncoveredFunctions`, and JavaScript `metadata.moduleSystem` before asking VibeGuard to write new tests. If before/after reports are available, inspect `coverageDelta.summary.averagePercentDelta`, `coverageDelta.summary.missingLinesReduced`, and file-level `status`. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, `stderr`, `failureAnalysis`, and `failureAnalysis.repairPlan` before proposing a commit. When `--repair` is used, also inspect `initialTestRuns`, `repairRuns`, and the final `testRuns`; only the final `testRuns` gate Git execution. When asking for a test PR, inspect `gitPlan`, `gitPolicy`, and `gitExecution`; Git state changes and PR creation still require policy confirmation, and local branch/commit execution is blocked unless generated tests have passed.
 
-Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr`、`failureAnalysis` 和 `failureAnalysis.repairPlan`。生成测试 PR 时，还要检查 `gitPlan`、`gitPolicy` 和 `gitExecution`；Git 状态变更和 PR 创建仍然需要 policy 确认，本地 branch/commit 执行会在生成测试未通过时被阻止。
+Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr`、`failureAnalysis` 和 `failureAnalysis.repairPlan`。使用 `--repair` 时，还要检查 `initialTestRuns`、`repairRuns` 和最终 `testRuns`；只有最终 `testRuns` 用作 Git 执行门。生成测试 PR 时，还要检查 `gitPlan`、`gitPolicy` 和 `gitExecution`；Git 状态变更和 PR 创建仍然需要 policy 确认，本地 branch/commit 执行会在生成测试未通过时被阻止。
 
 When generated tests fail, `failureAnalysis.repairPlan` tells Codex whether a test-only retry is safe, which actions to take next, and which guardrails must not be violated.
 
 生成测试失败时，`failureAnalysis.repairPlan` 会告诉 Codex 是否适合只重试测试文件、下一步动作是什么，以及哪些 guardrail 不能违反。
+
+With `--repair`, VibeGuard can rewrite only the generated test file through Policy-as-Code and rerun the same focused command for safe categories. The first supported successful repair is `python_source_dir_sys_path`, which fixes generated Python tests that fail because local source-directory imports are not on `sys.path`.
+
+使用 `--repair` 时，VibeGuard 可以只通过 Policy-as-Code 重写生成的测试文件，并对安全分类重新运行同一个聚焦命令。首个已支持的成功修复策略是 `python_source_dir_sys_path`，用于修复 Python 生成测试因源码目录本地 import 未进入 `sys.path` 而失败的场景。
 
 Generated tests may include behavior assertions for simple pure functions, clear branches such as null/None checks, object-property and dictionary-field fallbacks, numeric lower-bound branches including `<= 0`, empty collection checks, and clear exception branches such as `throw new RangeError(...)` or `raise ValueError(...)`. Python tests are generated as stdlib `unittest` cases so they can run without requiring pytest. More complex IO, database, dependency injection, and mock-heavy cases still require review.
 

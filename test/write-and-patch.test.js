@@ -298,6 +298,35 @@ test("writeSuggestedTests can run a generated Python unittest through policy", (
   assert.equal(result.testRuns[0].command, "python -m unittest tests/test_math.py");
 });
 
+test("writeSuggestedTests can repair Python local import path failures", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "helper.py"), "VALUE = 'Ada'\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "greeting.py"), `from helper import VALUE
+
+def greeting():
+    return VALUE
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    runTests: true,
+    repairFailures: true
+  });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_greeting.py"), "utf8");
+
+  assert.equal(result.initialTestRuns[0].status, "failed");
+  assert.equal(result.initialTestRuns[0].failureAnalysis.category, "python_local_import_path");
+  assert.equal(result.initialTestRuns[0].failureAnalysis.repairPlan.safeToAutoRetry, true);
+  assert.equal(result.repairRuns[0].status, "repaired");
+  assert.equal(result.repairRuns[0].strategy, "python_source_dir_sys_path");
+  assert.equal(result.repairRuns[0].written.policy.status, "allow");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.testRuns[0].repaired, true);
+  assert.match(generated, /sys\.path\.insert\(0, source_dir\)/);
+});
+
 test("writeSuggestedTests can prepare a Git and PR dry-run plan", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
