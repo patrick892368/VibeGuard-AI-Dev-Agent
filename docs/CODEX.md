@@ -216,6 +216,10 @@ Review findings include `file`, `line`, `severity`, `category`, `message`, and `
 
 Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category`、`message` 和 `recommendation`。Codex 可以使用 `actionItems` 做执行计划，或直接用 `markdown` 作为 PR 评论正文。
 
+`pr summary` includes review findings, severity counts, and action items in the generated PR body.
+
+`pr summary` 会在生成的 PR body 中包含 review findings、严重度统计和 action items。
+
 Read GitHub Actions status:
 
 读取 GitHub Actions 状态：

@@ -30,6 +30,10 @@ vibeguard audit summary --file reports/audit.jsonl
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。
 
+`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes.
+
+`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems 和验证 checklist。
+
 ## Git Hooks / Git Hooks
 
 Print a hook without writing to `.git`:

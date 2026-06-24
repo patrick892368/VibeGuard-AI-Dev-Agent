@@ -28,7 +28,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档和结构化 firstTasks 新人任务建议。Scans a repository and can generate bilingual onboarding / architecture docs plus structured firstTasks for newcomer work.
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
-- `vibeguard pr summary`: 从 diff 生成 GitHub-ready PR body。Builds a GitHub-ready PR body from a diff.
+- `vibeguard pr summary`: 从 diff 生成包含 review findings 和 actionItems 的 GitHub-ready PR body。Builds a GitHub-ready PR body with review findings and actionItems from a diff.
 - `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback。Detects GitHub remotes, creates PRs/comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.

@@ -36,6 +36,9 @@ test("buildPrSummary returns GitHub-ready body", () => {
   const result = buildPrSummary(diff);
   assert.match(result.body, /Changed Files/);
   assert.match(result.body, /src\/app.js/);
+  assert.match(result.body, /Review Action Items/);
+  assert.match(result.body, /Findings by severity/);
+  assert.match(result.body, /Add or update a focused test/);
   assert.equal(result.review.files[0], "src/app.js");
 });
 
