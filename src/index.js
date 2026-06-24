@@ -9,6 +9,7 @@ export { analyzeRepository } from "./agents/onboard.js";
 export { analyzeTestTargets } from "./agents/testWriter.js";
 export { analyzeReviewDiff } from "./agents/review.js";
 export { buildPrSummary } from "./agents/pr.js";
+export { runDoctor } from "./agents/doctor.js";
 export { applyPatchWithPolicy } from "./patch/safeApply.js";
 export { validateUnifiedDiff } from "./patch/validatePatch.js";
 export { generateDebugPatch } from "./llm/provider.js";

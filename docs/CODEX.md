@@ -21,6 +21,7 @@ Project constraint:
 Check policy:
 
 ```bash
+node ./bin/vibeguard.js doctor --json
 node ./bin/vibeguard.js policy check --path src/index.js --json
 node ./bin/vibeguard.js policy check --command "npm test" --json
 ```

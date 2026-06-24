@@ -46,8 +46,10 @@ Available tools:
 - `github_comment`
 - `eval_fixtures`
 - `eval_history`
+- `doctor`
 
 `eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking. `eval_history` summarizes those JSONL records for trend review.
+`doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 
 ## Codex
 

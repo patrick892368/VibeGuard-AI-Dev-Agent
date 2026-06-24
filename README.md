@@ -19,6 +19,7 @@ The core design rule is simple: every agent must pass through Policy-as-Code bef
 - `vibeguard github` detects GitHub remotes, can create PRs/comments through `gh`, and can read Actions run status.
 - `vibeguard run` executes commands only after command policy checks.
 - `vibeguard eval fixtures` evaluates the configured LLM provider against Python and Node fix fixtures.
+- `vibeguard doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without printing secrets.
 - `vibeguard mcp` starts a small JSON-RPC MCP-style stdio server for agent integrations.
 
 This repository is intentionally dependency-light at the start. The CLI runs on Node.js built-ins so the project can be tested immediately after clone.
@@ -68,6 +69,7 @@ vibeguard eval fixtures --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json
 vibeguard eval fixtures --history reports/eval-history.jsonl --json
 vibeguard eval history --file reports/eval-history.jsonl --json
+vibeguard doctor
 vibeguard mcp
 ```
 

@@ -10,6 +10,7 @@ import { analyzeTestTargets, writeSuggestedTests } from "./agents/testWriter.js"
 import { analyzeReviewDiff } from "./agents/review.js";
 import { buildPrSummary } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
+import { runDoctor } from "./agents/doctor.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
@@ -42,6 +43,7 @@ Usage:
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
+  vibeguard doctor
   vibeguard mcp
 
 Options:
@@ -336,6 +338,7 @@ async function dispatch(parsed) {
   if (command === "github") return githubCommand(parsed, root, subcommand);
   if (command === "run") return runCommand(parsed, root);
   if (command === "eval") return evalCommand(parsed, root, subcommand);
+  if (command === "doctor") return runDoctor({ root, env: loadRuntimeEnv(root) });
   if (command === "mcp") {
     await startMcpServer({ root });
     return null;

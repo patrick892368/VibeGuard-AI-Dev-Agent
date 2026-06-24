@@ -3,6 +3,7 @@ import { loadConfig } from "../config/loadConfig.js";
 import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { analyzeDebugLog } from "../agents/debug.js";
+import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets } from "../agents/testWriter.js";
@@ -59,6 +60,10 @@ const tools = [
   {
     name: "eval_history",
     description: "Summarize compact JSONL fixture evaluation history."
+  },
+  {
+    name: "doctor",
+    description: "Check local VibeGuard runtime, policy, provider, git, gh, and proxy readiness without exposing secrets."
   }
 ];
 
@@ -171,6 +176,7 @@ function callTool(name, args, root) {
       confirmed: Boolean(args.confirmed)
     });
   }
+  if (name === "doctor") return runDoctor({ root, env: loadRuntimeEnv(root) });
   throw new Error(`Unknown tool: ${name}`);
 }
 
