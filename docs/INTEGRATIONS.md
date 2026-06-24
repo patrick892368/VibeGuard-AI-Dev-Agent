@@ -12,6 +12,7 @@ Generated onboarding and architecture documents are bilingual Chinese/English by
 
 ```bash
 vibeguard debug --log error.log
+vibeguard debug --log error.log --ai-patch --output-patch reports/generated.patch
 vibeguard debug --log django-error.log
 vibeguard debug --log spring-error.log
 vibeguard test --write

@@ -250,6 +250,47 @@ test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
   assert.equal(parsed.aiPatch.policy.status, "deny");
 });
 
+test("CLI debug --ai-patch can write a policy-gated patch artifact", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-ai-output-"));
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
+  fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined", "utf8");
+  const patch = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "debug",
+    "--log",
+    "error.log",
+    "--ai-patch",
+    "--output-patch",
+    "reports/generated.patch",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VIBEGUARD_LLM_PROVIDER: "fixture",
+      VIBEGUARD_FIXTURE_PATCH: patch
+    }
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.aiPatch.validation.valid, true);
+  assert.equal(parsed.aiPatch.policy.status, "allow");
+  assert.equal(parsed.aiPatch.outputPatch.path, "reports/generated.patch");
+  assert.match(fs.readFileSync(path.join(root, "reports", "generated.patch"), "utf8"), /diff --git a\/src\/app\.js b\/src\/app\.js/);
+});
+
 test("CLI review can write a policy-gated comment body", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-comment-"));
   fs.mkdirSync(path.join(root, "reports"), { recursive: true });

@@ -64,6 +64,7 @@ vibeguard policy check --patch fix.diff
 vibeguard policy check --path src/index.js --audit-log reports/audit.jsonl
 
 vibeguard debug --log error.log
+vibeguard debug --log error.log --ai-patch --output-patch reports/generated.patch
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --dry-run
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --apply --audit-log reports/audit.jsonl
 vibeguard fix --log error.log --patch fix.diff --auto-test --apply
@@ -136,9 +137,9 @@ export OPENAI_API_KEY=...
 export VIBEGUARD_MODEL=...
 ```
 
-AI 生成的 patch 不会自动应用，必须先通过 Policy Engine 检查。
+AI 生成的 patch 不会自动应用，必须先通过 Policy Engine 检查。`debug --ai-patch --output-patch <file>` 可以经过 policy 写出规范化 patch artifact。
 
-Generated patches are not applied automatically. They must pass the Policy Engine first.
+Generated patches are not applied automatically. They must pass the Policy Engine first. `debug --ai-patch --output-patch <file>` can write the normalized patch artifact through policy.
 
 如果没有设置 `HTTPS_PROXY` / `HTTP_PROXY`，VibeGuard 会从当前仓库的 Git `https.proxy` / `http.proxy` 继承代理用于 provider 请求。
 

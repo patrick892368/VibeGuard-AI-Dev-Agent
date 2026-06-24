@@ -27,7 +27,7 @@ function printHelp() {
 
 Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
-  vibeguard debug --log <file>
+  vibeguard debug --log <file> [--ai-patch] [--output-patch <file>]
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
   vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
@@ -171,11 +171,27 @@ async function debugCommand(parsed, root) {
     const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
     result.aiPatch = ai;
     if (ai.patch) {
-      result.aiPatch.patch = normalizeUnifiedDiff(ai.patch);
-      result.aiPatch.validation = validateUnifiedDiff(ai.patch);
+      const normalizedPatch = normalizeUnifiedDiff(ai.patch);
+      result.aiPatch.patch = normalizedPatch;
+      result.aiPatch.validation = validateUnifiedDiff(normalizedPatch);
       result.aiPatch.policy = result.aiPatch.validation.valid
-        ? engine.checkPatch(ai.patch)
+        ? engine.checkPatch(normalizedPatch)
         : { status: "deny", reason: result.aiPatch.validation.reason, files: result.aiPatch.validation.files };
+      if (parsed["output-patch"]) {
+        if (result.aiPatch.policy.status !== "allow" && !(result.aiPatch.policy.status === "require_confirmation" && parsed.confirm)) {
+          result.aiPatch.outputPatch = {
+            status: result.aiPatch.policy.status,
+            stage: "patch_policy",
+            path: parsed["output-patch"],
+            policy: result.aiPatch.policy
+          };
+        } else if (result.aiPatch.validation.valid) {
+          result.aiPatch.outputPatch = writeFileWithPolicy(root, parsed["output-patch"], normalizedPatch, engine, {
+            confirmed: Boolean(parsed.confirm),
+            auditLog: parsed["audit-log"]
+          });
+        }
+      }
     }
   }
   return result;
