@@ -166,6 +166,10 @@ commands:
     - "git reset --hard"
   require_confirmation:
     - "npm install"
+    - "git switch -c"
+    - "git commit"
+    - "git push"
+    - "gh pr create"
 ```
 
 Policy result levels:

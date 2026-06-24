@@ -16,6 +16,15 @@ test("CLI policy check prints JSON result", () => {
   assert.equal(parsed.status, "allow");
 });
 
+test("CLI policy check requires confirmation for Git and PR state changes", () => {
+  const output = execFileSync(process.execPath, [bin, "policy", "check", "--command", "git push -u origin codex/fix-bug", "--json"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+  assert.equal(parsed.status, "require_confirmation");
+});
+
 test("CLI debug accepts log file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-"));
   fs.mkdirSync(path.join(root, "src"));
