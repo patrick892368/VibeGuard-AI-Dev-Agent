@@ -1,11 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, buildGhRunListArgs, createPullRequestWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhPrCommentArgs, buildGhRunListArgs, commentPullRequestWithGh, createPullRequestWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
+
+const bin = path.resolve("bin/vibeguard.js");
 
 test("hook templates include pre-commit policy check", () => {
   assert.ok(listHooks().includes("pre-commit"));
@@ -99,6 +103,30 @@ test("GitHub PR creation is dry-run by default", () => {
   const result = createPullRequestWithGh(process.cwd(), { title: "Fix bug" });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh pr create/);
+});
+
+test("GitHub PR comments are dry-run by default", () => {
+  assert.deepEqual(buildGhPrCommentArgs({ pr: 12, bodyFile: "review.md" }), [
+    "pr",
+    "comment",
+    "12",
+    "--body-file",
+    "review.md"
+  ]);
+  const result = commentPullRequestWithGh(process.cwd(), { pr: 12, body: "Looks good" });
+  assert.equal(result.status, "dry_run");
+  assert.match(result.command, /gh pr comment 12/);
+});
+
+test("CLI GitHub PR comment execute requires command confirmation", () => {
+  const output = execFileSync(process.execPath, [bin, "github", "comment", "--pr", "12", "--body", "review", "--execute", "--json"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const result = JSON.parse(output);
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "github_comment_policy");
+  assert.match(result.command, /gh pr comment 12/);
 });
 
 test("GitHub checks are dry-run by default", () => {

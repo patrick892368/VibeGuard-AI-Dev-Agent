@@ -115,6 +115,13 @@ node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --json
 node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --execute --json
 ```
 
+Post a PR summary or review note:
+
+```bash
+node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --json
+node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --json
+```
+
 ## Codex Operating Rules
 
 - Do not bypass `.vibeguard.yaml`.

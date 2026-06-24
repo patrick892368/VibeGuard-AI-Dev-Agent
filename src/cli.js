@@ -14,7 +14,7 @@ import { applyPatchWithPolicy } from "./patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -36,7 +36,8 @@ Usage:
   vibeguard hooks install <hook> --allow-git-dir
   vibeguard pr summary [--diff <file>]
   vibeguard github detect
-  vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute]
+  vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm]
+  vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm]
   vibeguard github checks [--branch <branch>] [--limit <n>] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
@@ -208,16 +209,61 @@ function runCommand(parsed, root) {
   });
 }
 
+function githubMutationPolicy(root, command, stage, confirmed) {
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const policy = engine.checkCommand(command);
+  if (policy.status !== "allow" && !(policy.status === "require_confirmation" && confirmed)) {
+    return {
+      status: policy.status,
+      stage,
+      command,
+      policy
+    };
+  }
+  return null;
+}
+
 function githubCommand(parsed, root, subcommand) {
   if (subcommand === "detect") return detectGitHubRepository(root);
   if (subcommand === "pr") {
-    return createPullRequestWithGh(root, {
+    const options = {
       title: parsed.title,
       bodyFile: parsed["body-file"],
       body: parsed.body,
       base: parsed.base,
       head: parsed.head,
-      draft: Boolean(parsed.draft),
+      draft: Boolean(parsed.draft)
+    };
+    const dryRun = createPullRequestWithGh(root, {
+      ...options,
+      dryRun: true
+    });
+    if (parsed.execute) {
+      const blocked = githubMutationPolicy(root, dryRun.command, "github_pr_policy", Boolean(parsed.confirm));
+      if (blocked) return blocked;
+    }
+    return createPullRequestWithGh(root, {
+      ...options,
+      dryRun: !parsed.execute
+    });
+  }
+  if (subcommand === "comment") {
+    const options = {
+      pr: parsed.pr,
+      bodyFile: parsed["body-file"],
+      body: parsed.body
+    };
+    const dryRun = commentPullRequestWithGh(root, {
+      ...options,
+      dryRun: true
+    });
+    if (parsed.execute) {
+      const blocked = githubMutationPolicy(root, dryRun.command, "github_comment_policy", Boolean(parsed.confirm));
+      if (blocked) return blocked;
+    }
+    return commentPullRequestWithGh(root, {
+      ...options,
       dryRun: !parsed.execute
     });
   }

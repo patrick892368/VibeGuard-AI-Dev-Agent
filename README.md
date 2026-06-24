@@ -16,7 +16,7 @@ The core design rule is simple: every agent must pass through Policy-as-Code bef
 - `vibeguard patch` checks or applies unified diffs through policy.
 - `vibeguard hooks` prints or installs Git hook templates.
 - `vibeguard pr summary` creates a GitHub-ready PR body from a diff.
-- `vibeguard github` detects GitHub remotes, can create PRs through `gh`, and can read Actions run status.
+- `vibeguard github` detects GitHub remotes, can create PRs/comments through `gh`, and can read Actions run status.
 - `vibeguard run` executes commands only after command policy checks.
 - `vibeguard eval fixtures` evaluates the configured LLM provider against Python and Node fix fixtures.
 - `vibeguard mcp` starts a small JSON-RPC MCP-style stdio server for agent integrations.
@@ -61,6 +61,7 @@ vibeguard hooks print pre-commit
 vibeguard pr summary --diff change.diff
 vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
+vibeguard github comment --pr 12 --body-file review.md
 vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard run --command "npm test" --dry-run
 vibeguard eval fixtures --json
@@ -146,7 +147,7 @@ Remote actions are available behind the same explicit execution gate:
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --json
 ```
 
-`git switch -c`, `git commit`, `git push`, and `gh pr create` require confirmation by default. Remote PR creation also requires a configured GitHub remote and authenticated `gh`.
+`git switch -c`, `git commit`, `git push`, `gh pr create`, and `gh pr comment` require confirmation by default. Remote PR creation/commenting also requires a configured GitHub remote and authenticated `gh`.
 
 ## Policy-as-Code
 
@@ -174,6 +175,7 @@ commands:
     - "git commit"
     - "git push"
     - "gh pr create"
+    - "gh pr comment"
 ```
 
 Policy result levels:

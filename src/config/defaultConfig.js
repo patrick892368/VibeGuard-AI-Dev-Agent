@@ -31,7 +31,8 @@ export const defaultConfig = {
       "git switch -c",
       "git commit",
       "git push",
-      "gh pr create"
+      "gh pr create",
+      "gh pr comment"
     ]
   },
   agents: {

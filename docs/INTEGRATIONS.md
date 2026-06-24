@@ -43,6 +43,7 @@ Available tools:
 - `summarize_pr`
 - `detect_github`
 - `github_checks`
+- `github_comment`
 - `eval_fixtures`
 - `eval_history`
 
@@ -92,6 +93,13 @@ Execute the PR creation only when ready:
 
 ```bash
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute
+```
+
+Post a PR comment through the GitHub CLI. The command is dry-run by default:
+
+```bash
+vibeguard github comment --pr 12 --body-file review.md
+vibeguard github comment --pr 12 --body-file review.md --execute --confirm
 ```
 
 Read recent workflow run status:

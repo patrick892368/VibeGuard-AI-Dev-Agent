@@ -30,6 +30,7 @@ The default policy also requires confirmation for Codex Git/PR operations that c
 - `git commit`
 - `git push`
 - `gh pr create`
+- `gh pr comment`
 
 ## Patch Policy
 

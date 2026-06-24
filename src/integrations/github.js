@@ -34,6 +34,15 @@ export function buildGhPrArgs(options = {}) {
   return args;
 }
 
+export function buildGhPrCommentArgs(options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  const args = ["pr", "comment", String(options.pr)];
+  if (options.bodyFile) args.push("--body-file", options.bodyFile);
+  if (options.body) args.push("--body", options.body);
+  if (!options.bodyFile && !options.body) throw new Error("GitHub PR comment body or bodyFile is required");
+  return args;
+}
+
 export function buildGhRunListArgs(options = {}) {
   const args = [
     "run",
@@ -60,6 +69,21 @@ export function createPullRequestWithGh(root = process.cwd(), options = {}) {
   return {
     status: "created",
     url: stdout.trim()
+  };
+}
+
+export function commentPullRequestWithGh(root = process.cwd(), options = {}) {
+  const args = buildGhPrCommentArgs(options);
+  if (options.dryRun !== false) {
+    return {
+      status: "dry_run",
+      command: `gh ${args.join(" ")}`
+    };
+  }
+  const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+  return {
+    status: "commented",
+    output: stdout.trim()
   };
 }
 

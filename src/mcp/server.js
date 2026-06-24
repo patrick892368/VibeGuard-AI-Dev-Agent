@@ -8,7 +8,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
-import { detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { commentPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 
 const tools = [
@@ -47,6 +47,10 @@ const tools = [
   {
     name: "github_checks",
     description: "Read recent GitHub Actions workflow run status through gh run list."
+  },
+  {
+    name: "github_comment",
+    description: "Create a GitHub PR comment through gh pr comment. Dry-run by default."
   },
   {
     name: "eval_fixtures",
@@ -113,6 +117,33 @@ function callTool(name, args, root) {
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
+  if (name === "github_comment") {
+    const dryRun = commentPullRequestWithGh(root, {
+      pr: args.pr,
+      bodyFile: args.bodyFile,
+      body: args.body,
+      dryRun: true
+    });
+    if (args.execute === true) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      const policy = engine.checkCommand(dryRun.command);
+      if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
+        return {
+          status: policy.status,
+          stage: "github_comment_policy",
+          command: dryRun.command,
+          policy
+        };
+      }
+    }
+    return commentPullRequestWithGh(root, {
+      pr: args.pr,
+      bodyFile: args.bodyFile,
+      body: args.body,
+      dryRun: args.execute !== true
+    });
+  }
   if (name === "github_checks") {
     return listWorkflowRunsWithGh(root, {
       branch: args.branch,

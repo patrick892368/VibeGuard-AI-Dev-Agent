@@ -26,3 +26,4 @@ commands:
     - "git commit"
     - "git push"
     - "gh pr create"
+    - "gh pr comment"
