@@ -63,6 +63,47 @@ test("MCP tools/call returns structured tool errors", async () => {
   assert.match(response.result.structuredContent.error, /requires path, command, or patch/);
 });
 
+test("MCP tools/call validates required arguments", async () => {
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 5,
+    method: "tools/call",
+    params: {
+      name: "audit_report",
+      arguments: {}
+    }
+  }, tempRepo());
+
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.structuredContent.error, /Missing required argument: output/);
+});
+
+test("MCP tools/call rejects unknown and mistyped arguments", async () => {
+  const unknown = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 6,
+    method: "tools/call",
+    params: {
+      name: "check_policy",
+      arguments: { path: "src/index.js", extra: true }
+    }
+  }, tempRepo());
+  const mistyped = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 7,
+    method: "tools/call",
+    params: {
+      name: "write_tests",
+      arguments: { limit: "2" }
+    }
+  }, tempRepo());
+
+  assert.equal(unknown.result.isError, true);
+  assert.match(unknown.result.structuredContent.error, /Unknown argument: extra/);
+  assert.equal(mistyped.result.isError, true);
+  assert.match(mistyped.result.structuredContent.error, /limit must be a number/);
+});
+
 test("MCP initialized notification does not produce a response", async () => {
   const response = await handleMcpRequest({
     jsonrpc: "2.0",

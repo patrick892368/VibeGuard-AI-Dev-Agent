@@ -208,6 +208,44 @@ const tools = [
   }
 ];
 
+function validateSchemaValue(name, value, schema) {
+  if (schema.type === "string" && typeof value !== "string") return `${name} must be a string`;
+  if (schema.type === "boolean" && typeof value !== "boolean") return `${name} must be a boolean`;
+  if (schema.type === "number" && typeof value !== "number") return `${name} must be a number`;
+  if (schema.type === "object" && (typeof value !== "object" || value === null || Array.isArray(value))) return `${name} must be an object`;
+  return null;
+}
+
+function validateToolArguments(name, args = {}) {
+  const tool = tools.find((item) => item.name === name);
+  if (!tool) throw new Error(`Unknown tool: ${name}`);
+  const schema = tool.inputSchema || objectSchema();
+  const rootError = validateSchemaValue("arguments", args, schema);
+  if (rootError) throw new Error(rootError);
+
+  const properties = schema.properties || {};
+  const errors = [];
+  for (const requiredKey of schema.required || []) {
+    if (!Object.prototype.hasOwnProperty.call(args, requiredKey)) {
+      errors.push(`Missing required argument: ${requiredKey}`);
+    }
+  }
+  if (schema.additionalProperties === false) {
+    for (const key of Object.keys(args)) {
+      if (!Object.prototype.hasOwnProperty.call(properties, key)) {
+        errors.push(`Unknown argument: ${key}`);
+      }
+    }
+  }
+  for (const [key, value] of Object.entries(args)) {
+    if (!Object.prototype.hasOwnProperty.call(properties, key)) continue;
+    const error = validateSchemaValue(key, value, properties[key]);
+    if (error) errors.push(error);
+  }
+  if (errors.length > 0) throw new Error(`Invalid arguments for ${name}: ${errors.join("; ")}`);
+  return args;
+}
+
 function ok(id, result) {
   return { jsonrpc: "2.0", id, result };
 }
@@ -508,7 +546,9 @@ export async function handleMcpRequest(request, root = process.cwd()) {
   if (request.method === "tools/list") return ok(request.id, { tools });
   if (request.method === "tools/call") {
     try {
-      const result = await callTool(request.params?.name, request.params?.arguments || {}, root);
+      const name = request.params?.name;
+      const args = validateToolArguments(name, request.params?.arguments ?? {});
+      const result = await callTool(name, args, root);
       return ok(request.id, toolContent(result));
     } catch (error) {
       return ok(request.id, toolErrorContent(error));
@@ -539,5 +579,6 @@ export const mcpInternals = {
   initializeResult,
   toolContent,
   toolErrorContent,
+  validateToolArguments,
   callTool
 };
