@@ -295,6 +295,75 @@ test("writeSuggestedTests can prepare a Git and PR dry-run plan", () => {
   assert.ok(result.gitPlan.commands.at(-1).argv.includes("--body"));
 });
 
+test("writeSuggestedTests blocks git plan execution without confirmation", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["src/**"], deny: [], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["git switch -c", "git commit"]
+    }
+  }, { root });
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    runTests: true,
+    createBranch: true,
+    commit: true,
+    executeGitPlan: true
+  });
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.gitPolicy.status, "require_confirmation");
+  assert.equal(result.gitExecution.status, "require_confirmation");
+  assert.equal(result.gitExecution.stage, "git_plan_policy");
+  assert.deepEqual(result.gitExecution.results, []);
+});
+
+test("writeSuggestedTests executes confirmed local branch and commit plan after tests pass", () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "core.autocrlf", "false"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  execFileSync("git", ["add", "."], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["commit", "-m", "initial"], { cwd: root, encoding: "utf8" });
+
+  const engine = new PolicyEngine({
+    paths: { allow: ["src/**"], deny: [".git/**"], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["git switch -c", "git commit"]
+    }
+  }, { root });
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    runTests: true,
+    createBranch: true,
+    commit: true,
+    executeGitPlan: true,
+    confirmed: true
+  });
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.gitPolicy.status, "allow");
+  assert.equal(result.gitExecution.status, "executed");
+  assert.deepEqual(result.gitExecution.results.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit"
+  ]);
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim(), "codex/add-generated-tests");
+  assert.equal(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: root, encoding: "utf8" }).trim(), "test: add generated coverage tests");
+});
+
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");

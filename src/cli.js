@@ -31,7 +31,7 @@ Usage:
   vibeguard debug --log <file>
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
@@ -414,6 +414,7 @@ async function dispatch(parsed) {
         push: Boolean(parsed.push),
         prDryRun: Boolean(parsed["pr-dry-run"]),
         createPr: Boolean(parsed["create-pr"]),
+        executeGitPlan: Boolean(parsed["execute-git-plan"]),
         branch: parsed.branch,
         commitMessage: parsed["commit-message"],
         prTitle: parsed["pr-title"],

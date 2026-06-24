@@ -23,7 +23,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - Debug snippets 会先经过 path policy，再包含 stack frame 和 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件但不读取 denied 路径。Debug snippets pass through path policy before including stack frames and short previews of framework-related likely files, so AI patch generation can see likely targets without reading denied paths.
 - `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
-- `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块和 stdlib `unittest` Python 测试，会为简单纯函数、明确分支、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并可生成 branch/commit/PR dry-run plan。Writes basic tests after policy checks, supports ESM/CommonJS Node modules and stdlib `unittest` Python tests, generates behavior assertions for simple pure functions, clear branches, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, and can generate a branch/commit/PR dry-run plan.
+- `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块和 stdlib `unittest` Python 测试，会为简单纯函数、明确分支、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并可生成 branch/commit/PR dry-run plan；只有生成测试通过且 `--execute-git-plan --confirm` 通过策略后才执行本地 Git plan。Writes basic tests after policy checks, supports ESM/CommonJS Node modules and stdlib `unittest` Python tests, generates behavior assertions for simple pure functions, clear branches, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, can generate a branch/commit/PR dry-run plan, and only executes the local Git plan after generated tests pass and `--execute-git-plan --confirm` passes policy.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings、recommendations、actionItems 和 PR comment Markdown。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings, recommendations, actionItems, and PR-comment Markdown.
 - `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档和结构化 firstTasks 新人任务建议。Scans a repository and can generate bilingual onboarding / architecture docs plus structured firstTasks for newcomer work.
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
@@ -79,6 +79,7 @@ vibeguard test --write --limit 1
 vibeguard test --write --coverage coverage.json --run --limit 1
 vibeguard test --write --run --test-command "node --test {testFile}"
 vibeguard test --write --create-branch --commit --pr-dry-run --json
+vibeguard test --write --run --create-branch --commit --execute-git-plan --confirm --json
 vibeguard review
 vibeguard onboard
 vibeguard onboard --write
@@ -205,6 +206,7 @@ Codex can first request a dry-run plan:
 ```bash
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --output-patch patches/fix.diff --dry-run --json
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --pr-dry-run --pr-body-file patches/pr-body.md --dry-run --json
+node ./bin/vibeguard.js test --write --run --create-branch --commit --pr-dry-run --json
 ```
 
 确认后才能执行本地 branch / commit：
@@ -213,6 +215,7 @@ After confirmation, local branch / commit execution is available:
 
 ```bash
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --execute-git-plan --confirm --apply --json
+node ./bin/vibeguard.js test --write --run --create-branch --commit --execute-git-plan --confirm --json
 ```
 
 远端 push / PR 也在同一个显式执行门后面：
@@ -300,7 +303,7 @@ The test suite covers:
 - Python `unittest` 风格测试生成和运行。Python `unittest`-style test generation and execution.
 - 简单纯函数、明确分支、常见边界值和明确异常分支行为断言生成。Simple pure-function, clear-branch, common-boundary, and clear-exception-branch behavior assertion generation.
 - 生成测试失败后的结构化修复计划。Structured repair plans after generated test failures.
-- Test Writer 生成测试后的 Git/PR dry-run plan。Git/PR dry-run plans after Test Writer creates tests.
+- Test Writer 生成测试后的 Git/PR dry-run plan，以及确认后执行本地 branch/commit 前的测试通过门。Git/PR dry-run plans after Test Writer creates tests, plus the passing-test gate before confirmed local branch/commit execution.
 
 ## 集成目标 / Integration Targets
 

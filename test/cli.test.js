@@ -160,6 +160,35 @@ test("CLI test --write can return a Git and PR dry-run plan", () => {
   assert.equal(parsed.gitPolicy.status, "require_confirmation");
 });
 
+test("CLI test --write blocks git plan execution without confirmation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-test-execute-pr-"));
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "test",
+    "--write",
+    "--run",
+    "--create-branch",
+    "--commit",
+    "--execute-git-plan",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.testRuns[0].status, "passed");
+  assert.equal(parsed.gitPolicy.status, "require_confirmation");
+  assert.equal(parsed.gitExecution.status, "require_confirmation");
+  assert.equal(parsed.gitExecution.stage, "git_plan_policy");
+});
+
 test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-ai-"));
   fs.writeFileSync(path.join(root, ".vibeguard.yaml"), "version: 1\n", "utf8");

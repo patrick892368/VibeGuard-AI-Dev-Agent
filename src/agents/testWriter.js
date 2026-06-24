@@ -4,7 +4,7 @@ import { listRepoFiles, readTextIfExists } from "../repo/files.js";
 import { scanRepository } from "../repo/scan.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../runner/safeCommand.js";
-import { buildFixGitPlan, checkGitPlanPolicy } from "../integrations/gitPlan.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
 
 function extractPythonFunctions(text) {
   return [...text.matchAll(/^\s*def\s+([a-zA-Z_]\w*)\s*\(/gm)].map((match) => match[1]);
@@ -802,6 +802,39 @@ function buildTestWriterGitPlan(written, testRuns, options = {}) {
   });
 }
 
+function buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine, options = {}) {
+  if (!options.executeGitPlan || !gitPlan) return null;
+  if (gitPolicy?.status !== "allow") {
+    return {
+      status: gitPolicy?.status || "blocked",
+      stage: "git_plan_policy",
+      policy: gitPolicy,
+      results: []
+    };
+  }
+  if (!options.runTests) {
+    return {
+      status: "blocked",
+      stage: "test_validation",
+      reason: "--execute-git-plan requires --run so generated tests are validated before Git state changes.",
+      results: []
+    };
+  }
+  const failingRuns = testRuns.filter((run) => run.status !== "passed");
+  if (failingRuns.length > 0) {
+    return {
+      status: "failed",
+      stage: "test_validation",
+      reason: "Generated tests must pass before Git plan execution.",
+      failingRuns,
+      results: []
+    };
+  }
+  return executeGitPlan(root, gitPlan, engine, {
+    confirmed: Boolean(options.confirmed)
+  });
+}
+
 export function analyzeTestTargets(options = {}) {
   const root = options.root || process.cwd();
   const files = listRepoFiles(root);
@@ -881,11 +914,13 @@ export function writeSuggestedTests(root, engine, options = {}) {
   const gitPolicy = gitPlan
     ? checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) })
     : null;
+  const gitExecution = buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine, options);
   return {
     ...analysis,
     written,
     testRuns,
     gitPlan,
-    gitPolicy
+    gitPolicy,
+    gitExecution
   };
 }
