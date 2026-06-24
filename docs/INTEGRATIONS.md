@@ -1,8 +1,10 @@
-# Integrations
+# Integrations / 集成
 
-VibeGuard is designed around a CLI-first core so every integration uses the same policy checks.
+VibeGuard uses a CLI-first core so every integration shares the same policy checks.
 
-## CLI
+VibeGuard 采用 CLI-first 内核，因此所有集成都复用同一套 policy 检查。
+
+## CLI / CLI
 
 ```bash
 vibeguard debug --log error.log
@@ -12,9 +14,11 @@ vibeguard onboard --write
 vibeguard policy check --path src/index.js
 ```
 
-## Git Hooks
+## Git Hooks / Git Hooks
 
 Print a hook without writing to `.git`:
+
+打印 hook，不写入 `.git`：
 
 ```bash
 vibeguard hooks print pre-commit
@@ -22,17 +26,21 @@ vibeguard hooks print pre-commit
 
 Install a hook with explicit confirmation:
 
+显式确认后安装 hook：
+
 ```bash
 vibeguard hooks install pre-commit --allow-git-dir
 ```
 
-## MCP-Style Server
+## MCP-Style Server / MCP-Style Server
 
 ```bash
 vibeguard mcp
 ```
 
 Available tools:
+
+可用 tools：
 
 - `check_policy`
 - `debug_error`
@@ -48,38 +56,65 @@ Available tools:
 - `eval_history`
 - `doctor`
 
-`eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking. `eval_history` summarizes those JSONL records for trend review.
+`eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking.
+
+`eval_fixtures` 支持经过 policy 检查的 `output` 报告，也支持 JSONL `history` 追加，用于 Codex/Grok 质量跟踪。
+
+`eval_history` summarizes those JSONL records for trend review.
+
+`eval_history` 会汇总 JSONL 历史记录，方便看趋势。
+
 `doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 
-## Codex
+`doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥。
+
+## Codex / Codex
 
 Codex is the current priority integration target.
 
-Use the CLI directly from the Codex tool runner, or connect through the MCP-style stdio server. The important rule is that Codex must not bypass `.vibeguard.yaml`.
+Codex 是当前优先集成目标。
+
+Use the CLI directly from Codex, or connect through the MCP-style stdio server. Codex must not bypass `.vibeguard.yaml`.
+
+Codex 可以直接调用 CLI，也可以通过 MCP-style stdio server 连接。Codex 不能绕过 `.vibeguard.yaml`。
 
 See `docs/CODEX.md` for the focused Codex workflow.
 
-Grok is the current priority model provider. Other agent/provider integrations stay deferred until the Codex + Grok flow is stable.
+Codex 专用流程见 `docs/CODEX.md`。
 
-The current Codex flow supports patch artifact output, Git/PR dry-run planning, and confirmed execution of branch/commit/push/PR commands from `fix`. Execution requires `--execute-git-plan --confirm --apply`; remote push and PR creation also require `--push --create-pr`, a GitHub remote, and authenticated `gh`.
+Grok is the current priority model provider. Other agent/provider integrations are deferred until Codex + Grok is stable.
 
-## Deferred Agent Integrations
+Grok 是当前优先模型 provider。其他 agent/provider 集成等 Codex + Grok 稳定后再做。
 
-These integrations are intentionally deferred until the Codex flow is stable:
+The current Codex flow supports patch artifact output, Git/PR dry-run planning, confirmed branch/commit/push/PR execution, fixture evaluation history, and environment diagnosis.
+
+当前 Codex 流程支持 patch artifact 输出、Git/PR dry-run 计划、确认后执行 branch/commit/push/PR、fixture 评测历史和环境诊断。
+
+## Deferred Agent Integrations / 暂缓 Agent 集成
+
+These integrations are deferred until Codex is stable:
+
+以下集成在 Codex 稳定前暂缓：
 
 - Cursor
 - Claude Code
 - Cline
 
-## VS Code
+## VS Code / VS Code
 
 The repository includes a minimal extension scaffold in `integrations/vscode`.
 
-The extension calls the local CLI and renders JSON results in a VS Code output channel. This is not the current priority; Codex comes first. The CLI remains the source of truth for policy decisions.
+仓库包含一个最小 VS Code extension scaffold，位于 `integrations/vscode`。
 
-## GitHub
+The extension calls the local CLI and renders JSON results in a VS Code output channel. It is not the current priority; Codex remains the source of truth.
+
+该 extension 调用本地 CLI 并在 VS Code output channel 展示 JSON。它不是当前重点；Codex 和 CLI 仍是 policy 决策来源。
+
+## GitHub / GitHub
 
 Detect the repository:
+
+检测仓库：
 
 ```bash
 vibeguard github detect
@@ -87,17 +122,23 @@ vibeguard github detect
 
 Create a draft PR through the GitHub CLI. The command is dry-run by default:
 
+通过 GitHub CLI 创建 draft PR。默认 dry-run：
+
 ```bash
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 ```
 
-Execute the PR creation only when ready:
+Execute PR creation only when ready:
+
+确认就绪后才执行 PR 创建：
 
 ```bash
-vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute
+vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm
 ```
 
 Post a PR comment through the GitHub CLI. The command is dry-run by default:
+
+通过 GitHub CLI 发布 PR comment。默认 dry-run：
 
 ```bash
 vibeguard github comment --pr 12 --body-file review.md
@@ -106,7 +147,13 @@ vibeguard github comment --pr 12 --body-file review.md --execute --confirm
 
 Read recent workflow run status:
 
+读取最近的 workflow run 状态：
+
 ```bash
 vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard github checks --branch codex/fix-bug --limit 5 --execute
 ```
+
+`gh pr create` and `gh pr comment` require policy confirmation and authenticated `gh`.
+
+`gh pr create` 和 `gh pr comment` 需要 policy 确认，并且本机要有已认证的 `gh`。
