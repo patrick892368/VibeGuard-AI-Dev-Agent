@@ -43,8 +43,9 @@ Available tools:
 - `summarize_pr`
 - `detect_github`
 - `eval_fixtures`
+- `eval_history`
 
-`eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking.
+`eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking. `eval_history` summarizes those JSONL records for trend review.
 
 ## Codex
 

@@ -17,7 +17,7 @@ import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { createPullRequestWithGh, detectGitHubRepository } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
-import { evaluateFixFixtures } from "./eval/fixtures.js";
+import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
 
 function printHelp() {
   console.log(`VibeGuard AI Dev Agent
@@ -39,6 +39,7 @@ Usage:
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
+  vibeguard eval history [--file <file>]
   vibeguard mcp
 
 Options:
@@ -231,6 +232,14 @@ async function evalCommand(parsed, root, subcommand) {
       history: parsed.history,
       confirmed: Boolean(parsed.confirm),
       env: loadRuntimeEnv(root)
+    });
+  }
+  if (subcommand === "history") {
+    return summarizeEvalHistory({
+      root,
+      file: parsed.file,
+      limit: parsed.limit,
+      confirmed: Boolean(parsed.confirm)
     });
   }
   throw new Error(`Unknown eval command: ${subcommand || ""}`);

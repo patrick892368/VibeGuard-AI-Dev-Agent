@@ -33,3 +33,14 @@ export function appendFileWithPolicy(root, relativePath, content, engine, option
     policy: result
   };
 }
+
+export function readFileWithPolicy(root, relativePath, engine, options = {}) {
+  const result = engine.checkPath(relativePath, "read");
+  assertPolicyAllowed(result, options);
+  const absolute = path.join(root, relativePath);
+  return {
+    content: fs.readFileSync(absolute, "utf8"),
+    path: relativePath,
+    policy: result
+  };
+}

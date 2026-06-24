@@ -9,7 +9,7 @@ import { analyzeTestTargets } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
 import { detectGitHubRepository } from "../integrations/github.js";
-import { evaluateFixFixtures } from "../eval/fixtures.js";
+import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 
 const tools = [
   {
@@ -47,6 +47,10 @@ const tools = [
   {
     name: "eval_fixtures",
     description: "Evaluate the configured LLM provider against Python and Node fix fixtures."
+  },
+  {
+    name: "eval_history",
+    description: "Summarize compact JSONL fixture evaluation history."
   }
 ];
 
@@ -113,6 +117,14 @@ function callTool(name, args, root) {
       history: args.history,
       confirmed: Boolean(args.confirmed),
       env: loadRuntimeEnv(root)
+    });
+  }
+  if (name === "eval_history") {
+    return summarizeEvalHistory({
+      root,
+      file: args.file,
+      limit: args.limit,
+      confirmed: Boolean(args.confirmed)
     });
   }
   throw new Error(`Unknown tool: ${name}`);

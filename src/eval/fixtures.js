@@ -6,7 +6,7 @@ import { loadConfig } from "../config/loadConfig.js";
 import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { runFixWorkflow } from "../agents/fix.js";
-import { appendFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
+import { appendFileWithPolicy, readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 
 export const defaultEvalFixtures = [
   {
@@ -155,6 +155,116 @@ function buildHistoryEntry(report) {
       testStatus: result.testStatus,
       pr: result.pr
     }))
+  };
+}
+
+function emptyHistorySummary(pathName, policy, status, stage) {
+  return {
+    status,
+    stage,
+    history: {
+      path: pathName,
+      policy
+    },
+    summary: {
+      entries: 0,
+      latestSuccessRate: null,
+      averageSuccessRate: null,
+      bestSuccessRate: null,
+      worstSuccessRate: null,
+      outcomeCounts: {},
+      providers: {},
+      models: {}
+    },
+    recent: [],
+    parseErrors: []
+  };
+}
+
+function increment(target, key, amount = 1) {
+  if (!key) return;
+  target[key] = (target[key] || 0) + amount;
+}
+
+function parseHistoryLines(text) {
+  const entries = [];
+  const parseErrors = [];
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (!line) continue;
+    try {
+      entries.push(JSON.parse(line));
+    } catch (error) {
+      parseErrors.push({
+        line: index + 1,
+        error: error.message
+      });
+    }
+  }
+  return { entries, parseErrors };
+}
+
+export function summarizeEvalHistory(options = {}) {
+  const repoRoot = options.root || process.cwd();
+  const historyPath = options.file || options.history || "reports/eval-history.jsonl";
+  const { config } = loadConfig(repoRoot);
+  const engine = new PolicyEngine(config, { root: repoRoot });
+  const policy = engine.checkPath(historyPath, "read_eval_history");
+  if (policy.status !== "allow" && !(policy.status === "require_confirmation" && options.confirmed)) {
+    return emptyHistorySummary(historyPath, policy, policy.status, "history_read");
+  }
+
+  const absolute = path.join(repoRoot, historyPath);
+  if (!fs.existsSync(absolute)) {
+    return emptyHistorySummary(historyPath, policy, "missing", "history_read");
+  }
+
+  const historyFile = readFileWithPolicy(repoRoot, historyPath, engine, {
+    confirmed: Boolean(options.confirmed)
+  });
+  const { entries, parseErrors } = parseHistoryLines(historyFile.content);
+  const rates = entries
+    .map((entry) => entry.summary?.successRate)
+    .filter((rate) => typeof rate === "number");
+  const outcomeCounts = {};
+  const providers = {};
+  const models = {};
+
+  for (const entry of entries) {
+    increment(providers, entry.provider);
+    increment(models, entry.model);
+    for (const [outcome, count] of Object.entries(entry.summary?.counts || {})) {
+      increment(outcomeCounts, outcome, count);
+    }
+  }
+
+  const latest = entries.at(-1) || null;
+  return {
+    status: "completed",
+    history: {
+      path: historyPath,
+      policy
+    },
+    summary: {
+      entries: entries.length,
+      latestSuccessRate: latest?.summary?.successRate ?? null,
+      averageSuccessRate: rates.length === 0 ? null : rates.reduce((sum, rate) => sum + rate, 0) / rates.length,
+      bestSuccessRate: rates.length === 0 ? null : Math.max(...rates),
+      worstSuccessRate: rates.length === 0 ? null : Math.min(...rates),
+      outcomeCounts,
+      providers,
+      models
+    },
+    recent: entries.slice(-Number(options.limit || 5)).map((entry) => ({
+      timestamp: entry.timestamp || null,
+      mode: entry.mode || null,
+      provider: entry.provider || null,
+      model: entry.model || null,
+      successRate: entry.summary?.successRate ?? null,
+      counts: entry.summary?.counts || {}
+    })),
+    parseErrors
   };
 }
 

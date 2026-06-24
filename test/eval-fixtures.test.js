@@ -170,3 +170,73 @@ test("CLI eval fixtures blocks history output on denied path before provider cal
   assert.equal(result.summary.total, 0);
   assert.equal(fs.existsSync(path.join(root, ".env")), false);
 });
+
+test("CLI eval history summarizes JSONL success trends", () => {
+  const root = copyRepoWithoutSecrets();
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "eval-history.jsonl"), [
+    JSON.stringify({
+      timestamp: "2026-06-24T00:00:00.000Z",
+      mode: "dry_run",
+      provider: "grok",
+      model: "grok-test",
+      summary: {
+        total: 2,
+        successRate: 0.5,
+        counts: { passed: 1, blocked: 1 }
+      },
+      results: []
+    }),
+    JSON.stringify({
+      timestamp: "2026-06-24T00:01:00.000Z",
+      mode: "dry_run",
+      provider: "grok",
+      model: "grok-test",
+      summary: {
+        total: 2,
+        successRate: 1,
+        counts: { passed: 2 }
+      },
+      results: []
+    })
+  ].join("\n") + "\n", "utf8");
+
+  const output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "history", "--file", "reports/eval-history.jsonl", "--json"], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VIBEGUARD_DISABLE_DOTENV: "1"
+    }
+  });
+  const result = JSON.parse(output);
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.summary.entries, 2);
+  assert.equal(result.summary.latestSuccessRate, 1);
+  assert.equal(result.summary.averageSuccessRate, 0.75);
+  assert.deepEqual(result.summary.outcomeCounts, { passed: 3, blocked: 1 });
+});
+
+test("CLI eval history blocks denied read paths", () => {
+  const root = copyRepoWithoutSecrets();
+  let output;
+  try {
+    output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "history", "--file", ".env", "--json"], {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        VIBEGUARD_DISABLE_DOTENV: "1"
+      }
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const result = JSON.parse(output);
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "history_read");
+  assert.equal(result.history.policy.status, "deny");
+  assert.equal(result.summary.entries, 0);
+});
