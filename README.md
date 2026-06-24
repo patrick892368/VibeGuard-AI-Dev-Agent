@@ -19,7 +19,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 ## 当前能力 / Current Capabilities
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
-- `vibeguard debug`: 解析 Python、Django、Node.js、Java/Spring Boot 报错日志，定位可能文件并解释失败上下文。Parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and explains context.
+- `vibeguard debug`: 解析 Python、Django、Node.js、Java/Spring Boot 报错日志，定位可能文件，并输出结构化 `explanation` 解释为什么失败。Parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and returns a structured `explanation` for why the failure happened.
 - Debug snippets 会先包含 stack frame，再补充 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件。Debug snippets include stack frames first, then short previews of framework-related likely files so AI patch generation can see the file that likely needs the change.
 - `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.

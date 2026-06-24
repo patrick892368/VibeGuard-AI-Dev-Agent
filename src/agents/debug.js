@@ -234,6 +234,79 @@ function likelyFixHints(summary) {
   return hints;
 }
 
+function firstFrameEvidence(frames) {
+  const frame = frames[0];
+  if (!frame) return null;
+  return `${frame.file}:${frame.line}${frame.symbol ? ` in ${frame.symbol}` : ""}`;
+}
+
+function buildErrorExplanation(summary, frames, frameworkContexts) {
+  const text = `${summary.type}: ${summary.message}`;
+  const evidence = [
+    summary.type ? `error=${summary.type}` : null,
+    summary.message ? `message=${summary.message}` : null,
+    firstFrameEvidence(frames),
+    frameworkContexts[0]?.framework ? `framework=${frameworkContexts[0].framework}` : null
+  ].filter(Boolean);
+
+  if (/TemplateDoesNotExist/.test(summary.type)) {
+    const templateName = summary.message.trim().split(/\s+/)[0];
+    return {
+      message: `Django could not find the template ${templateName || summary.message}.`,
+      likelyCause: "A view, helper, or render call points at a template path that does not exist in the configured template directories.",
+      evidence
+    };
+  }
+  if (/NoSuchBeanDefinitionException|UnsatisfiedDependencyException/.test(summary.type)) {
+    return {
+      message: "Spring could not construct the requested dependency graph.",
+      likelyCause: "A required bean is missing from component scanning, lacks a bean annotation, is behind the wrong profile, or is not registered in configuration.",
+      evidence
+    };
+  }
+  if (/NameError|ReferenceError/.test(text)) {
+    return {
+      message: "The code references a name that is not available at runtime.",
+      likelyCause: "The variable or symbol is misspelled, not imported, or outside the current scope at the failing line.",
+      evidence
+    };
+  }
+  if (/TypeError/.test(text)) {
+    return {
+      message: "The code used a value with an unexpected type or shape.",
+      likelyCause: "A value may be null/undefined, missing a property, or not compatible with the operation at the failing line.",
+      evidence
+    };
+  }
+  if (/NullPointerException/.test(summary.type)) {
+    return {
+      message: "Java attempted to dereference a null object.",
+      likelyCause: "An object needed by the failing method was not initialized, injected, or validated before use.",
+      evidence
+    };
+  }
+  if (/ModuleNotFoundError|Cannot find module/.test(text)) {
+    return {
+      message: "The runtime could not resolve an imported module.",
+      likelyCause: "The dependency may be missing, the import path may be wrong, or the module is not available in the active environment.",
+      evidence
+    };
+  }
+  if (/SyntaxError/.test(text)) {
+    return {
+      message: "The parser rejected the source before execution.",
+      likelyCause: "The reported line likely contains malformed syntax, an invalid token, or an incomplete expression.",
+      evidence
+    };
+  }
+
+  return {
+    message: "The runtime stopped at the reported error.",
+    likelyCause: "Start with the first in-repository stack frame and inspect the values passed into that function.",
+    evidence
+  };
+}
+
 function sourceSnippet(root, file, line, radius = 3) {
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute)) return null;
@@ -291,6 +364,7 @@ export function analyzeDebugLog(logText, options = {}) {
 
   return {
     summary,
+    explanation: buildErrorExplanation(summary, frames, frameworkContexts),
     frames,
     likelyFiles: uniqueFiles,
     snippets,

@@ -26,6 +26,10 @@ vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard audit summary --file reports/audit.jsonl
 ```
 
+`debug` returns a structured `explanation` with a user-facing message, likely cause, and evidence such as error type, stack location, and framework.
+
+`debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。
+
 `review` returns line-level findings, recommendations, severity summaries, actionItems, and PR-comment Markdown when the diff hunk contains line metadata.
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。

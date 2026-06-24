@@ -48,6 +48,8 @@ NameError: name 'missing' is not defined`;
 
   const result = analyzeDebugLog(log, { root });
   assert.equal(result.summary.type, "NameError");
+  assert.match(result.explanation.message, /references a name/);
+  assert.ok(result.explanation.evidence.some((item) => item.includes("src/app.py:2")));
   assert.deepEqual(result.likelyFiles, ["src/app.py"]);
   assert.equal(result.snippets.length, 1);
   assert.ok(result.hints.some((hint) => hint.includes("missing import") || hint.includes("scope")));
@@ -85,6 +87,8 @@ django.template.exceptions.TemplateDoesNotExist: home.html`;
 
   const result = analyzeDebugLog(log, { root });
   assert.equal(result.summary.type, "django.template.exceptions.TemplateDoesNotExist");
+  assert.match(result.explanation.message, /Django could not find/);
+  assert.ok(result.explanation.evidence.includes("framework=Django"));
   assert.equal(result.frameworkContext.framework, "Django");
   assert.ok(result.likelyFiles.includes("blog/views.py"));
   assert.ok(result.likelyFiles.includes("project/settings.py"));
@@ -114,6 +118,8 @@ Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No q
 
   const result = analyzeDebugLog(log, { root });
   assert.equal(result.summary.type, "org.springframework.beans.factory.NoSuchBeanDefinitionException");
+  assert.match(result.explanation.message, /Spring could not construct/);
+  assert.ok(result.explanation.evidence.includes("framework=Spring Boot"));
   assert.equal(result.frames[0].file, "src/main/java/com/example/UserService.java");
   assert.equal(result.frameworkContext.framework, "Spring Boot");
   assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserService.java"));
