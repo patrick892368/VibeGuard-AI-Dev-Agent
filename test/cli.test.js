@@ -49,6 +49,34 @@ test("CLI policy check can write audit JSONL", () => {
   assert.equal(events[0].target, "src/index.js");
 });
 
+test("CLI audit summary reads policy-gated audit logs", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-audit-summary-"));
+  execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "policy",
+    "check",
+    "--path",
+    "src/index.js",
+    "--audit-log",
+    "reports/audit.jsonl",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+
+  const output = execFileSync(process.execPath, [bin, "--root", root, "audit", "summary", "--file", "reports/audit.jsonl", "--json"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+  assert.equal(parsed.summary.entries, 1);
+  assert.equal(parsed.summary.operations.policy_check_path, 1);
+  assert.equal(parsed.audit.policy.status, "allow");
+});
+
 test("CLI debug accepts log file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-"));
   fs.mkdirSync(path.join(root, "src"));

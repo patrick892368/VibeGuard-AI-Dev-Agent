@@ -111,6 +111,14 @@ Recommended local path:
 reports/audit.jsonl
 ```
 
+Summarize an audit log:
+
+汇总审计日志：
+
+```bash
+vibeguard audit summary --file reports/audit.jsonl
+```
+
 ## Local Secrets / 本地密钥
 
 `.env` may contain local provider credentials such as Grok / xAI API keys.

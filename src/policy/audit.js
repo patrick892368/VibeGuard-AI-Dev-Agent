@@ -38,3 +38,45 @@ export function appendAuditEvent(root, engine, auditLog, event, options = {}) {
     event: normalized
   };
 }
+
+function increment(target, key) {
+  const normalized = key || "unknown";
+  target[normalized] = (target[normalized] || 0) + 1;
+}
+
+export function summarizeAuditEvents(text, options = {}) {
+  const limit = Number(options.limit || 20);
+  const events = [];
+  const parseErrors = [];
+  for (const [index, line] of text.split(/\r?\n/).entries()) {
+    if (!line.trim()) continue;
+    try {
+      events.push(JSON.parse(line));
+    } catch (error) {
+      parseErrors.push({ line: index + 1, error: error.message });
+    }
+  }
+
+  const operations = {};
+  const policyStatuses = {};
+  const outcomes = {};
+  for (const event of events) {
+    increment(operations, event.operation);
+    increment(policyStatuses, event.policyStatus);
+    increment(outcomes, event.outcome || event.status || event.auditStatus);
+  }
+
+  return {
+    status: "completed",
+    summary: {
+      entries: events.length,
+      parseErrors: parseErrors.length,
+      operations,
+      policyStatuses,
+      outcomes,
+      blockedEvents: events.filter((event) => event.outcome === "blocked" || event.policyStatus === "deny").length
+    },
+    recent: events.slice(-limit).reverse(),
+    parseErrors
+  };
+}

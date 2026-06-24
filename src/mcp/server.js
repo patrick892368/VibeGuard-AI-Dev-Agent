@@ -2,6 +2,8 @@ import readline from "node:readline";
 import { loadConfig } from "../config/loadConfig.js";
 import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
+import { readFileWithPolicy } from "../policy/safeWrite.js";
+import { summarizeAuditEvents } from "../policy/audit.js";
 import { analyzeDebugLog } from "../agents/debug.js";
 import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
@@ -151,6 +153,16 @@ const tools = [
     name: "doctor",
     description: "Check local VibeGuard runtime, policy, provider, git, gh, and proxy readiness without exposing secrets.",
     inputSchema: objectSchema()
+  },
+  {
+    name: "audit_summary",
+    description: "Summarize a policy-gated JSONL audit log.",
+    inputSchema: objectSchema({
+      file: stringSchema,
+      limit: numberSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    })
   }
 ];
 
@@ -314,6 +326,22 @@ async function callTool(name, args, root) {
     });
   }
   if (name === "doctor") return runDoctor({ root, env: loadRuntimeEnv(root) });
+  if (name === "audit_summary") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const auditFile = readFileWithPolicy(root, args.file || "reports/audit.jsonl", engine, {
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
+    return {
+      ...summarizeAuditEvents(auditFile.content, { limit: args.limit }),
+      audit: {
+        path: auditFile.path,
+        policy: auditFile.policy,
+        auditLog: auditFile.auditLog
+      }
+    };
+  }
   throw new Error(`Unknown tool: ${name}`);
 }
 

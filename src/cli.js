@@ -20,6 +20,8 @@ import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubReposito
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
+import { readFileWithPolicy } from "./policy/safeWrite.js";
+import { summarizeAuditEvents } from "./policy/audit.js";
 
 function printHelp() {
   console.log(`VibeGuard AI Dev Agent
@@ -45,6 +47,7 @@ Usage:
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
+  vibeguard audit summary [--file <audit.jsonl>]
   vibeguard doctor
   vibeguard mcp
 
@@ -356,6 +359,27 @@ async function evalCommand(parsed, root, subcommand) {
   throw new Error(`Unknown eval command: ${subcommand || ""}`);
 }
 
+function auditCommand(parsed, root, subcommand) {
+  if (subcommand === "summary") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const file = parsed.file || "reports/audit.jsonl";
+    const auditFile = readFileWithPolicy(root, file, engine, {
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
+    return {
+      ...summarizeAuditEvents(auditFile.content, { limit: parsed.limit }),
+      audit: {
+        path: auditFile.path,
+        policy: auditFile.policy,
+        auditLog: auditFile.auditLog
+      }
+    };
+  }
+  throw new Error(`Unknown audit command: ${subcommand || ""}`);
+}
+
 async function dispatch(parsed) {
   const root = parsed.root ? String(parsed.root) : process.cwd();
   const [command, subcommand] = parsed._;
@@ -400,6 +424,7 @@ async function dispatch(parsed) {
   if (command === "github") return githubCommand(parsed, root, subcommand);
   if (command === "run") return runCommand(parsed, root);
   if (command === "eval") return evalCommand(parsed, root, subcommand);
+  if (command === "audit") return auditCommand(parsed, root, subcommand);
   if (command === "doctor") return runDoctor({ root, env: loadRuntimeEnv(root) });
   if (command === "mcp") {
     await startMcpServer({ root });
@@ -426,5 +451,6 @@ export const cliInternals = {
   debugCommand,
   fixCommand,
   evalCommand,
+  auditCommand,
   reviewCommand
 };

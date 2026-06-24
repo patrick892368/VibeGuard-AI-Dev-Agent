@@ -31,6 +31,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态。Detects GitHub remotes, creates PRs/comments, and reads Actions status.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
+- `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
 - `vibeguard eval fixtures`: 用 Python / Node fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python and Node fixtures.
 - `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote 和 `gh`，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, and `gh` without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema 和 structured tool output。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, and structured tool output.
@@ -90,6 +91,7 @@ vibeguard github comment --pr 12 --body-file review.md
 vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard run --command "npm test" --dry-run
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
+vibeguard audit summary --file reports/audit.jsonl
 vibeguard eval fixtures --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json
 vibeguard eval fixtures --history reports/eval-history.jsonl --json

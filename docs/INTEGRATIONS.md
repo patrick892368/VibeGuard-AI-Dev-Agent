@@ -23,6 +23,7 @@ vibeguard review
 vibeguard onboard --write
 vibeguard policy check --path src/index.js
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
+vibeguard audit summary --file reports/audit.jsonl
 ```
 
 `review` returns line-level findings when the diff hunk contains line metadata.
@@ -74,6 +75,7 @@ Available tools:
 - `eval_fixtures`
 - `eval_history`
 - `doctor`
+- `audit_summary`
 
 `eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking.
 
@@ -94,6 +96,10 @@ Available tools:
 `--audit-log reports/audit.jsonl` can be used from CLI or MCP-style workflows to append policy-gated JSONL audit events.
 
 CLI 或 MCP-style 工作流可以使用 `--audit-log reports/audit.jsonl` 追加经过 policy 检查的 JSONL 审计事件。
+
+`audit_summary` summarizes JSONL audit logs for operation counts, policy statuses, blocked events, recent entries, and parse errors.
+
+`audit_summary` 会汇总 JSONL 审计日志，展示操作次数、policy 状态、blocked 事件、最近记录和解析错误。
 
 ## Codex / Codex
 
