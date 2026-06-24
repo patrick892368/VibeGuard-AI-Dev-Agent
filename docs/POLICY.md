@@ -30,9 +30,9 @@ If `paths.allow` is not empty, files outside the allow list are denied unless th
 
 如果 `paths.allow` 不为空，不在 allow list 内的文件会被拒绝，除非它匹配 `paths.require_confirmation`。
 
-Policy-gated file reads, writes, and appends also resolve the final absolute path and reject any target that escapes the repository root.
+The Policy Engine denies any path that escapes the repository root, including paths found inside unified diffs. Policy-gated file reads, writes, and appends also resolve the final absolute path and reject escaped targets before touching the filesystem.
 
-经过 policy 的文件读取、写入和追加还会解析最终绝对路径，并拒绝任何逃出仓库 root 的目标。
+Policy Engine 会拒绝任何逃出仓库 root 的路径，包括 unified diff 中的路径。经过 policy 的文件读取、写入和追加也会解析最终绝对路径，并在触碰文件系统前拒绝逃逸目标。
 
 Sensitive examples:
 

@@ -14,6 +14,15 @@ export class PolicyEngine {
     const requireConfirmation = paths.require_confirmation || [];
     const allow = paths.allow || [];
 
+    if (normalizedPath === ".." || normalizedPath.startsWith("../")) {
+      return {
+        status: "deny",
+        operation,
+        path: normalizedPath,
+        reason: "Path escapes repository root"
+      };
+    }
+
     if (matchAnyGlob(normalizedPath, deny)) {
       return {
         status: "deny",

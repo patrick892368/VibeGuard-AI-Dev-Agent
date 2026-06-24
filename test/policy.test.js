@@ -35,6 +35,15 @@ test("PolicyEngine denies paths outside allow list", () => {
   assert.equal(engine.checkPath("scripts/deploy.sh").status, "deny");
 });
 
+test("PolicyEngine denies paths that escape the repository root", () => {
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root: process.cwd() });
+
+  assert.equal(engine.checkPath("../outside.txt").status, "deny");
+});
+
 test("PolicyEngine checks command policy", () => {
   const engine = new PolicyEngine(config, { root: process.cwd() });
   assert.equal(engine.checkCommand("npm test").status, "allow");
@@ -61,4 +70,22 @@ diff --git a/.env b/.env
   const result = engine.checkPatch(patch);
   assert.equal(result.status, "deny");
   assert.deepEqual(result.files, [".env", "src/app.js"]);
+});
+
+test("PolicyEngine denies patch files that escape the repository root", () => {
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root: process.cwd() });
+  const patch = `diff --git a/../outside.txt b/../outside.txt
+--- a/../outside.txt
++++ b/../outside.txt
+@@ -1 +1 @@
+-old
++new
+`;
+
+  const result = engine.checkPatch(patch);
+  assert.equal(result.status, "deny");
+  assert.deepEqual(result.files, ["../outside.txt"]);
 });
