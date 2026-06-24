@@ -131,7 +131,8 @@ test("writeSuggestedTests writes simple Python behavior assertions", () => {
   const result = writeSuggestedTests(root, engine, { limit: 1 });
   const generated = fs.readFileSync(path.join(root, "tests", "test_math.py"), "utf8");
   assert.equal(result.written.length, 1);
-  assert.match(generated, /assert module\.add\(2, 3\) == 5/);
+  assert.match(generated, /class GeneratedBehaviorTest\(unittest\.TestCase\)/);
+  assert.match(generated, /self\.assertEqual\(module\.add\(2, 3\), 5\)/);
 });
 
 test("writeSuggestedTests writes simple JavaScript branch assertions", () => {
@@ -167,8 +168,8 @@ test("writeSuggestedTests writes simple Python branch assertions", () => {
   const result = writeSuggestedTests(root, engine, { limit: 1 });
   const generated = fs.readFileSync(path.join(root, "tests", "test_user.py"), "utf8");
   assert.equal(result.written.length, 1);
-  assert.match(generated, /assert module\.display_name\(None\) == "unknown"/);
-  assert.match(generated, /assert module\.display_name\(" Ada "\) == "Ada"/);
+  assert.match(generated, /self\.assertEqual\(module\.display_name\(None\), "unknown"\)/);
+  assert.match(generated, /self\.assertEqual\(module\.display_name\(" Ada "\), "Ada"\)/);
 });
 
 test("writeSuggestedTests writes JavaScript numeric boundary assertions", () => {
@@ -205,8 +206,8 @@ test("writeSuggestedTests writes Python empty collection branch assertions", () 
   const result = writeSuggestedTests(root, engine, { limit: 1 });
   const generated = fs.readFileSync(path.join(root, "tests", "test_items.py"), "utf8");
   assert.equal(result.written.length, 1);
-  assert.match(generated, /assert module\.first_item\(\[\]\) == None/);
-  assert.match(generated, /assert module\.first_item\(\["Ada"\]\) == "Ada"/);
+  assert.match(generated, /self\.assertEqual\(module\.first_item\(\[\]\), None\)/);
+  assert.match(generated, /self\.assertEqual\(module\.first_item\(\["Ada"\]\), "Ada"\)/);
 });
 
 test("writeSuggestedTests writes simple JavaScript exception assertions", () => {
@@ -242,8 +243,22 @@ test("writeSuggestedTests writes simple Python exception assertions", () => {
   const generated = fs.readFileSync(path.join(root, "tests", "test_number.py"), "utf8");
   assert.equal(result.written.length, 1);
   assert.match(generated, /module\.require_positive\(-2\)/);
-  assert.match(generated, /except ValueError/);
-  assert.match(generated, /raise AssertionError\("expected ValueError"\)/);
+  assert.match(generated, /with self\.assertRaises\(ValueError\)/);
+});
+
+test("writeSuggestedTests can run a generated Python unittest through policy", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.py"), `def add(a, b):
+    return a + b
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  assert.equal(result.written.length, 1);
+  assert.equal(result.testRuns.length, 1);
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.testRuns[0].command, "python -m unittest tests/test_math.py");
 });
 
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {

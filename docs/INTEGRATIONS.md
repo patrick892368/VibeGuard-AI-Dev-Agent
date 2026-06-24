@@ -98,9 +98,9 @@ Available tools:
 
 `github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。
 
-`write_tests` can analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware tests with simple behavior and exception assertions, optionally run them through command policy, and return `failureAnalysis.repairPlan` for failed runs.
+`write_tests` can analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests and stdlib `unittest` Python tests with simple behavior and exception assertions, optionally run them through command policy, and return `failureAnalysis.repairPlan` for failed runs.
 
-`write_tests` 可以分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的生成测试，并包含简单行为和异常断言；也可以通过 command policy 执行这些测试，并为失败运行返回 `failureAnalysis.repairPlan`。
+`write_tests` 可以分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的 JavaScript 生成测试和 stdlib `unittest` Python 测试，并包含简单行为和异常断言；也可以通过 command policy 执行这些测试，并为失败运行返回 `failureAnalysis.repairPlan`。
 
 `doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 

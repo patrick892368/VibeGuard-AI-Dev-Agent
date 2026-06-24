@@ -464,14 +464,10 @@ function loadCoverageAfter(options, root) {
 function pythonBehaviorAssertion(hint) {
   const call = `module.${hint.name}(${hint.args.map(pythonLiteral).join(", ")})`;
   if (hint.throws) {
-    return `    try:
-        ${call}
-    except ${hint.throws}:
-        pass
-    else:
-        raise AssertionError("expected ${hint.throws}")`;
+    return `        with self.assertRaises(${hint.throws}):
+            ${call}`;
   }
-  return `    assert ${call} == ${pythonLiteral(hint.expected)}`;
+  return `        self.assertEqual(${call}, ${pythonLiteral(hint.expected)})`;
 }
 
 function jsErrorConstructor(errorName) {
@@ -493,10 +489,11 @@ export function generateTestContent(candidate) {
 
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
-    const assertions = functions.map((name) => `    assert hasattr(module, "${name}")`).join("\n");
+    const assertions = functions.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`).join("\n");
     const behaviorAssertions = assertionHints.map(pythonBehaviorAssertion).join("\n");
     return `import importlib.util
 import pathlib
+import unittest
 
 
 def load_module():
@@ -509,10 +506,15 @@ def load_module():
     return module
 
 
-def test_exports_expected_functions():
-    module = load_module()
+class GeneratedBehaviorTest(unittest.TestCase):
+    def test_exports_expected_functions(self):
+        module = load_module()
 ${assertions}
-${behaviorAssertions ? `\n\ndef test_covers_simple_behavior():\n    module = load_module()\n${behaviorAssertions}\n` : ""}
+${behaviorAssertions ? `\n    def test_covers_simple_behavior(self):\n        module = load_module()\n${behaviorAssertions}\n` : ""}
+
+
+if __name__ == "__main__":
+    unittest.main()
 `;
   }
 
@@ -563,7 +565,7 @@ function defaultTestArgv(candidate, repo) {
   const sourceFile = candidate.sourceFile;
   const extension = path.extname(sourceFile);
 
-  if (extension === ".py") return ["python", "-m", "pytest", testFile];
+  if (extension === ".py") return ["python", "-m", "unittest", testFile];
   if ([".js", ".mjs", ".cjs"].includes(extension)) return ["node", "--test", testFile];
   if (extension === ".java") {
     if (repo.suggestedCommands.includes("mvn test")) return ["mvn", "test"];
