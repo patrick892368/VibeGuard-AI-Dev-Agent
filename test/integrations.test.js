@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, createPullRequestWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhRunListArgs, createPullRequestWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
@@ -99,6 +99,22 @@ test("GitHub PR creation is dry-run by default", () => {
   const result = createPullRequestWithGh(process.cwd(), { title: "Fix bug" });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh pr create/);
+});
+
+test("GitHub checks are dry-run by default", () => {
+  assert.deepEqual(buildGhRunListArgs({ branch: "codex/fix-bug", limit: 5 }), [
+    "run",
+    "list",
+    "--limit",
+    "5",
+    "--json",
+    "databaseId,status,conclusion,name,headBranch,event,workflowName,url,createdAt,updatedAt",
+    "--branch",
+    "codex/fix-bug"
+  ]);
+  const result = listWorkflowRunsWithGh(process.cwd(), { branch: "codex/fix-bug" });
+  assert.equal(result.status, "dry_run");
+  assert.match(result.command, /gh run list/);
 });
 
 test("buildFixGitPlan includes push and PR commands for Codex review", () => {

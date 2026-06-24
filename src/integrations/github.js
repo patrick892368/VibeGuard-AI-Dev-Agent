@@ -34,6 +34,20 @@ export function buildGhPrArgs(options = {}) {
   return args;
 }
 
+export function buildGhRunListArgs(options = {}) {
+  const args = [
+    "run",
+    "list",
+    "--limit",
+    String(options.limit || 10),
+    "--json",
+    "databaseId,status,conclusion,name,headBranch,event,workflowName,url,createdAt,updatedAt"
+  ];
+  if (options.branch) args.push("--branch", options.branch);
+  if (options.workflow) args.push("--workflow", options.workflow);
+  return args;
+}
+
 export function createPullRequestWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrArgs(options);
   if (options.dryRun !== false) {
@@ -46,5 +60,21 @@ export function createPullRequestWithGh(root = process.cwd(), options = {}) {
   return {
     status: "created",
     url: stdout.trim()
+  };
+}
+
+export function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
+  const args = buildGhRunListArgs(options);
+  if (options.dryRun !== false) {
+    return {
+      status: "dry_run",
+      command: `gh ${args.join(" ")}`
+    };
+  }
+
+  const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+  return {
+    status: "completed",
+    runs: JSON.parse(stdout)
   };
 }

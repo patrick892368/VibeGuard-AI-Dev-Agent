@@ -14,7 +14,7 @@ import { applyPatchWithPolicy } from "./patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { createPullRequestWithGh, detectGitHubRepository } from "./integrations/github.js";
+import { createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -37,6 +37,7 @@ Usage:
   vibeguard pr summary [--diff <file>]
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute]
+  vibeguard github checks [--branch <branch>] [--limit <n>] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
@@ -217,6 +218,14 @@ function githubCommand(parsed, root, subcommand) {
       base: parsed.base,
       head: parsed.head,
       draft: Boolean(parsed.draft),
+      dryRun: !parsed.execute
+    });
+  }
+  if (subcommand === "checks") {
+    return listWorkflowRunsWithGh(root, {
+      branch: parsed.branch,
+      workflow: parsed.workflow,
+      limit: parsed.limit,
       dryRun: !parsed.execute
     });
   }

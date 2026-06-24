@@ -16,7 +16,7 @@ The core design rule is simple: every agent must pass through Policy-as-Code bef
 - `vibeguard patch` checks or applies unified diffs through policy.
 - `vibeguard hooks` prints or installs Git hook templates.
 - `vibeguard pr summary` creates a GitHub-ready PR body from a diff.
-- `vibeguard github` detects GitHub remotes and can create PRs through `gh`.
+- `vibeguard github` detects GitHub remotes, can create PRs through `gh`, and can read Actions run status.
 - `vibeguard run` executes commands only after command policy checks.
 - `vibeguard eval fixtures` evaluates the configured LLM provider against Python and Node fix fixtures.
 - `vibeguard mcp` starts a small JSON-RPC MCP-style stdio server for agent integrations.
@@ -61,6 +61,7 @@ vibeguard hooks print pre-commit
 vibeguard pr summary --diff change.diff
 vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
+vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard run --command "npm test" --dry-run
 vibeguard eval fixtures --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json

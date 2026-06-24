@@ -108,6 +108,13 @@ node ./bin/vibeguard.js review --json
 node ./bin/vibeguard.js pr summary --diff change.diff --json
 ```
 
+Read recent GitHub Actions run status:
+
+```bash
+node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --json
+node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --execute --json
+```
+
 ## Codex Operating Rules
 
 - Do not bypass `.vibeguard.yaml`.

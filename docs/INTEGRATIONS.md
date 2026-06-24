@@ -42,6 +42,7 @@ Available tools:
 - `review_pr`
 - `summarize_pr`
 - `detect_github`
+- `github_checks`
 - `eval_fixtures`
 - `eval_history`
 
@@ -91,4 +92,11 @@ Execute the PR creation only when ready:
 
 ```bash
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute
+```
+
+Read recent workflow run status:
+
+```bash
+vibeguard github checks --branch codex/fix-bug --limit 5
+vibeguard github checks --branch codex/fix-bug --limit 5 --execute
 ```

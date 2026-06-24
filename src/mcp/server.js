@@ -8,7 +8,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
-import { detectGitHubRepository } from "../integrations/github.js";
+import { detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 
 const tools = [
@@ -43,6 +43,10 @@ const tools = [
   {
     name: "detect_github",
     description: "Detect the GitHub origin repository for the current repo."
+  },
+  {
+    name: "github_checks",
+    description: "Read recent GitHub Actions workflow run status through gh run list."
   },
   {
     name: "eval_fixtures",
@@ -109,6 +113,14 @@ function callTool(name, args, root) {
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
+  if (name === "github_checks") {
+    return listWorkflowRunsWithGh(root, {
+      branch: args.branch,
+      workflow: args.workflow,
+      limit: args.limit,
+      dryRun: args.execute !== true
+    });
+  }
   if (name === "eval_fixtures") {
     return evaluateFixFixtures({
       root,
