@@ -284,6 +284,45 @@ test("fix CLI executes confirmed local branch and commit plan after patch apply"
   assert.equal(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: root, encoding: "utf8" }).trim(), "fix: address ReferenceError");
 });
 
+test("fix CLI executes confirmed push plan against local bare remote", () => {
+  const root = copyFixture("node-bug");
+  const remote = tempDir("vibeguard-remote-");
+  execFileSync("git", ["init", "--bare"], { cwd: remote, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", remote], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root, encoding: "utf8" });
+
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--create-branch",
+    "--commit",
+    "--push",
+    "--execute-git-plan",
+    "--confirm",
+    "--apply",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.gitExecution.status, "executed");
+  assert.deepEqual(result.gitExecution.results.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "push_branch"
+  ]);
+  const pushedRef = execFileSync("git", ["--git-dir", remote, "show-ref", "refs/heads/codex/fix-referenceerror"], {
+    encoding: "utf8"
+  });
+  assert.match(pushedRef, /refs\/heads\/codex\/fix-referenceerror/);
+});
+
 test("fix CLI applies Node fixture patch and runs tests", () => {
   const root = copyFixture("node-bug");
   const result = runCli([

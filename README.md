@@ -197,6 +197,7 @@ The test suite covers:
 - Review diff analysis.
 - Repository scanning.
 - Confirmed Codex Git plan execution for local branch and commit flows.
+- Confirmed push plan execution against a local bare Git remote.
 - Compact fixture evaluation history output.
 
 ## Integration Targets
