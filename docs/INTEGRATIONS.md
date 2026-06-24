@@ -127,9 +127,9 @@ Spring Boot support uses the same flow and returns Spring-specific `frameworkCon
 
 Spring Boot 支持也使用同一流程，并针对依赖注入、配置、Web 和数据层失败返回 Spring 专用的 `frameworkContext` / `frameworkContexts`。
 
-The current Codex flow supports patch artifact output, Git/PR dry-run planning, confirmed branch/commit/push/PR execution, fixture evaluation history, and environment diagnosis.
+The current Codex flow supports patch artifact output, stack-trace based minimal test selection, Git/PR dry-run planning, confirmed branch/commit/push/PR execution, fixture evaluation history, and environment diagnosis.
 
-当前 Codex 流程支持 patch artifact 输出、Git/PR dry-run 计划、确认后执行 branch/commit/push/PR、fixture 评测历史和环境诊断。
+当前 Codex 流程支持 patch artifact 输出、基于 stack trace 的最小测试选择、Git/PR dry-run 计划、确认后执行 branch/commit/push/PR、fixture 评测历史和环境诊断。
 
 ## Deferred Agent Integrations / 暂缓 Agent 集成
 

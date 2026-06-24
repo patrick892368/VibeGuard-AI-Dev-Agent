@@ -8,6 +8,7 @@ import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatc
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
+import { scanRepository } from "../repo/scan.js";
 
 function buildFixTitle(debug) {
   const type = debug.summary?.type || "bug";
@@ -72,6 +73,89 @@ function resolveRootPath(root, filePath) {
   return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
+function quoteCommandPart(value) {
+  return /\s/.test(value) ? JSON.stringify(value) : value;
+}
+
+function isTestFile(file) {
+  return /(^|\/)(test|tests|__tests__)\//.test(file) ||
+    /\.(test|spec)\.[cm]?[jt]sx?$/.test(file) ||
+    file.endsWith("_test.py") ||
+    path.posix.basename(file).startsWith("test_") ||
+    file.endsWith("Test.java");
+}
+
+function pythonModuleName(file) {
+  return file.replace(/\.py$/, "").replace(/\//g, ".");
+}
+
+function testCommandForFile(root, repo, testFile) {
+  const extension = path.posix.extname(testFile);
+  if (extension === ".py") {
+    const absolute = path.join(root, testFile);
+    const text = fs.existsSync(absolute) ? fs.readFileSync(absolute, "utf8") : "";
+    if (repo.frameworks.includes("Django") && repo.files.includes("manage.py")) {
+      return `python manage.py test ${pythonModuleName(testFile)}`;
+    }
+    if (/unittest/.test(text)) return `python -m unittest ${quoteCommandPart(testFile)}`;
+    if (repo.files.includes("pytest.ini") || /pytest/.test(text)) return `python -m pytest ${quoteCommandPart(testFile)}`;
+    return `python -m unittest ${quoteCommandPart(testFile)}`;
+  }
+  if ([".js", ".mjs", ".cjs"].includes(extension)) {
+    return `node --test ${quoteCommandPart(testFile)}`;
+  }
+  if (extension === ".java") {
+    if (repo.suggestedCommands.includes("mvn test")) return "mvn test";
+    if (repo.suggestedCommands.includes("./gradlew test")) return "./gradlew test";
+  }
+  return null;
+}
+
+function sourceStem(file) {
+  return path.posix.basename(file, path.posix.extname(file)).replace(/[._-](test|spec)$/i, "");
+}
+
+function normalizedTestStem(file) {
+  return sourceStem(file).replace(/^test[_-]/i, "");
+}
+
+function scoreTestFileForSource(testFile, sourceFile) {
+  const source = sourceStem(sourceFile).toLowerCase();
+  const test = normalizedTestStem(testFile).toLowerCase();
+  if (test === source) return 100;
+  if (test.includes(source) || source.includes(test)) return 50;
+  const sourceDir = path.posix.dirname(sourceFile).replace(/^src\//, "");
+  if (sourceDir !== "." && testFile.includes(sourceDir)) return 10;
+  return 0;
+}
+
+function selectAutoTestCommand(debug, root) {
+  const repo = scanRepository(root);
+  const frameTest = debug.frames.find((frame) => isTestFile(frame.file));
+  if (frameTest) {
+    const command = testCommandForFile(root, repo, frameTest.file);
+    if (command) return command;
+  }
+
+  const sourceFiles = [...new Set([
+    ...debug.frames.filter((frame) => !isTestFile(frame.file)).map((frame) => frame.file),
+    ...(debug.likelyFiles || []).filter((file) => !isTestFile(file))
+  ])];
+  let best = null;
+  for (const testFile of repo.testFiles) {
+    const score = Math.max(0, ...sourceFiles.map((sourceFile) => scoreTestFileForSource(testFile, sourceFile)));
+    if (score > 0 && (!best || score > best.score || (score === best.score && testFile < best.file))) {
+      best = { file: testFile, score };
+    }
+  }
+  if (best) {
+    const command = testCommandForFile(root, repo, best.file);
+    if (command) return command;
+  }
+
+  return debug.suggestedTestCommands?.[0] || null;
+}
+
 function patchFromOptions(options) {
   if (options.patchText) {
     return {
@@ -103,7 +187,7 @@ export async function runFixWorkflow(options = {}) {
   }
 
   const debug = analyzeDebugLog(logText, { root });
-  const selectedTestCommand = options.testCommand || (options.autoTest ? debug.suggestedTestCommands?.[0] : null);
+  const selectedTestCommand = options.testCommand || (options.autoTest ? selectAutoTestCommand(debug, root) : null);
   const providedPatch = patchFromOptions(options);
   const patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
 
@@ -349,5 +433,6 @@ export const fixInternals = {
   buildBranchName,
   buildCommitMessage,
   buildFixTitle,
-  buildDecisionSummary
+  buildDecisionSummary,
+  selectAutoTestCommand
 };

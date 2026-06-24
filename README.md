@@ -158,9 +158,9 @@ node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fix
 
 `fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present.
 
-`--auto-test` 会在 apply 后运行仓库分析建议的第一个测试命令，并且仍经过 command policy。
+`--auto-test` 会在 apply 后优先运行 stack trace 或源码文件对应的最小相关测试；如果找不到单文件测试，再回退到仓库分析建议的第一个测试命令。所有测试命令仍经过 command policy。
 
-`--auto-test` runs the first repository-suggested test command after apply, still through command policy.
+`--auto-test` first runs the smallest relevant test inferred from the stack trace or source file after apply. If no matching test file is found, it falls back to the first repository-suggested test command. Every test command still goes through command policy.
 
 ## 评测 / Evaluation
 

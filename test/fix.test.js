@@ -346,7 +346,7 @@ test("fix CLI applies Node fixture patch and runs tests", () => {
   assert.match(fs.readFileSync(path.join(root, "src", "user.js"), "utf8"), /user\.firstName/);
 });
 
-test("fix CLI auto-test runs the first suggested test command", () => {
+test("fix CLI auto-test prioritizes the stack trace test file for Node", () => {
   const root = copyFixture("node-bug");
   const result = runCli([
     "--root",
@@ -362,7 +362,27 @@ test("fix CLI auto-test runs the first suggested test command", () => {
   ]);
 
   assert.equal(result.status, "passed");
-  assert.equal(result.selectedTestCommand, "npm test");
-  assert.equal(result.decision.selectedTestCommand, "npm test");
+  assert.equal(result.selectedTestCommand, "node --test tests/user.case.js");
+  assert.equal(result.decision.selectedTestCommand, "node --test tests/user.case.js");
+  assert.equal(result.tests.status, "passed");
+});
+
+test("fix CLI auto-test prioritizes the traceback test file for Python", () => {
+  const root = copyFixture("python-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/name-error.patch",
+    "--auto-test",
+    "--apply",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.selectedTestCommand, "python -m unittest tests/test_greeter.py");
   assert.equal(result.tests.status, "passed");
 });
