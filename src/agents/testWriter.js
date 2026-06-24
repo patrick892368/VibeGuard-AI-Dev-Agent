@@ -386,6 +386,44 @@ function customTestCommand(command, candidate) {
     .replaceAll("{sourceFile}", candidate.sourceFile);
 }
 
+function analyzeTestFailure(result) {
+  if (result.status !== "failed" && result.status !== "blocked") return null;
+  const output = `${result.error || ""}\n${result.stderr || ""}\n${result.stdout || ""}`;
+  const rules = [
+    {
+      pattern: /Cannot use import statement outside a module|Unexpected token 'export'|require is not defined in ES module scope/i,
+      category: "module_system_mismatch",
+      nextAction: "Regenerate the test with the correct ESM/CommonJS module system or adjust package.json type/module extension."
+    },
+    {
+      pattern: /ERR_MODULE_NOT_FOUND|Cannot find module|ModuleNotFoundError|No module named/i,
+      category: "missing_module_or_bad_import",
+      nextAction: "Check the generated import path, test location, and whether required test dependencies are installed."
+    },
+    {
+      pattern: /pytest:.*not recognized|No module named pytest|pytest.*not found/i,
+      category: "missing_test_runner",
+      nextAction: "Install/enable the expected test runner or pass a custom --test-command that exists in this repository."
+    },
+    {
+      pattern: /AssertionError|assertion/i,
+      category: "assertion_failed",
+      nextAction: "Inspect the assertion and source behavior; prefer strengthening the test or fixing the source bug instead of weakening assertions."
+    },
+    {
+      pattern: /ReferenceError|TypeError|NameError|AttributeError|NullPointerException/i,
+      category: "runtime_error",
+      nextAction: "Inspect the stack trace and inputs used by the generated test; the source may have import-time side effects or missing setup."
+    }
+  ];
+  const matched = rules.find((rule) => rule.pattern.test(output));
+  return {
+    category: matched?.category || "unknown_failure",
+    nextAction: matched?.nextAction || "Inspect stdout/stderr and rerun the smallest failing test command after correcting the generated test or setup.",
+    evidence: output.split(/\r?\n/).find((line) => line.trim())?.trim() || null
+  };
+}
+
 function runGeneratedTest(root, candidate, engine, repo, options = {}) {
   const common = {
     sourceFile: candidate.sourceFile,
@@ -393,12 +431,16 @@ function runGeneratedTest(root, candidate, engine, repo, options = {}) {
   };
   try {
     if (options.testCommand) {
-      return {
+      const result = {
         ...common,
         ...runCommandWithPolicy(root, customTestCommand(options.testCommand, candidate), engine, {
           confirmed: options.confirmed,
           dryRun: options.dryRun
         })
+      };
+      return {
+        ...result,
+        failureAnalysis: analyzeTestFailure(result)
       };
     }
 
@@ -411,20 +453,28 @@ function runGeneratedTest(root, candidate, engine, repo, options = {}) {
       };
     }
 
-    return {
+    const result = {
       ...common,
       ...runArgvWithPolicy(root, argv, engine, {
         confirmed: options.confirmed,
         dryRun: options.dryRun
       })
     };
+    return {
+      ...result,
+      failureAnalysis: analyzeTestFailure(result)
+    };
   } catch (error) {
     const argv = options.testCommand ? null : defaultTestArgv(candidate, repo);
-    return {
+    const result = {
       ...common,
       status: "blocked",
       command: options.testCommand ? customTestCommand(options.testCommand, candidate) : argv ? commandDisplay(argv) : undefined,
       error: error.message
+    };
+    return {
+      ...result,
+      failureAnalysis: analyzeTestFailure(result)
     };
   }
 }

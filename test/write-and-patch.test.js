@@ -138,6 +138,22 @@ module.exports = { add };
   assert.equal(result.testRuns[0].status, "passed");
 });
 
+test("writeSuggestedTests classifies failed generated test runs", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    runTests: true,
+    testCommand: "node missing-runner.js"
+  });
+  assert.equal(result.testRuns[0].status, "failed");
+  assert.equal(result.testRuns[0].failureAnalysis.category, "missing_module_or_bad_import");
+  assert.match(result.testRuns[0].failureAnalysis.nextAction, /import path|test dependencies/);
+});
+
 test("writeOnboardingDocs writes onboarding and architecture docs through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "README.md"), "# Demo\n", "utf8");
