@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { PolicyEngine } from "../src/policy/engine.js";
-import { writeFileWithPolicy } from "../src/policy/safeWrite.js";
+import { readFileWithPolicy, writeFileWithPolicy } from "../src/policy/safeWrite.js";
 import { writeSuggestedTests } from "../src/agents/testWriter.js";
 import { writeOnboardingDocs } from "../src/agents/onboard.js";
 import { applyPatchWithPolicy } from "../src/patch/safeApply.js";
@@ -34,6 +34,17 @@ test("writeFileWithPolicy writes allowed files and blocks denied files", () => {
   assert.equal(result.policy.status, "allow");
   assert.equal(fs.readFileSync(path.join(root, "docs", "NOTE.md"), "utf8"), "hello");
   assert.throws(() => writeFileWithPolicy(root, ".env", "SECRET=1", engine), /deny policy/);
+});
+
+test("policy-gated file operations reject paths outside the repository root", () => {
+  const root = tempRepo();
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  assert.throws(() => writeFileWithPolicy(root, "../escape.txt", "nope", engine), /escapes repository root/);
+  assert.throws(() => readFileWithPolicy(root, "../escape.txt", engine), /escapes repository root/);
 });
 
 test("policy-gated operations can append audit JSONL events", () => {

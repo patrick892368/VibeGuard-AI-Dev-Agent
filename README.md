@@ -275,6 +275,7 @@ The test suite covers:
 
 - YAML 配置解析。YAML config parsing.
 - 路径和命令 policy。Path and command policy checks.
+- Policy-gated 文件操作的仓库 root containment。Repository-root containment for policy-gated file operations.
 - Patch 安全检查。Patch file safety checks.
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.

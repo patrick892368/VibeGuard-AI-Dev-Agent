@@ -11,6 +11,16 @@ export function assertPolicyAllowed(result, options = {}) {
   }
 }
 
+function resolveInsideRoot(root, relativePath) {
+  const absoluteRoot = path.resolve(root);
+  const absoluteTarget = path.resolve(absoluteRoot, relativePath);
+  const relative = path.relative(absoluteRoot, absoluteTarget);
+  if (relative && (relative.startsWith("..") || path.isAbsolute(relative))) {
+    throw new Error(`Path escapes repository root: ${relativePath}`);
+  }
+  return absoluteTarget;
+}
+
 export function writeFileWithPolicy(root, relativePath, content, engine, options = {}) {
   const result = engine.checkPath(relativePath, "write");
   const auditLog = appendAuditEvent(root, engine, options.auditLog, {
@@ -21,7 +31,7 @@ export function writeFileWithPolicy(root, relativePath, content, engine, options
     reason: result.reason
   }, options);
   assertPolicyAllowed(result, options);
-  const absolute = path.join(root, relativePath);
+  const absolute = resolveInsideRoot(root, relativePath);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
   fs.writeFileSync(absolute, content, "utf8");
   return {
@@ -41,7 +51,7 @@ export function appendFileWithPolicy(root, relativePath, content, engine, option
     reason: result.reason
   }, options);
   assertPolicyAllowed(result, options);
-  const absolute = path.join(root, relativePath);
+  const absolute = resolveInsideRoot(root, relativePath);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
   fs.appendFileSync(absolute, content, "utf8");
   return {
@@ -61,7 +71,7 @@ export function readFileWithPolicy(root, relativePath, engine, options = {}) {
     reason: result.reason
   }, options);
   assertPolicyAllowed(result, options);
-  const absolute = path.join(root, relativePath);
+  const absolute = resolveInsideRoot(root, relativePath);
   return {
     content: fs.readFileSync(absolute, "utf8"),
     path: relativePath,

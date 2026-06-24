@@ -30,6 +30,10 @@ If `paths.allow` is not empty, files outside the allow list are denied unless th
 
 如果 `paths.allow` 不为空，不在 allow list 内的文件会被拒绝，除非它匹配 `paths.require_confirmation`。
 
+Policy-gated file reads, writes, and appends also resolve the final absolute path and reject any target that escapes the repository root.
+
+经过 policy 的文件读取、写入和追加还会解析最终绝对路径，并拒绝任何逃出仓库 root 的目标。
+
 Sensitive examples:
 
 敏感示例：
