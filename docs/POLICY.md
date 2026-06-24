@@ -93,6 +93,24 @@ All agents must call the Policy Engine before:
 - Creating PR branches, pushes, PRs, or comments. / 创建 PR branch、push、PR 或 comment。
 - Writing reports or generated artifacts. / 写报告或生成物。
 
+## Audit Logs / 审计日志
+
+Audit logging is explicit. Pass `--audit-log reports/audit.jsonl` to append JSONL events for policy checks, writes, patch checks/apply operations, and command execution.
+
+审计日志是显式启用的。传入 `--audit-log reports/audit.jsonl` 后，会为 policy check、写文件、patch 检查/应用和命令执行追加 JSONL 事件。
+
+The audit log path is checked by the same path policy before any event is written. If the audit path is denied or requires unconfirmed human approval, the event is not written and the result reports the audit policy status.
+
+写入任何审计事件前，审计日志路径本身也会经过同一套路经 policy 检查。如果审计路径被拒绝，或需要但尚未获得人工确认，则事件不会写入，结果会返回审计路径的 policy 状态。
+
+Recommended local path:
+
+推荐本地路径：
+
+```bash
+reports/audit.jsonl
+```
+
 ## Local Secrets / 本地密钥
 
 `.env` may contain local provider credentials such as Grok / xAI API keys.

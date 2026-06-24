@@ -18,6 +18,7 @@ vibeguard test --coverage coverage-before.json --coverage-after coverage-after.j
 vibeguard review
 vibeguard onboard --write
 vibeguard policy check --path src/index.js
+vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 ```
 
 ## Git Hooks / Git Hooks
@@ -77,6 +78,10 @@ Available tools:
 `doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 
 `doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥。
+
+`--audit-log reports/audit.jsonl` can be used from CLI or MCP-style workflows to append policy-gated JSONL audit events.
+
+CLI 或 MCP-style 工作流可以使用 `--audit-log reports/audit.jsonl` 追加经过 policy 检查的 JSONL 审计事件。
 
 ## Codex / Codex
 

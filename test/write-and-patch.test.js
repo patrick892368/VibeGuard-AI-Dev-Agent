@@ -18,7 +18,7 @@ function tempRepo() {
 function engineFor(root) {
   return new PolicyEngine({
     paths: {
-      allow: ["src/**", "test/**", "tests/**", "docs/**", "README.md"],
+      allow: ["src/**", "test/**", "tests/**", "docs/**", "reports/**", "README.md"],
       deny: [".env", ".git/**"],
       require_confirmation: ["package-lock.json"]
     },
@@ -34,6 +34,33 @@ test("writeFileWithPolicy writes allowed files and blocks denied files", () => {
   assert.equal(result.policy.status, "allow");
   assert.equal(fs.readFileSync(path.join(root, "docs", "NOTE.md"), "utf8"), "hello");
   assert.throws(() => writeFileWithPolicy(root, ".env", "SECRET=1", engine), /deny policy/);
+});
+
+test("policy-gated operations can append audit JSONL events", () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
+  execFileSync("git", ["add", "."], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "init"], { cwd: root, encoding: "utf8" });
+  const engine = engineFor(root);
+  const auditLog = "reports/audit.jsonl";
+
+  writeFileWithPolicy(root, "docs/NOTE.md", "hello", engine, { auditLog });
+  runCommandWithPolicy(root, "node --version", engine, { dryRun: true, auditLog });
+  applyPatchWithPolicy(root, `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`, engine, { checkOnly: true, auditLog });
+
+  const events = fs.readFileSync(path.join(root, auditLog), "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  assert.deepEqual(events.map((event) => event.operation), ["write_file", "run_command", "check_patch", "check_patch_result"]);
+  assert.equal(events[0].policyStatus, "allow");
+  assert.equal(events[1].dryRun, true);
+  assert.deepEqual(events[2].files, ["src/app.js"]);
 });
 
 test("writeSuggestedTests writes a real JavaScript smoke test through policy", () => {

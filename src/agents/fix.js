@@ -149,7 +149,8 @@ export async function runFixWorkflow(options = {}) {
   try {
     applyCheck = applyPatchWithPolicy(root, patchSource.patch, engine, {
       confirmed: Boolean(options.confirmed),
-      checkOnly: true
+      checkOnly: true,
+      auditLog: options.auditLog
     });
   } catch (error) {
     const status = "failed";
@@ -194,7 +195,8 @@ export async function runFixWorkflow(options = {}) {
       };
     }
     outputPatch = writeFileWithPolicy(root, options.outputPatch, patchSource.patch, engine, {
-      confirmed: Boolean(options.confirmed)
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
     });
   }
 
@@ -216,7 +218,8 @@ export async function runFixWorkflow(options = {}) {
       };
     }
     prBody = writeFileWithPolicy(root, options.writePrBody, pr.body, engine, {
-      confirmed: Boolean(options.confirmed)
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
     });
   }
 
@@ -276,7 +279,8 @@ export async function runFixWorkflow(options = {}) {
   try {
     applyResult = applyPatchWithPolicy(root, patchSource.patch, engine, {
       confirmed: Boolean(options.confirmed),
-      checkOnly: false
+      checkOnly: false,
+      auditLog: options.auditLog
     });
   } catch (error) {
     return {
@@ -292,7 +296,8 @@ export async function runFixWorkflow(options = {}) {
   if (selectedTestCommand) {
     try {
       tests = runCommandWithPolicy(root, selectedTestCommand, engine, {
-        confirmed: Boolean(options.confirmed)
+        confirmed: Boolean(options.confirmed),
+        auditLog: options.auditLog
       });
     } catch (error) {
       tests = {

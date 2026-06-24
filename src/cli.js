@@ -14,6 +14,7 @@ import { runDoctor } from "./agents/doctor.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
+import { appendAuditEvent } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
@@ -50,6 +51,7 @@ Usage:
 Options:
   --json      Print JSON output
   --root DIR  Repository root, defaults to current working directory
+  --audit-log FILE  Append policy-gated JSONL audit events
 `);
 }
 
@@ -94,16 +96,56 @@ function resolveInputPath(root, filePath) {
   return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
+function withAudit(root, engine, auditLog, result, event, confirmed = false) {
+  if (!auditLog) return result;
+  return {
+    ...result,
+    auditLog: appendAuditEvent(root, engine, auditLog, {
+      ...event,
+      policyStatus: result.status,
+      reason: result.reason
+    }, { confirmed })
+  };
+}
+
 function policyCommand(parsed, root) {
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
 
-  if (parsed.path) return engine.checkPath(parsed.path);
-  if (parsed.command) return engine.checkCommand(parsed.command);
-  if (parsed.patch) return engine.checkPatch(fs.readFileSync(resolveInputPath(root, parsed.patch), "utf8"));
+  if (parsed.path) {
+    const result = engine.checkPath(parsed.path);
+    return withAudit(root, engine, parsed["audit-log"], result, {
+      operation: "policy_check_path",
+      target: parsed.path,
+      outcome: result.status === "allow" || (result.status === "require_confirmation" && parsed.confirm) ? "allowed" : "blocked"
+    }, Boolean(parsed.confirm));
+  }
+  if (parsed.command) {
+    const result = engine.checkCommand(parsed.command);
+    return withAudit(root, engine, parsed["audit-log"], result, {
+      operation: "policy_check_command",
+      command: parsed.command,
+      outcome: result.status === "allow" || (result.status === "require_confirmation" && parsed.confirm) ? "allowed" : "blocked"
+    }, Boolean(parsed.confirm));
+  }
+  if (parsed.patch) {
+    const result = engine.checkPatch(fs.readFileSync(resolveInputPath(root, parsed.patch), "utf8"));
+    return withAudit(root, engine, parsed["audit-log"], result, {
+      operation: "policy_check_patch",
+      files: result.files,
+      outcome: result.status === "allow" || (result.status === "require_confirmation" && parsed.confirm) ? "allowed" : "blocked"
+    }, Boolean(parsed.confirm));
+  }
 
   const stdin = readStdinIfAvailable();
-  if (stdin.trim()) return engine.checkPatch(stdin);
+  if (stdin.trim()) {
+    const result = engine.checkPatch(stdin);
+    return withAudit(root, engine, parsed["audit-log"], result, {
+      operation: "policy_check_patch",
+      files: result.files,
+      outcome: result.status === "allow" || (result.status === "require_confirmation" && parsed.confirm) ? "allowed" : "blocked"
+    }, Boolean(parsed.confirm));
+  }
   throw new Error("policy check requires --path, --command, --patch, or patch text on stdin");
 }
 
@@ -149,6 +191,7 @@ async function fixCommand(parsed, root) {
     dryRun: Boolean(parsed["dry-run"]),
     apply: Boolean(parsed.apply),
     confirmed: Boolean(parsed.confirm),
+    auditLog: parsed["audit-log"],
     env: loadRuntimeEnv(root)
   });
 }
@@ -182,11 +225,19 @@ function patchCommand(parsed, root, subcommand) {
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
 
-  if (subcommand === "check") return engine.checkPatch(patchText);
+  if (subcommand === "check") {
+    const result = engine.checkPatch(patchText);
+    return withAudit(root, engine, parsed["audit-log"], result, {
+      operation: "check_patch",
+      files: result.files,
+      outcome: result.status === "allow" || (result.status === "require_confirmation" && parsed.confirm) ? "allowed" : "blocked"
+    }, Boolean(parsed.confirm));
+  }
   if (subcommand === "apply") {
     return applyPatchWithPolicy(root, patchText, engine, {
       confirmed: Boolean(parsed.confirm),
-      checkOnly: Boolean(parsed["check-only"])
+      checkOnly: Boolean(parsed["check-only"]),
+      auditLog: parsed["audit-log"]
     });
   }
   throw new Error(`Unknown patch command: ${subcommand || ""}`);
@@ -208,7 +259,8 @@ function runCommand(parsed, root) {
   const engine = new PolicyEngine(config, { root });
   return runCommandWithPolicy(root, parsed.command, engine, {
     confirmed: Boolean(parsed.confirm),
-    dryRun: Boolean(parsed["dry-run"])
+    dryRun: Boolean(parsed["dry-run"]),
+    auditLog: parsed["audit-log"]
   });
 }
 
@@ -327,7 +379,8 @@ async function dispatch(parsed) {
         runTests: Boolean(parsed.run),
         testCommand: parsed["test-command"],
         dryRun: Boolean(parsed["dry-run"]),
-        confirmed: Boolean(parsed.confirm)
+        confirmed: Boolean(parsed.confirm),
+        auditLog: parsed["audit-log"]
       });
     }
     return analyzeTestTargets({ root, coverageFile: parsed.coverage, coverageAfterFile: parsed["coverage-after"] });
@@ -337,7 +390,7 @@ async function dispatch(parsed) {
     if (parsed.write) {
       const { config } = loadConfig(root);
       const engine = new PolicyEngine(config, { root });
-      return writeOnboardingDocs(root, engine, { confirmed: Boolean(parsed.confirm) });
+      return writeOnboardingDocs(root, engine, { confirmed: Boolean(parsed.confirm), auditLog: parsed["audit-log"] });
     }
     return analyzeRepository({ root });
   }

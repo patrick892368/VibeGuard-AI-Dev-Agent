@@ -25,6 +25,30 @@ test("CLI policy check requires confirmation for Git and PR state changes", () =
   assert.equal(parsed.status, "require_confirmation");
 });
 
+test("CLI policy check can write audit JSONL", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-audit-"));
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "policy",
+    "check",
+    "--path",
+    "src/index.js",
+    "--audit-log",
+    "reports/audit.jsonl",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+  const events = fs.readFileSync(path.join(root, "reports", "audit.jsonl"), "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  assert.equal(parsed.auditLog.status, "written");
+  assert.equal(events[0].operation, "policy_check_path");
+  assert.equal(events[0].target, "src/index.js");
+});
+
 test("CLI debug accepts log file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-"));
   fs.mkdirSync(path.join(root, "src"));

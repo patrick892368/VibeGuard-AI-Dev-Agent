@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { appendAuditEvent } from "./audit.js";
 
 export function assertPolicyAllowed(result, options = {}) {
   if (result.status === "deny") {
@@ -12,35 +13,59 @@ export function assertPolicyAllowed(result, options = {}) {
 
 export function writeFileWithPolicy(root, relativePath, content, engine, options = {}) {
   const result = engine.checkPath(relativePath, "write");
+  const auditLog = appendAuditEvent(root, engine, options.auditLog, {
+    operation: "write_file",
+    target: relativePath,
+    policyStatus: result.status,
+    outcome: result.status === "allow" || (result.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    reason: result.reason
+  }, options);
   assertPolicyAllowed(result, options);
   const absolute = path.join(root, relativePath);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
   fs.writeFileSync(absolute, content, "utf8");
   return {
     path: relativePath,
-    policy: result
+    policy: result,
+    auditLog
   };
 }
 
 export function appendFileWithPolicy(root, relativePath, content, engine, options = {}) {
   const result = engine.checkPath(relativePath, "append");
+  const auditLog = appendAuditEvent(root, engine, options.auditLog, {
+    operation: "append_file",
+    target: relativePath,
+    policyStatus: result.status,
+    outcome: result.status === "allow" || (result.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    reason: result.reason
+  }, options);
   assertPolicyAllowed(result, options);
   const absolute = path.join(root, relativePath);
   fs.mkdirSync(path.dirname(absolute), { recursive: true });
   fs.appendFileSync(absolute, content, "utf8");
   return {
     path: relativePath,
-    policy: result
+    policy: result,
+    auditLog
   };
 }
 
 export function readFileWithPolicy(root, relativePath, engine, options = {}) {
   const result = engine.checkPath(relativePath, "read");
+  const auditLog = appendAuditEvent(root, engine, options.auditLog, {
+    operation: "read_file",
+    target: relativePath,
+    policyStatus: result.status,
+    outcome: result.status === "allow" || (result.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    reason: result.reason
+  }, options);
   assertPolicyAllowed(result, options);
   const absolute = path.join(root, relativePath);
   return {
     content: fs.readFileSync(absolute, "utf8"),
     path: relativePath,
-    policy: result
+    policy: result,
+    auditLog
   };
 }

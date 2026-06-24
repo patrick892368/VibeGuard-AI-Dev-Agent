@@ -32,6 +32,7 @@ Check local readiness and policy:
 node ./bin/vibeguard.js doctor --json
 node ./bin/vibeguard.js policy check --path src/index.js --json
 node ./bin/vibeguard.js policy check --command "npm test" --json
+node ./bin/vibeguard.js policy check --path src/index.js --audit-log reports/audit.jsonl --json
 ```
 
 Analyze an error log:
@@ -137,7 +138,12 @@ Run tests through command policy:
 
 ```bash
 node ./bin/vibeguard.js run --command "npm test" --json
+node ./bin/vibeguard.js run --command "npm test" --audit-log reports/audit.jsonl --json
 ```
+
+Codex should use `--audit-log reports/audit.jsonl` for reviewed write/patch/command workflows when a persistent local audit trail is useful. The audit log path is checked by policy before any JSONL event is appended.
+
+需要保留本地审计轨迹时，Codex 应在已审查的写文件、patch、命令流程中使用 `--audit-log reports/audit.jsonl`。追加 JSONL 事件前，审计日志路径本身也会经过 policy 检查。
 
 Find test targets with coverage reports:
 

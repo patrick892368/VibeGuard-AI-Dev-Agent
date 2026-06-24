@@ -114,6 +114,7 @@ function callTool(name, args, root) {
       dryRun: args.dryRun !== false,
       apply: Boolean(args.apply),
       confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog,
       env: loadRuntimeEnv(root)
     });
   }
@@ -131,7 +132,8 @@ function callTool(name, args, root) {
         runTests: Boolean(args.run),
         testCommand: args.testCommand,
         dryRun: Boolean(args.dryRun),
-        confirmed: Boolean(args.confirmed)
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
       });
     }
     return analyzeTestTargets({

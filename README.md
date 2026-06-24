@@ -30,6 +30,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard pr summary`: 从 diff 生成 GitHub-ready PR body。Builds a GitHub-ready PR body from a diff.
 - `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态。Detects GitHub remotes, creates PRs/comments, and reads Actions status.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
+- `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard eval fixtures`: 用 Python / Node fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python and Node fixtures.
 - `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote 和 `gh`，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, and `gh` without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server。Starts an MCP-style stdio server.
@@ -58,9 +59,11 @@ node ./bin/vibeguard.js --help
 vibeguard policy check --path src/index.js
 vibeguard policy check --command "npm test"
 vibeguard policy check --patch fix.diff
+vibeguard policy check --path src/index.js --audit-log reports/audit.jsonl
 
 vibeguard debug --log error.log
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --dry-run
+vibeguard fix --log error.log --patch fix.diff --test "npm test" --apply --audit-log reports/audit.jsonl
 vibeguard fix --log error.log --patch fix.diff --auto-test --apply
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --output-patch patches/fix.diff --dry-run
 vibeguard fix --log error.log --patch fix.diff --test "npm test" --create-branch --commit --pr-dry-run --dry-run
@@ -86,6 +89,7 @@ vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 vibeguard github comment --pr 12 --body-file review.md
 vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard run --command "npm test" --dry-run
+vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard eval fixtures --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json
 vibeguard eval fixtures --history reports/eval-history.jsonl --json
@@ -276,6 +280,7 @@ The test suite covers:
 - PR 创建调度和 PR comment dry-run。PR creation dispatch and PR comment dry-run.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
+- Policy-gated JSONL 审计日志。Policy-gated JSONL audit logs.
 - coverage.py JSON / LCOV 解析、未覆盖文件排序、missing line 到函数映射、before/after coverage delta，以及生成测试后的 policy-gated test run。coverage.py JSON / LCOV parsing, uncovered file prioritization, missing-line-to-function mapping, before/after coverage deltas, and policy-gated test runs after generating tests.
 
 ## 集成目标 / Integration Targets

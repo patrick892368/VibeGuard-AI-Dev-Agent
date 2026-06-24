@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { assertPolicyAllowed } from "../policy/safeWrite.js";
+import { appendAuditEvent } from "../policy/audit.js";
 
 export function commandDisplay(argv) {
   return argv.map((part) => (/\s/.test(part) ? JSON.stringify(part) : part)).join(" ");
@@ -7,13 +8,22 @@ export function commandDisplay(argv) {
 
 export function runCommandWithPolicy(root, command, engine, options = {}) {
   const policy = engine.checkCommand(command);
+  const policyAuditLog = appendAuditEvent(root, engine, options.auditLog, {
+    operation: "run_command",
+    command,
+    policyStatus: policy.status,
+    outcome: policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    dryRun: Boolean(options.dryRun),
+    reason: policy.reason
+  }, options);
   assertPolicyAllowed(policy, { confirmed: options.confirmed });
 
   if (options.dryRun) {
     return {
       status: "checked",
       command,
-      policy
+      policy,
+      auditLog: policyAuditLog
     };
   }
 
@@ -23,19 +33,36 @@ export function runCommandWithPolicy(root, command, engine, options = {}) {
     encoding: "utf8"
   });
 
-  return {
+  const resultBody = {
     status: result.status === 0 ? "passed" : "failed",
     exitCode: result.status,
     command,
     stdout: result.stdout,
     stderr: result.stderr,
-    policy
+    policy,
+    auditLog: policyAuditLog
   };
+  appendAuditEvent(root, engine, options.auditLog, {
+    operation: "run_command_result",
+    command,
+    status: resultBody.status,
+    exitCode: resultBody.exitCode
+  }, options);
+  return resultBody;
 }
 
 export function runArgvWithPolicy(root, argv, engine, options = {}) {
   const command = commandDisplay(argv);
   const policy = engine.checkCommand(command);
+  const policyAuditLog = appendAuditEvent(root, engine, options.auditLog, {
+    operation: "run_command",
+    command,
+    argv,
+    policyStatus: policy.status,
+    outcome: policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    dryRun: Boolean(options.dryRun),
+    reason: policy.reason
+  }, options);
   assertPolicyAllowed(policy, { confirmed: options.confirmed });
 
   if (options.dryRun) {
@@ -43,7 +70,8 @@ export function runArgvWithPolicy(root, argv, engine, options = {}) {
       status: "checked",
       command,
       argv,
-      policy
+      policy,
+      auditLog: policyAuditLog
     };
   }
 
@@ -53,7 +81,7 @@ export function runArgvWithPolicy(root, argv, engine, options = {}) {
     encoding: "utf8"
   });
 
-  return {
+  const resultBody = {
     status: result.status === 0 ? "passed" : "failed",
     exitCode: result.status,
     command,
@@ -61,6 +89,16 @@ export function runArgvWithPolicy(root, argv, engine, options = {}) {
     stdout: result.stdout,
     stderr: result.stderr,
     error: result.error?.message || null,
-    policy
+    policy,
+    auditLog: policyAuditLog
   };
+  appendAuditEvent(root, engine, options.auditLog, {
+    operation: "run_command_result",
+    command,
+    argv,
+    status: resultBody.status,
+    exitCode: resultBody.exitCode,
+    error: resultBody.error
+  }, options);
+  return resultBody;
 }
