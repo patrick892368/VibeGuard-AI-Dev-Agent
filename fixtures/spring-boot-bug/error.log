@@ -1,0 +1,4 @@
+org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'userController'
+    at com.example.UserController.<init>(UserController.java:9)
+Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No qualifying bean of type 'com.example.UserService' available
+    at com.example.UserController.<init>(UserController.java:9)

@@ -1,0 +1,12 @@
+diff --git a/src/main/java/com/example/UserService.java b/src/main/java/com/example/UserService.java
+--- a/src/main/java/com/example/UserService.java
++++ b/src/main/java/com/example/UserService.java
+@@ -1,5 +1,8 @@
+ package com.example;
+ 
++import org.springframework.stereotype.Service;
++
++@Service
+ public class UserService {
+     public String displayName(String rawName) {
+         return rawName == null ? "unknown" : rawName.trim();

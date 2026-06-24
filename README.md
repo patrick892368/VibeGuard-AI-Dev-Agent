@@ -153,6 +153,7 @@ For deterministic local demos and tests, pass a known patch file:
 ```bash
 node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fixes/reference-error.patch --test "npm test" --dry-run --json
 node ./bin/vibeguard.js --root fixtures/django-bug fix --log error.log --patch fixes/template-error.patch --auto-test --dry-run --json
+node ./bin/vibeguard.js --root fixtures/spring-boot-bug fix --log error.log --patch fixes/service-annotation.patch --auto-test --dry-run --json
 ```
 
 `fix` 总是先校验 patch shape、检查 policy、运行 `git apply --check`，只有传入 `--apply` 才真正应用 patch。
@@ -274,7 +275,7 @@ The test suite covers:
 - YAML 配置解析。YAML config parsing.
 - 路径和命令 policy。Path and command policy checks.
 - Patch 安全检查。Patch file safety checks.
-- Python / Node / Django-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, and Django-style fixture projects.
+- Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
 - Python / Django / Node / Java / Spring Boot 报错解析。Python / Django / Node / Java / Spring Boot error parsing.
 - Review diff 分析。Review diff analysis.

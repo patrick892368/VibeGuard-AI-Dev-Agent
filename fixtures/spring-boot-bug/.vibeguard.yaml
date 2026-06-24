@@ -1,0 +1,32 @@
+version: 1
+
+paths:
+  allow:
+    - "src/**"
+    - "tests/**"
+    - "fixes/**"
+    - "error.log"
+    - "pom.xml"
+    - ".vibeguard.yaml"
+
+  deny:
+    - ".env"
+    - ".env.*"
+    - ".git/**"
+    - "node_modules/**"
+    - "target/**"
+
+  require_confirmation: []
+
+commands:
+  deny:
+    - "rm -rf"
+    - "git reset --hard"
+    - "git push --force"
+
+  require_confirmation:
+    - "git switch -c"
+    - "git commit"
+    - "git push"
+    - "gh pr create"
+    - "gh pr comment"
