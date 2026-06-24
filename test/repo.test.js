@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { scanRepository } from "../src/repo/scan.js";
-import { analyzeTestTargets, parseCoverageReport } from "../src/agents/testWriter.js";
+import { analyzeTestTargets, compareCoverageReports, parseCoverageReport } from "../src/agents/testWriter.js";
 import { analyzeRepository, buildOnboardingMarkdown } from "../src/agents/onboard.js";
 
 function tempRepo() {
@@ -76,6 +76,31 @@ end_of_record
   assert.equal(report.files[0].percentCovered, 50);
 });
 
+test("compareCoverageReports summarizes coverage changes", () => {
+  const root = tempRepo();
+  const before = parseCoverageReport(JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [1, 2],
+        summary: { percent_covered: 50 }
+      }
+    }
+  }), { root });
+  const after = parseCoverageReport(JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [2],
+        summary: { percent_covered: 75 }
+      }
+    }
+  }), { root });
+
+  const delta = compareCoverageReports(before, after);
+  assert.equal(delta.summary.averagePercentDelta, 25);
+  assert.equal(delta.summary.missingLinesReduced, 1);
+  assert.equal(delta.files[0].status, "improved");
+});
+
 test("analyzeTestTargets prioritizes uncovered coverage files", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
@@ -99,6 +124,34 @@ test("analyzeTestTargets prioritizes uncovered coverage files", () => {
   assert.equal(result.coverage.summary.filesWithMissingLines, 1);
   assert.equal(result.candidates[0].sourceFile, "src/uncovered.js");
   assert.equal(result.candidates[0].coverage.missingLineCount, 1);
+});
+
+test("analyzeTestTargets includes coverage delta when before and after reports are provided", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const beforePath = path.join(root, "coverage-before.json");
+  const afterPath = path.join(root, "coverage-after.json");
+  fs.writeFileSync(beforePath, JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [1],
+        summary: { percent_covered: 0 }
+      }
+    }
+  }), "utf8");
+  fs.writeFileSync(afterPath, JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [],
+        summary: { percent_covered: 100 }
+      }
+    }
+  }), "utf8");
+
+  const result = analyzeTestTargets({ root, coverageFile: beforePath, coverageAfterFile: afterPath });
+  assert.equal(result.coverageDelta.summary.averagePercentDelta, 100);
+  assert.equal(result.coverageDelta.summary.missingLinesReduced, 1);
 });
 
 test("analyzeTestTargets maps missing coverage lines to functions", () => {

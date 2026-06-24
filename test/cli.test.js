@@ -57,14 +57,23 @@ test("CLI test command accepts coverage report", () => {
       }
     }
   }), "utf8");
+  fs.writeFileSync(path.join(root, "coverage-after.json"), JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [],
+        summary: { percent_covered: 100 }
+      }
+    }
+  }), "utf8");
 
-  const output = execFileSync(process.execPath, [bin, "--root", root, "test", "--coverage", "coverage.json", "--json"], {
+  const output = execFileSync(process.execPath, [bin, "--root", root, "test", "--coverage", "coverage.json", "--coverage-after", "coverage-after.json", "--json"], {
     cwd: process.cwd(),
     encoding: "utf8"
   });
   const parsed = JSON.parse(output);
   assert.equal(parsed.coverage.format, "coverage.py-json");
   assert.equal(parsed.candidates[0].coverage.missingLineCount, 1);
+  assert.equal(parsed.coverageDelta.summary.missingLinesReduced, 1);
 });
 
 test("CLI debug --ai-patch marks non-diff AI output as denied", () => {

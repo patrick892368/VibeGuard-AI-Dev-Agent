@@ -188,6 +188,66 @@ function summarizeCoverage(files) {
   };
 }
 
+function sumMissingLines(report) {
+  return (report?.files || []).reduce((sum, file) => sum + file.missingLineCount, 0);
+}
+
+function roundMetric(value) {
+  return typeof value === "number" ? Math.round(value * 100) / 100 : null;
+}
+
+export function compareCoverageReports(before, after) {
+  if (!before || !after) return null;
+  const beforeByFile = new Map(before.files.map((file) => [file.file, file]));
+  const afterByFile = new Map(after.files.map((file) => [file.file, file]));
+  const files = [...new Set([...beforeByFile.keys(), ...afterByFile.keys()])].sort().map((file) => {
+    const beforeFile = beforeByFile.get(file) || null;
+    const afterFile = afterByFile.get(file) || null;
+    const percentDelta = typeof beforeFile?.percentCovered === "number" && typeof afterFile?.percentCovered === "number"
+      ? afterFile.percentCovered - beforeFile.percentCovered
+      : null;
+    const missingLineDelta = (afterFile?.missingLineCount ?? 0) - (beforeFile?.missingLineCount ?? 0);
+    return {
+      file,
+      beforePercentCovered: beforeFile?.percentCovered ?? null,
+      afterPercentCovered: afterFile?.percentCovered ?? null,
+      percentDelta: roundMetric(percentDelta),
+      beforeMissingLineCount: beforeFile?.missingLineCount ?? null,
+      afterMissingLineCount: afterFile?.missingLineCount ?? null,
+      missingLineDelta,
+      status: percentDelta > 0 || missingLineDelta < 0
+        ? "improved"
+        : percentDelta < 0 || missingLineDelta > 0
+          ? "regressed"
+          : "unchanged"
+    };
+  });
+
+  const averagePercentDelta = typeof before.summary.averagePercentCovered === "number" && typeof after.summary.averagePercentCovered === "number"
+    ? after.summary.averagePercentCovered - before.summary.averagePercentCovered
+    : null;
+  const beforeMissingLines = sumMissingLines(before);
+  const afterMissingLines = sumMissingLines(after);
+
+  return {
+    status: "compared",
+    beforeFormat: before.format,
+    afterFormat: after.format,
+    summary: {
+      beforeAveragePercentCovered: roundMetric(before.summary.averagePercentCovered),
+      afterAveragePercentCovered: roundMetric(after.summary.averagePercentCovered),
+      averagePercentDelta: roundMetric(averagePercentDelta),
+      beforeMissingLines,
+      afterMissingLines,
+      missingLinesReduced: beforeMissingLines - afterMissingLines,
+      filesImproved: files.filter((file) => file.status === "improved").length,
+      filesRegressed: files.filter((file) => file.status === "regressed").length,
+      filesUnchanged: files.filter((file) => file.status === "unchanged").length
+    },
+    files
+  };
+}
+
 export function parseCoverageReport(text, options = {}) {
   const root = options.root || process.cwd();
   const trimmed = text.trim();
@@ -208,11 +268,19 @@ export function parseCoverageReport(text, options = {}) {
   };
 }
 
-function loadCoverage(options, root) {
-  if (options.coverageText) return parseCoverageReport(options.coverageText, { root });
-  if (!options.coverageFile) return null;
-  const coverageFile = path.isAbsolute(options.coverageFile) ? options.coverageFile : path.join(root, options.coverageFile);
+function loadCoverageInput(options, root, fileKey, textKey) {
+  if (options[textKey]) return parseCoverageReport(options[textKey], { root });
+  if (!options[fileKey]) return null;
+  const coverageFile = path.isAbsolute(options[fileKey]) ? options[fileKey] : path.join(root, options[fileKey]);
   return parseCoverageReport(fs.readFileSync(coverageFile, "utf8"), { root });
+}
+
+function loadCoverage(options, root) {
+  return loadCoverageInput(options, root, "coverageFile", "coverageText");
+}
+
+function loadCoverageAfter(options, root) {
+  return loadCoverageInput(options, root, "coverageAfterFile", "coverageAfterText");
 }
 
 export function generateTestContent(candidate) {
@@ -352,6 +420,7 @@ export function analyzeTestTargets(options = {}) {
   const files = listRepoFiles(root);
   const repo = scanRepository(root);
   const coverage = loadCoverage(options, root);
+  const coverageAfter = loadCoverageAfter(options, root);
   const coverageByFile = new Map((coverage?.files || []).map((item) => [item.file, item]));
   const sourceFiles = files.filter((file) =>
     !/(^|\/)(test|tests|__tests__)\//.test(file) &&
@@ -393,13 +462,21 @@ export function analyzeTestTargets(options = {}) {
   return {
     frameworkHints: repo.suggestedCommands,
     coverage,
+    coverageAfter,
+    coverageDelta: compareCoverageReports(coverage, coverageAfter),
     coverageTargets: coverageTargets(sortedCandidates),
     candidates: sortedCandidates
   };
 }
 
 export function writeSuggestedTests(root, engine, options = {}) {
-  const analysis = analyzeTestTargets({ root, coverageFile: options.coverageFile, coverageText: options.coverageText });
+  const analysis = analyzeTestTargets({
+    root,
+    coverageFile: options.coverageFile,
+    coverageText: options.coverageText,
+    coverageAfterFile: options.coverageAfterFile,
+    coverageAfterText: options.coverageAfterText
+  });
   const limit = Number(options.limit || 1);
   const writable = analysis.candidates.filter((candidate) => candidate.suggestedTestFile && !candidate.hasLikelyTest).slice(0, limit);
   const written = writable.map((candidate) =>

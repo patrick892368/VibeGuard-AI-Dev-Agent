@@ -126,13 +126,21 @@ function callTool(name, args, root) {
         limit: args.limit || 1,
         coverageFile: args.coverageFile,
         coverageText: args.coverageText,
+        coverageAfterFile: args.coverageAfterFile,
+        coverageAfterText: args.coverageAfterText,
         runTests: Boolean(args.run),
         testCommand: args.testCommand,
         dryRun: Boolean(args.dryRun),
         confirmed: Boolean(args.confirmed)
       });
     }
-    return analyzeTestTargets({ root, coverageFile: args.coverageFile, coverageText: args.coverageText });
+    return analyzeTestTargets({
+      root,
+      coverageFile: args.coverageFile,
+      coverageText: args.coverageText,
+      coverageAfterFile: args.coverageAfterFile,
+      coverageAfterText: args.coverageAfterText
+    });
   }
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");

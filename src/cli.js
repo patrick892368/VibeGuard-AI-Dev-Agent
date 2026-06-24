@@ -27,8 +27,8 @@ Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file>
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
-  vibeguard test [--coverage <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--run] [--test-command <cmd>]
+  vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>]
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
@@ -323,13 +323,14 @@ async function dispatch(parsed) {
       return writeSuggestedTests(root, engine, {
         limit: parsed.limit || 1,
         coverageFile: parsed.coverage,
+        coverageAfterFile: parsed["coverage-after"],
         runTests: Boolean(parsed.run),
         testCommand: parsed["test-command"],
         dryRun: Boolean(parsed["dry-run"]),
         confirmed: Boolean(parsed.confirm)
       });
     }
-    return analyzeTestTargets({ root, coverageFile: parsed.coverage });
+    return analyzeTestTargets({ root, coverageFile: parsed.coverage, coverageAfterFile: parsed["coverage-after"] });
   }
   if (command === "review") return reviewCommand(parsed, root);
   if (command === "onboard") {
