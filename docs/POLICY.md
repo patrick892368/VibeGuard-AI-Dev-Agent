@@ -4,9 +4,9 @@ VibeGuard uses `.vibeguard.yaml` as the repository safety boundary.
 
 VibeGuard 使用 `.vibeguard.yaml` 作为仓库安全边界。
 
-All agents must respect this policy before writes, patch apply, risky commands, Git/PR actions, and generated artifacts.
+All agents must respect this policy before debug-context reads, writes, patch apply, risky commands, Git/PR actions, and generated artifacts.
 
-所有 agent 在写文件、应用 patch、执行风险命令、Git/PR 操作和写生成物前，都必须遵守该 policy。
+所有 agent 在读取 debug context、写文件、应用 patch、执行风险命令、Git/PR 操作和写生成物前，都必须遵守该 policy。
 
 ## Path Policy / 路径策略
 
@@ -91,6 +91,7 @@ All agents must call the Policy Engine before:
 所有 agent 必须在以下操作前调用 Policy Engine：
 
 - Writing files. / 写文件。
+- Reading debug context snippets. / 读取 debug context 片段。
 - Applying patches. / 应用 patch。
 - Running risky commands. / 执行风险命令。
 - Preparing Git hooks. / 准备 Git hooks。

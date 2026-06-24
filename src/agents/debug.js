@@ -307,7 +307,13 @@ function buildErrorExplanation(summary, frames, frameworkContexts) {
   };
 }
 
-function sourceSnippet(root, file, line, radius = 3) {
+function canReadContextFile(engine, file) {
+  if (!engine) return true;
+  return engine.checkPath(file, "read_debug_context").status === "allow";
+}
+
+function sourceSnippet(root, file, line, radius = 3, engine = null) {
+  if (!canReadContextFile(engine, file)) return null;
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute)) return null;
   const lines = fs.readFileSync(absolute, "utf8").split(/\r?\n/);
@@ -321,7 +327,8 @@ function sourceSnippet(root, file, line, radius = 3) {
   };
 }
 
-function sourcePreview(root, file, limit = 40) {
+function sourcePreview(root, file, limit = 40, engine = null) {
+  if (!canReadContextFile(engine, file)) return null;
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute)) return null;
   const lines = fs.readFileSync(absolute, "utf8").split(/\r?\n/);
@@ -336,6 +343,7 @@ function sourcePreview(root, file, limit = 40) {
 
 export function analyzeDebugLog(logText, options = {}) {
   const root = options.root || process.cwd();
+  const engine = options.engine || null;
   const repo = scanRepository(root);
   const pythonFrames = parsePythonTraceback(logText, root);
   const nodeFrames = parseNodeStack(logText, root);
@@ -349,14 +357,14 @@ export function analyzeDebugLog(logText, options = {}) {
   const snippets = [];
   const snippetFiles = new Set();
   for (const frame of frames.slice(0, 5)) {
-    const snippet = sourceSnippet(root, frame.file, frame.line);
+    const snippet = sourceSnippet(root, frame.file, frame.line, 3, engine);
     if (!snippet) continue;
     snippets.push(snippet);
     snippetFiles.add(frame.file);
   }
   for (const file of uniqueFiles) {
     if (snippets.length >= 8 || snippetFiles.has(file)) continue;
-    const snippet = sourcePreview(root, file);
+    const snippet = sourcePreview(root, file, 40, engine);
     if (!snippet) continue;
     snippets.push(snippet);
     snippetFiles.add(file);

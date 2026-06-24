@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { analyzeDebugLog, parseJavaStack, parseNodeStack, parsePythonTraceback } from "../src/agents/debug.js";
+import { PolicyEngine } from "../src/policy/engine.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-debug-"));
@@ -53,6 +54,23 @@ NameError: name 'missing' is not defined`;
   assert.deepEqual(result.likelyFiles, ["src/app.py"]);
   assert.equal(result.snippets.length, 1);
   assert.ok(result.hints.some((hint) => hint.includes("missing import") || hint.includes("scope")));
+});
+
+test("analyzeDebugLog does not read snippets from denied paths", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "secret.py"), "def run():\n    missing_secret\n", "utf8");
+  const log = `Traceback (most recent call last):
+  File "${path.join(root, "secret.py")}", line 2, in run
+    missing_secret
+NameError: name 'missing_secret' is not defined`;
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: ["secret.py"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const result = analyzeDebugLog(log, { root, engine });
+  assert.deepEqual(result.likelyFiles, ["secret.py"]);
+  assert.equal(result.snippets.length, 0);
 });
 
 test("parseJavaStack maps Java stack frames to repository files", () => {

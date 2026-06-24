@@ -26,9 +26,9 @@ vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard audit summary --file reports/audit.jsonl
 ```
 
-`debug` returns a structured `explanation` with a user-facing message, likely cause, and evidence such as error type, stack location, and framework.
+`debug` returns a structured `explanation` with a user-facing message, likely cause, and evidence such as error type, stack location, and framework. Source snippets are included only when path policy allows reading that file.
 
-`debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。
+`debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。源码片段只有在 path policy 允许读取该文件时才会返回。
 
 `review` returns line-level findings, recommendations, severity summaries, actionItems, and PR-comment Markdown when the diff hunk contains line metadata.
 

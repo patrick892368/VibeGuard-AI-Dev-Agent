@@ -155,10 +155,10 @@ function policyCommand(parsed, root) {
 async function debugCommand(parsed, root) {
   const logText = parsed.log ? fs.readFileSync(resolveInputPath(root, parsed.log), "utf8") : readStdinIfAvailable();
   if (!logText.trim()) throw new Error("debug requires --log <file> or error text on stdin");
-  const result = analyzeDebugLog(logText, { root });
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const result = analyzeDebugLog(logText, { root, engine });
   if (parsed["ai-patch"]) {
-    const { config } = loadConfig(root);
-    const engine = new PolicyEngine(config, { root });
     const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
     result.aiPatch = ai;
     if (ai.patch) {

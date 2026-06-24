@@ -268,7 +268,7 @@ export async function runFixWorkflow(options = {}) {
     throw new Error("runFixWorkflow requires a PolicyEngine");
   }
 
-  const debug = analyzeDebugLog(logText, { root });
+  const debug = analyzeDebugLog(logText, { root, engine });
   const selectedTestCommand = options.testCommand || (options.autoTest ? selectAutoTestCommand(debug, root) : null);
   const providedPatch = patchFromOptions(options);
   let patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);

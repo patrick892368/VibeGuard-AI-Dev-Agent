@@ -229,7 +229,11 @@ async function callTool(name, args, root) {
     if (args.patch) return engine.checkPatch(args.patch);
     throw new Error("check_policy requires path, command, or patch");
   }
-  if (name === "debug_error") return analyzeDebugLog(args.log || "", { root });
+  if (name === "debug_error") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return analyzeDebugLog(args.log || "", { root, engine });
+  }
   if (name === "fix_error") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
