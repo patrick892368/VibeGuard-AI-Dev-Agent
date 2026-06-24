@@ -80,6 +80,7 @@ Available tools:
 - `onboard_repo`
 - `write_tests`
 - `review_pr`
+- `apply_patch_safely`
 - `summarize_pr`
 - `detect_github`
 - `github_pr`
@@ -106,6 +107,10 @@ Available tools:
 `review_pr` can return structured findings and, when `writeComment` is provided, write the PR comment body through policy.
 
 `review_pr` 可以返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
+
+`apply_patch_safely` validates a unified diff through patch validation, path policy, and `git apply --check` by default; it only applies when `apply` is true.
+
+`apply_patch_safely` 默认通过 patch validation、路径 policy 和 `git apply --check` 校验 unified diff；只有 `apply` 为 true 时才会真正应用。
 
 `summarize_pr` can return a GitHub-ready PR body and, when `writeBody` is provided, write that body through policy.
 

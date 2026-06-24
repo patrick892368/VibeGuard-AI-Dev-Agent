@@ -3,10 +3,19 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { handleMcpRequest, mcpInternals } from "../src/mcp/server.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-mcp-"));
+}
+
+function tempGitRepo() {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
+  return root;
 }
 
 test("MCP tools expose input schemas", () => {
@@ -15,6 +24,7 @@ test("MCP tools expose input schemas", () => {
     assert.ok(tool.description);
   }
   assert.ok(mcpInternals.tools.some((tool) => tool.name === "github_pr"));
+  assert.ok(mcpInternals.tools.some((tool) => tool.name === "apply_patch_safely"));
 });
 
 test("MCP initialize returns server info and tool capabilities", async () => {
@@ -131,4 +141,53 @@ test("MCP github_pr returns a dry-run PR command", async () => {
   assert.equal(response.result.structuredContent.status, "dry_run");
   assert.match(response.result.structuredContent.command, /gh pr create/);
   assert.match(response.result.structuredContent.command, /--draft/);
+});
+
+test("MCP apply_patch_safely checks a patch without modifying files", async () => {
+  const root = tempGitRepo();
+  const patch = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 8,
+    method: "tools/call",
+    params: {
+      name: "apply_patch_safely",
+      arguments: { patch }
+    }
+  }, root);
+
+  assert.equal(response.result.structuredContent.status, "checked");
+  assert.equal(response.result.structuredContent.policy.status, "allow");
+  assert.equal(fs.readFileSync(path.join(root, "src", "app.js"), "utf8"), "old\n");
+});
+
+test("MCP apply_patch_safely blocks denied patch files", async () => {
+  const root = tempGitRepo();
+  const patch = `diff --git a/.env b/.env
+--- a/.env
++++ b/.env
+@@ -1 +1 @@
+-A=1
++A=2
+`;
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 9,
+    method: "tools/call",
+    params: {
+      name: "apply_patch_safely",
+      arguments: { patch }
+    }
+  }, root);
+
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.structuredContent.error, /Patch contains deny file changes: \.env/);
 });

@@ -13,6 +13,7 @@ import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
+import { applyPatchWithPolicy } from "../patch/safeApply.js";
 
 const stringSchema = { type: "string" };
 const booleanSchema = { type: "boolean" };
@@ -108,6 +109,16 @@ const tools = [
       confirmed: booleanSchema,
       auditLog: stringSchema
     })
+  },
+  {
+    name: "apply_patch_safely",
+    description: "Validate and optionally apply a unified diff through Policy-as-Code. Checks only by default.",
+    inputSchema: objectSchema({
+      patch: stringSchema,
+      apply: booleanSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    }, ["patch"])
   },
   {
     name: "summarize_pr",
@@ -389,6 +400,15 @@ async function callTool(name, args, root) {
       });
     }
     return analyzeReviewDiff(args.diff || "");
+  }
+  if (name === "apply_patch_safely") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return applyPatchWithPolicy(root, args.patch, engine, {
+      checkOnly: args.apply !== true,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
   }
   if (name === "summarize_pr") {
     if (args.writeBody) {

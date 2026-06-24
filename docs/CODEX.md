@@ -93,6 +93,10 @@ Write generated patch artifacts after validation and policy checks:
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --output-patch patches/fix.diff --dry-run --json
 ```
 
+Through MCP, use `apply_patch_safely` for patch validation. It checks only by default and applies only when `apply` is true.
+
+通过 MCP 时，使用 `apply_patch_safely` 做 patch 校验。它默认只检查，只有 `apply` 为 true 时才会应用。
+
 Generate a branch, commit, and PR dry-run plan:
 
 生成 branch、commit、PR dry-run 计划：

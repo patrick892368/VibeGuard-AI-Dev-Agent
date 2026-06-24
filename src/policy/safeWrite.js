@@ -3,11 +3,12 @@ import path from "node:path";
 import { appendAuditEvent } from "./audit.js";
 
 export function assertPolicyAllowed(result, options = {}) {
+  const target = result.path || result.command || (Array.isArray(result.files) ? result.files.join(", ") : "operation");
   if (result.status === "deny") {
-    throw new Error(`${result.reason}: ${result.path || result.command}`);
+    throw new Error(`${result.reason}: ${target}`);
   }
   if (result.status === "require_confirmation" && !options.confirmed) {
-    throw new Error(`${result.reason}: ${result.path || result.command}`);
+    throw new Error(`${result.reason}: ${target}`);
   }
 }
 
