@@ -106,9 +106,13 @@ Available tools:
 
 `eval_history` 会汇总 JSONL 历史记录，方便看趋势。
 
-`debug_error` can parse pasted logs, and when `aiPatch` is true it calls the configured provider, normalizes and validates the generated diff, checks patch policy, and can write a patch artifact through `outputPatch`.
+`debug_error` can parse pasted logs or read `logFile` through path policy. When `aiPatch` is true it calls the configured provider, normalizes and validates the generated diff, checks patch policy, and can write a patch artifact through `outputPatch`.
 
-`debug_error` 可以解析粘贴的日志；当 `aiPatch` 为 true 时，会调用配置的 provider，规范化并校验生成的 diff，执行 patch policy 检查，并可通过 `outputPatch` 写出 patch artifact。
+`debug_error` 可以解析粘贴的日志，也可以通过 path policy 读取 `logFile`；当 `aiPatch` 为 true 时，会调用配置的 provider，规范化并校验生成的 diff，执行 patch policy 检查，并可通过 `outputPatch` 写出 patch artifact。
+
+`fix_error` accepts pasted `log` / `patch` text or `logFile` / `patchFile` inputs; file inputs are read through path policy before debug analysis or patch parsing.
+
+`fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。
 
 `onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
 

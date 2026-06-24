@@ -45,6 +45,7 @@ const tools = [
     description: "Parse an error log and optionally generate a policy-checked AI patch artifact.",
     inputSchema: objectSchema({
       log: stringSchema,
+      logFile: stringSchema,
       aiPatch: booleanSchema,
       outputPatch: stringSchema,
       confirmed: booleanSchema,
@@ -56,7 +57,9 @@ const tools = [
     description: "Run the safe fix workflow: debug log, patch validation, policy check, optional apply, tests, and PR summary.",
     inputSchema: objectSchema({
       log: stringSchema,
+      logFile: stringSchema,
       patch: stringSchema,
+      patchFile: stringSchema,
       testCommand: stringSchema,
       autoTest: booleanSchema,
       outputPatch: stringSchema,
@@ -333,8 +336,21 @@ async function callTool(name, args, root) {
   if (name === "debug_error") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    const logText = args.log || "";
+    const logFile = args.logFile
+      ? readFileWithPolicy(root, args.logFile, engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      })
+      : null;
+    const logText = logFile?.content || args.log || "";
     const result = analyzeDebugLog(logText, { root, engine });
+    if (logFile) {
+      result.logFileRead = {
+        path: logFile.path,
+        policy: logFile.policy,
+        auditLog: logFile.auditLog
+      };
+    }
     if (args.aiPatch) {
       const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
       result.aiPatch = ai;
@@ -371,7 +387,9 @@ async function callTool(name, args, root) {
       root,
       engine,
       logText: args.log || "",
+      logFile: args.logFile,
       patchText: args.patch,
+      patchFile: args.patchFile,
       testCommand: args.testCommand,
       autoTest: Boolean(args.autoTest),
       outputPatch: args.outputPatch,

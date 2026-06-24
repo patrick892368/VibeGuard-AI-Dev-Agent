@@ -143,6 +143,28 @@ test("MCP github_pr returns a dry-run PR command", async () => {
   assert.match(response.result.structuredContent.command, /--draft/);
 });
 
+test("MCP debug_error reads log files through path policy", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 11,
+    method: "tools/call",
+    params: {
+      name: "debug_error",
+      arguments: {
+        logFile: "error.log"
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.summary.type, "ReferenceError");
+  assert.equal(result.logFileRead.path, "error.log");
+  assert.equal(result.logFileRead.policy.status, "allow");
+});
+
 test("MCP debug_error can generate and write a policy-gated AI patch artifact", async () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
@@ -192,6 +214,27 @@ test("MCP debug_error can generate and write a policy-gated AI patch artifact", 
       else process.env[key] = value;
     }
   }
+});
+
+test("MCP fix_error blocks denied patch file reads", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".env"), "not a patch\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 12,
+    method: "tools/call",
+    params: {
+      name: "fix_error",
+      arguments: {
+        log: "ReferenceError: oldName is not defined",
+        patchFile: ".env"
+      }
+    }
+  }, root);
+
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
 });
 
 test("MCP write_tests can repair generated Python test imports", async () => {
