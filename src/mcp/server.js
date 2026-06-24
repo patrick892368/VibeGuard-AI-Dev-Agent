@@ -9,7 +9,7 @@ import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
-import { analyzeReviewDiff } from "../agents/review.js";
+import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
 import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
@@ -103,7 +103,10 @@ const tools = [
     name: "review_pr",
     description: "Analyze a unified diff for review findings.",
     inputSchema: objectSchema({
-      diff: stringSchema
+      diff: stringSchema,
+      writeComment: stringSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
@@ -307,7 +310,17 @@ async function callTool(name, args, root) {
       coverageAfterText: args.coverageAfterText
     });
   }
-  if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
+  if (name === "review_pr") {
+    if (args.writeComment) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      return writeReviewComment(root, args.diff || "", args.writeComment, engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      });
+    }
+    return analyzeReviewDiff(args.diff || "");
+  }
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
   if (name === "github_pr") {

@@ -208,3 +208,35 @@ test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
   assert.equal(parsed.aiPatch.validation.valid, false);
   assert.equal(parsed.aiPatch.policy.status, "deny");
 });
+
+test("CLI review can write a policy-gated comment body", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-comment-"));
+  const diff = `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`;
+  fs.writeFileSync(path.join(root, "change.diff"), diff, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "review",
+    "--diff",
+    "change.diff",
+    "--write-comment",
+    "reports/review.md",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.writtenComment.path, "reports/review.md");
+  assert.equal(parsed.writtenComment.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, "reports", "review.md"), "utf8"), /VibeGuard Review/);
+});

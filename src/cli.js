@@ -7,7 +7,7 @@ import { PolicyEngine } from "./policy/engine.js";
 import { analyzeDebugLog } from "./agents/debug.js";
 import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "./agents/testWriter.js";
-import { analyzeReviewDiff } from "./agents/review.js";
+import { analyzeReviewDiff, writeReviewComment } from "./agents/review.js";
 import { buildPrSummary } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
 import { runDoctor } from "./agents/doctor.js";
@@ -32,7 +32,7 @@ Usage:
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
   vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
-  vibeguard review [--diff <file>]
+  vibeguard review [--diff <file>] [--write-comment <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
   vibeguard patch apply --file <patch> [--confirm]
@@ -212,6 +212,14 @@ function reviewCommand(parsed, root) {
     }
   }
   if (!diffText.trim()) throw new Error("review requires a git diff, --diff <file>, or diff text on stdin");
+  if (parsed["write-comment"]) {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return writeReviewComment(root, diffText, parsed["write-comment"], engine, {
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
+  }
   return analyzeReviewDiff(diffText);
 }
 

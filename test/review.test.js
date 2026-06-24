@@ -1,6 +1,10 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeReviewDiff } from "../src/agents/review.js";
+import { analyzeReviewDiff, writeReviewComment } from "../src/agents/review.js";
+import { PolicyEngine } from "../src/policy/engine.js";
 
 test("analyzeReviewDiff reports risky source changes without tests", () => {
   const diff = `diff --git a/src/db.js b/src/db.js
@@ -62,4 +66,26 @@ test("analyzeReviewDiff flags secret literals, html sinks, and sync filesystem c
   assert.ok(result.findings.some((finding) => finding.message.includes("HTML injection") && finding.line === 12));
   assert.ok(result.findings.some((finding) => finding.category === "performance" && finding.line === 13));
   assert.ok(result.actionItems.some((item) => /HTML sink/.test(item.action)));
+});
+
+test("writeReviewComment writes markdown through policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-review-comment-"));
+  const engine = new PolicyEngine({
+    paths: { allow: ["reports/**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+  const diff = `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`;
+
+  const result = writeReviewComment(root, diff, "reports/review.md", engine);
+
+  assert.equal(result.writtenComment.path, "reports/review.md");
+  assert.equal(result.writtenComment.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, "reports", "review.md"), "utf8"), /VibeGuard Review/);
+  assert.match(fs.readFileSync(path.join(root, "reports", "review.md"), "utf8"), /parameterized queries/);
 });

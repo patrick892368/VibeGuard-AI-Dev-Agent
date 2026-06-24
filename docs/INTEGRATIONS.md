@@ -22,6 +22,7 @@ vibeguard test --coverage coverage.json
 vibeguard test --coverage coverage/lcov.info
 vibeguard test --coverage coverage-before.json --coverage-after coverage-after.json
 vibeguard review
+vibeguard review --diff change.diff --write-comment reports/review.md
 vibeguard onboard --write
 vibeguard policy check --path src/index.js
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
@@ -32,9 +33,9 @@ vibeguard audit summary --file reports/audit.jsonl
 
 `debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。源码片段只有在 path policy 允许读取该文件时才会返回。
 
-`review` returns line-level findings, recommendations, severity summaries, actionItems, and PR-comment Markdown when the diff hunk contains line metadata.
+`review` returns line-level findings, recommendations, severity summaries, actionItems, and PR-comment Markdown when the diff hunk contains line metadata. `--write-comment` writes that Markdown through Policy-as-Code so it can be passed to `github comment --body-file`.
 
-`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。
+`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`。
 
 `summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes.
 
@@ -99,6 +100,10 @@ Available tools:
 `onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, and structured `firstTasks` with low-risk commands and files for newcomers.
 
 `onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown，以及包含低风险命令和文件的新手任务 `firstTasks`。
+
+`review_pr` can return structured findings and, when `writeComment` is provided, write the PR comment body through policy.
+
+`review_pr` 可以返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
 
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution.
 

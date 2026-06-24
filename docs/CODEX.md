@@ -240,12 +240,13 @@ Review changes:
 
 ```bash
 node ./bin/vibeguard.js review --json
+node ./bin/vibeguard.js review --diff change.diff --write-comment reports/review.md --json
 node ./bin/vibeguard.js pr summary --diff change.diff --json
 ```
 
-Review findings include `file`, `line`, `severity`, `category`, `message`, and `recommendation` when line information is available. Codex can use `actionItems` for planning or `markdown` as a PR comment body.
+Review findings include `file`, `line`, `severity`, `category`, `message`, and `recommendation` when line information is available. Codex can use `actionItems` for planning, `markdown` as a PR comment body, or `--write-comment` to write that body through Policy-as-Code before calling `github comment --body-file`.
 
-Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category`、`message` 和 `recommendation`。Codex 可以使用 `actionItems` 做执行计划，或直接用 `markdown` 作为 PR 评论正文。
+Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category`、`message` 和 `recommendation`。Codex 可以使用 `actionItems` 做执行计划，直接用 `markdown` 作为 PR 评论正文，或用 `--write-comment` 先经过 Policy-as-Code 写出正文文件，再调用 `github comment --body-file`。
 
 `pr summary` includes review findings, severity counts, and action items in the generated PR body.
 

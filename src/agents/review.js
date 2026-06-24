@@ -1,4 +1,5 @@
 import { parsePatchFiles } from "../patch/parsePatch.js";
+import { writeFileWithPolicy } from "../policy/safeWrite.js";
 
 function changedEntries(diffText) {
   const entries = [];
@@ -167,5 +168,13 @@ export function analyzeReviewDiff(diffText, options = {}) {
     actionItems: actionItems(findings),
     markdown: buildReviewMarkdown(files, findings, summaryBySeverity),
     findings
+  };
+}
+
+export function writeReviewComment(root, diffText, outputPath, engine, options = {}) {
+  const review = analyzeReviewDiff(diffText, options);
+  return {
+    ...review,
+    writtenComment: writeFileWithPolicy(root, outputPath, review.markdown, engine, options)
   };
 }
