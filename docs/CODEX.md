@@ -65,6 +65,10 @@ node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
 node ./bin/vibeguard.js fix --log error.log --auto-test --apply --json
 ```
 
+`fix` normalizes fenced diffs, plain unified diffs, and incorrect hunk counts before policy and `git apply --check`.
+
+`fix` 会在 policy 和 `git apply --check` 前规范化 fenced diff、plain unified diff 和错误的 hunk count。
+
 Write generated patch artifacts after validation and policy checks:
 
 在校验和 policy 通过后写出 patch artifact：

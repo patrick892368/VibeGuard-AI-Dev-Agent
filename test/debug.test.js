@@ -119,6 +119,7 @@ Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No q
   assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserService.java"));
   assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserRepository.java"));
   assert.ok(result.likelyFiles.includes("src/main/resources/application.properties"));
+  assert.ok(result.snippets.some((snippet) => snippet.file.endsWith("UserService.java")));
   assert.ok(result.suggestedTestCommands.includes("mvn test"));
   assert.ok(result.hints.some((hint) => hint.includes("dependency injection")));
 });

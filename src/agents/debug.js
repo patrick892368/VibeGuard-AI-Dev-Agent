@@ -248,6 +248,19 @@ function sourceSnippet(root, file, line, radius = 3) {
   };
 }
 
+function sourcePreview(root, file, limit = 40) {
+  const absolute = path.join(root, file);
+  if (!fs.existsSync(absolute)) return null;
+  const lines = fs.readFileSync(absolute, "utf8").split(/\r?\n/);
+  const end = Math.min(lines.length, limit);
+  return {
+    file,
+    start: 1,
+    end,
+    text: lines.slice(0, end).map((value, index) => `${index + 1}: ${value}`).join("\n")
+  };
+}
+
 export function analyzeDebugLog(logText, options = {}) {
   const root = options.root || process.cwd();
   const repo = scanRepository(root);
@@ -260,7 +273,21 @@ export function analyzeDebugLog(logText, options = {}) {
   const springContext = springDebugContext(summary, logText, repo);
   const frameworkContexts = [djangoContext, springContext].filter(Boolean);
   const uniqueFiles = [...new Set([...frames.map((frame) => frame.file), ...frameworkContexts.flatMap((context) => context.likelyFiles)])];
-  const snippets = frames.slice(0, 5).map((frame) => sourceSnippet(root, frame.file, frame.line)).filter(Boolean);
+  const snippets = [];
+  const snippetFiles = new Set();
+  for (const frame of frames.slice(0, 5)) {
+    const snippet = sourceSnippet(root, frame.file, frame.line);
+    if (!snippet) continue;
+    snippets.push(snippet);
+    snippetFiles.add(frame.file);
+  }
+  for (const file of uniqueFiles) {
+    if (snippets.length >= 8 || snippetFiles.has(file)) continue;
+    const snippet = sourcePreview(root, file);
+    if (!snippet) continue;
+    snippets.push(snippet);
+    snippetFiles.add(file);
+  }
 
   return {
     summary,

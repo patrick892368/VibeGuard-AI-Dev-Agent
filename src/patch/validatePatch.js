@@ -8,6 +8,22 @@ function stripToDiff(text) {
   return diffIndex >= 0 ? candidate.slice(diffIndex) : candidate;
 }
 
+function cleanHeaderPath(rawPath) {
+  if (!rawPath) return null;
+  const value = rawPath.trim().split(/\s+/)[0];
+  if (value === "/dev/null") return null;
+  return value.replace(/^a\//, "").replace(/^b\//, "");
+}
+
+function addGitHeaderIfMissing(text) {
+  if (/^diff --git /m.test(text) || !/^@@ .+ @@/m.test(text)) return text;
+  const oldPath = cleanHeaderPath(text.match(/^---\s+(.+)$/m)?.[1]);
+  const newPath = cleanHeaderPath(text.match(/^\+\+\+\s+(.+)$/m)?.[1]);
+  const target = newPath || oldPath;
+  if (!target) return text;
+  return `diff --git a/${oldPath || target} b/${newPath || target}\n${text}`;
+}
+
 function countHunkLines(lines) {
   let oldCount = 0;
   let newCount = 0;
@@ -21,7 +37,7 @@ function countHunkLines(lines) {
 
 export function normalizeUnifiedDiff(patchText) {
   if (!patchText || !patchText.trim()) return "";
-  const lines = stripToDiff(patchText).split("\n");
+  const lines = addGitHeaderIfMissing(stripToDiff(patchText)).split("\n");
   const output = [];
 
   for (let index = 0; index < lines.length; index += 1) {

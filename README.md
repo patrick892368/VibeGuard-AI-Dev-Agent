@@ -20,7 +20,8 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
 - `vibeguard debug`: 解析 Python、Django、Node.js、Java/Spring Boot 报错日志，定位可能文件并解释失败上下文。Parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and explains context.
-- `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans.
+- Debug snippets 会先包含 stack frame，再补充 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件。Debug snippets include stack frames first, then short previews of framework-related likely files so AI patch generation can see the file that likely needs the change.
+- `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff 和 hunk count。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, and hunk counts.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
 - `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块，可用 `--run` 继续通过 command policy 执行生成的测试，并分类失败日志。Writes basic tests after policy checks, supports ESM/CommonJS Node modules, can use `--run` to execute generated tests through command policy, and classifies failed run logs.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings.

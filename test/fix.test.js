@@ -65,6 +65,19 @@ diff --git a/src/greeter.py b/src/greeter.py
   assert.equal(validateUnifiedDiff(normalized).valid, true);
 });
 
+test("normalizeUnifiedDiff adds a git header to plain unified diffs", () => {
+  const patch = `--- a/accounts/views.py
++++ b/accounts/views.py
+@@ -1,2 +1,2 @@
+-PROFILE_TEMPLATE = "profiles/detail.html"
++PROFILE_TEMPLATE = "accounts/detail.html"
+`;
+
+  const normalized = normalizeUnifiedDiff(patch);
+  assert.match(normalized, /^diff --git a\/accounts\/views\.py b\/accounts\/views\.py/);
+  assert.equal(validateUnifiedDiff(normalized).valid, true);
+});
+
 test("fix workflow blocks non-diff patch output", async () => {
   const root = tempDir("vibeguard-invalid-patch-");
   const engine = new PolicyEngine({
