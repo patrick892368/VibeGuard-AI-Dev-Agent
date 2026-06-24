@@ -101,6 +101,33 @@ test("analyzeTestTargets prioritizes uncovered coverage files", () => {
   assert.equal(result.candidates[0].coverage.missingLineCount, 1);
 });
 
+test("analyzeTestTargets maps missing coverage lines to functions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "math.js"), `export function covered() {
+  return true;
+}
+
+export function uncovered() {
+  return false;
+}
+`, "utf8");
+  const coveragePath = path.join(root, "coverage.json");
+  fs.writeFileSync(coveragePath, JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [6],
+        summary: { percent_covered: 50 }
+      }
+    }
+  }), "utf8");
+
+  const result = analyzeTestTargets({ root, coverageFile: coveragePath });
+  assert.deepEqual(result.candidates[0].functions, ["covered", "uncovered"]);
+  assert.deepEqual(result.candidates[0].uncoveredFunctions, ["uncovered"]);
+  assert.deepEqual(result.candidates[0].functionRanges.map((range) => range.name), ["covered", "uncovered"]);
+});
+
 test("analyzeTestTargets finds Java methods and suggested JUnit path", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });

@@ -138,7 +138,12 @@ Find test targets with coverage reports:
 ```bash
 node ./bin/vibeguard.js test --coverage coverage.json --json
 node ./bin/vibeguard.js test --coverage coverage/lcov.info --json
+node ./bin/vibeguard.js test --write --coverage coverage.json --run --limit 1 --json
 ```
+
+Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, and `uncoveredFunctions` before asking VibeGuard to write new tests. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, and `stderr` before proposing a commit.
+
+Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines` 和 `uncoveredFunctions`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout` 和 `stderr`。
 
 Review changes:
 

@@ -21,8 +21,8 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
 - `vibeguard debug`: 解析 Python、Node.js、Java 报错日志，定位可能文件并解释失败上下文。Parses Python, Node.js, and Java errors, finds likely files, and explains context.
 - `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans.
-- `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件。Scans source files for test candidates and can use coverage.py JSON / LCOV to prioritize uncovered files.
-- `vibeguard test --write`: 经过 policy 后写入基础测试。Writes basic tests after policy checks.
+- `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数。Scans source files for test candidates and can use coverage.py JSON / LCOV to prioritize uncovered files and functions.
+- `vibeguard test --write`: 经过 policy 后写入基础测试，可用 `--run` 继续通过 command policy 执行生成的测试。Writes basic tests after policy checks and can use `--run` to execute generated tests through command policy.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险。Reviews diffs for bugs, security, performance, missing tests, and policy risk.
 - `vibeguard onboard`: 扫描仓库并生成 onboarding 文档。Scans a repository and can generate onboarding docs.
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
@@ -70,6 +70,8 @@ vibeguard test
 vibeguard test --coverage coverage.json
 vibeguard test --coverage coverage/lcov.info
 vibeguard test --write --limit 1
+vibeguard test --write --coverage coverage.json --run --limit 1
+vibeguard test --write --run --test-command "node --test {testFile}"
 vibeguard review
 vibeguard onboard
 vibeguard onboard --write
@@ -273,7 +275,7 @@ The test suite covers:
 - PR 创建调度和 PR comment dry-run。PR creation dispatch and PR comment dry-run.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
-- coverage.py JSON / LCOV 解析和未覆盖测试候选排序。coverage.py JSON / LCOV parsing and uncovered test target prioritization.
+- coverage.py JSON / LCOV 解析、未覆盖文件排序、missing line 到函数映射，以及生成测试后的 policy-gated test run。coverage.py JSON / LCOV parsing, uncovered file prioritization, missing-line-to-function mapping, and policy-gated test runs after generating tests.
 
 ## 集成目标 / Integration Targets
 

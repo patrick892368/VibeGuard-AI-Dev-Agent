@@ -9,6 +9,7 @@ VibeGuard 采用 CLI-first 内核，因此所有集成都复用同一套 policy 
 ```bash
 vibeguard debug --log error.log
 vibeguard test --write
+vibeguard test --write --run --limit 1
 vibeguard test --coverage coverage.json
 vibeguard test --coverage coverage/lcov.info
 vibeguard review
@@ -65,6 +66,10 @@ Available tools:
 `eval_history` summarizes those JSONL records for trend review.
 
 `eval_history` 会汇总 JSONL 历史记录，方便看趋势。
+
+`write_tests` can analyze coverage, write generated tests, and optionally run them through command policy when called with `write: true` and `run: true`.
+
+`write_tests` 可以分析 coverage、写入生成测试，并在传入 `write: true` 和 `run: true` 时通过 command policy 执行这些测试。
 
 `doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 

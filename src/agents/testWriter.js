@@ -3,6 +3,7 @@ import path from "node:path";
 import { listRepoFiles, readTextIfExists } from "../repo/files.js";
 import { scanRepository } from "../repo/scan.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
+import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../runner/safeCommand.js";
 
 function extractPythonFunctions(text) {
   return [...text.matchAll(/^\s*def\s+([a-zA-Z_]\w*)\s*\(/gm)].map((match) => match[1]);
@@ -20,6 +21,58 @@ function extractJavaMethods(text) {
   return [...text.matchAll(/(?:public|private|protected)\s+(?:static\s+)?[\w.<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(/g)]
     .map((match) => match[1])
     .filter((name) => !["if", "for", "while", "switch", "catch"].includes(name));
+}
+
+function lineNumberAt(text, index) {
+  return text.slice(0, index).split("\n").length;
+}
+
+function rangeFromStarts(starts, totalLines) {
+  return starts.map((item, index) => ({
+    name: item.name,
+    startLine: item.line,
+    endLine: (starts[index + 1]?.line || totalLines + 1) - 1
+  }));
+}
+
+function extractPythonFunctionRanges(text) {
+  const starts = [...text.matchAll(/^\s*def\s+([a-zA-Z_]\w*)\s*\(/gm)]
+    .map((match) => ({ name: match[1], line: lineNumberAt(text, match.index) }));
+  return rangeFromStarts(starts, text.split(/\r?\n/).length);
+}
+
+function extractJavaScriptFunctionRanges(text) {
+  const starts = [];
+  const patterns = [
+    /export\s+function\s+([a-zA-Z_$][\w$]*)\s*\(/g,
+    /function\s+([a-zA-Z_$][\w$]*)\s*\(/g,
+    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      starts.push({ name: match[1], line: lineNumberAt(text, match.index) });
+    }
+  }
+  const unique = [...new Map(starts.sort((a, b) => a.line - b.line).map((item) => [`${item.name}:${item.line}`, item])).values()];
+  return rangeFromStarts(unique, text.split(/\r?\n/).length);
+}
+
+function extractJavaMethodRanges(text) {
+  const starts = [...text.matchAll(/(?:public|private|protected)\s+(?:static\s+)?[\w.<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(/g)]
+    .map((match) => ({ name: match[1], line: lineNumberAt(text, match.index) }))
+    .filter((item) => !["if", "for", "while", "switch", "catch"].includes(item.name));
+  return rangeFromStarts(starts, text.split(/\r?\n/).length);
+}
+
+function uncoveredFunctions(functionRanges, coverage) {
+  if (!coverage?.missingLines?.length) return [];
+  return functionRanges
+    .filter((range) => coverage.missingLines.some((line) => line >= range.startLine && line <= range.endLine))
+    .map((range) => range.name);
+}
+
+function testTargetFunctions(candidate) {
+  return candidate.uncoveredFunctions?.length ? candidate.uncoveredFunctions : candidate.functions;
 }
 
 function javaMetadata(text, sourceFile) {
@@ -165,7 +218,7 @@ function loadCoverage(options, root) {
 export function generateTestContent(candidate) {
   const sourceFile = candidate.sourceFile.replace(/\\/g, "/");
   const testFile = candidate.suggestedTestFile.replace(/\\/g, "/");
-  const functions = candidate.functions;
+  const functions = testTargetFunctions(candidate);
 
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
@@ -218,6 +271,82 @@ ${assertions}
 `;
 }
 
+function defaultTestArgv(candidate, repo) {
+  const testFile = candidate.suggestedTestFile;
+  const sourceFile = candidate.sourceFile;
+  const extension = path.extname(sourceFile);
+
+  if (extension === ".py") return ["python", "-m", "pytest", testFile];
+  if ([".js", ".mjs", ".cjs"].includes(extension)) return ["node", "--test", testFile];
+  if (extension === ".java") {
+    if (repo.suggestedCommands.includes("mvn test")) return ["mvn", "test"];
+    if (repo.suggestedCommands.includes("./gradlew test")) return ["./gradlew", "test"];
+  }
+  return null;
+}
+
+function customTestCommand(command, candidate) {
+  return command
+    .replaceAll("{testFile}", candidate.suggestedTestFile)
+    .replaceAll("{sourceFile}", candidate.sourceFile);
+}
+
+function runGeneratedTest(root, candidate, engine, repo, options = {}) {
+  const common = {
+    sourceFile: candidate.sourceFile,
+    testFile: candidate.suggestedTestFile
+  };
+  try {
+    if (options.testCommand) {
+      return {
+        ...common,
+        ...runCommandWithPolicy(root, customTestCommand(options.testCommand, candidate), engine, {
+          confirmed: options.confirmed,
+          dryRun: options.dryRun
+        })
+      };
+    }
+
+    const argv = defaultTestArgv(candidate, repo);
+    if (!argv) {
+      return {
+        ...common,
+        status: "skipped",
+        reason: "No default test command is available for this candidate"
+      };
+    }
+
+    return {
+      ...common,
+      ...runArgvWithPolicy(root, argv, engine, {
+        confirmed: options.confirmed,
+        dryRun: options.dryRun
+      })
+    };
+  } catch (error) {
+    const argv = options.testCommand ? null : defaultTestArgv(candidate, repo);
+    return {
+      ...common,
+      status: "blocked",
+      command: options.testCommand ? customTestCommand(options.testCommand, candidate) : argv ? commandDisplay(argv) : undefined,
+      error: error.message
+    };
+  }
+}
+
+function coverageTargets(candidates) {
+  return candidates
+    .filter((candidate) => candidate.coverage?.missingLineCount > 0)
+    .map((candidate) => ({
+      sourceFile: candidate.sourceFile,
+      suggestedTestFile: candidate.suggestedTestFile,
+      missingLineCount: candidate.coverage.missingLineCount,
+      missingLines: candidate.coverage.missingLines,
+      percentCovered: candidate.coverage.percentCovered,
+      uncoveredFunctions: candidate.uncoveredFunctions
+    }));
+}
+
 export function analyzeTestTargets(options = {}) {
   const root = options.root || process.cwd();
   const files = listRepoFiles(root);
@@ -237,28 +366,35 @@ export function analyzeTestTargets(options = {}) {
     const isPython = file.endsWith(".py");
     const isJava = file.endsWith(".java");
     const functions = isPython ? extractPythonFunctions(text) : isJava ? extractJavaMethods(text) : extractJavaScriptFunctions(text);
+    const functionRanges = isPython ? extractPythonFunctionRanges(text) : isJava ? extractJavaMethodRanges(text) : extractJavaScriptFunctionRanges(text);
     if (functions.length === 0) continue;
     const testPath = candidateTestPath(file);
     const hasLikelyTest = testPath ? files.includes(testPath) : false;
+    const fileCoverage = coverageByFile.get(file) || null;
     candidates.push({
       sourceFile: file,
       functions,
+      functionRanges,
+      uncoveredFunctions: uncoveredFunctions(functionRanges, fileCoverage),
       suggestedTestFile: testPath,
       hasLikelyTest,
-      coverage: coverageByFile.get(file) || null,
+      coverage: fileCoverage,
       metadata: isJava ? javaMetadata(text, file) : undefined
     });
   }
 
+  const sortedCandidates = candidates.sort((a, b) =>
+    Number(Boolean(b.coverage?.missingLineCount)) - Number(Boolean(a.coverage?.missingLineCount)) ||
+    (a.coverage?.percentCovered ?? 101) - (b.coverage?.percentCovered ?? 101) ||
+    Number(a.hasLikelyTest) - Number(b.hasLikelyTest) ||
+    a.sourceFile.localeCompare(b.sourceFile)
+  );
+
   return {
     frameworkHints: repo.suggestedCommands,
     coverage,
-    candidates: candidates.sort((a, b) =>
-      Number(Boolean(b.coverage?.missingLineCount)) - Number(Boolean(a.coverage?.missingLineCount)) ||
-      (a.coverage?.percentCovered ?? 101) - (b.coverage?.percentCovered ?? 101) ||
-      Number(a.hasLikelyTest) - Number(b.hasLikelyTest) ||
-      a.sourceFile.localeCompare(b.sourceFile)
-    )
+    coverageTargets: coverageTargets(sortedCandidates),
+    candidates: sortedCandidates
   };
 }
 
@@ -269,8 +405,12 @@ export function writeSuggestedTests(root, engine, options = {}) {
   const written = writable.map((candidate) =>
     writeFileWithPolicy(root, candidate.suggestedTestFile, generateTestContent(candidate), engine, options)
   );
+  const testRuns = options.runTests
+    ? writable.map((candidate) => runGeneratedTest(root, candidate, engine, { suggestedCommands: analysis.frameworkHints }, options))
+    : [];
   return {
     ...analysis,
-    written
+    written,
+    testRuns
   };
 }

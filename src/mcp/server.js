@@ -6,7 +6,7 @@ import { analyzeDebugLog } from "../agents/debug.js";
 import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
-import { analyzeTestTargets } from "../agents/testWriter.js";
+import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
 import { commentPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
@@ -31,7 +31,7 @@ const tools = [
   },
   {
     name: "write_tests",
-    description: "Find source files that are good candidates for new tests."
+    description: "Find source files that are good candidates for new tests, and optionally write/run generated tests through policy."
   },
   {
     name: "review_pr",
@@ -118,7 +118,22 @@ function callTool(name, args, root) {
     });
   }
   if (name === "onboard_repo") return analyzeRepository({ root });
-  if (name === "write_tests") return analyzeTestTargets({ root, coverageFile: args.coverageFile, coverageText: args.coverageText });
+  if (name === "write_tests") {
+    if (args.write) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      return writeSuggestedTests(root, engine, {
+        limit: args.limit || 1,
+        coverageFile: args.coverageFile,
+        coverageText: args.coverageText,
+        runTests: Boolean(args.run),
+        testCommand: args.testCommand,
+        dryRun: Boolean(args.dryRun),
+        confirmed: Boolean(args.confirmed)
+      });
+    }
+    return analyzeTestTargets({ root, coverageFile: args.coverageFile, coverageText: args.coverageText });
+  }
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);

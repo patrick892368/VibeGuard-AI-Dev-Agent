@@ -48,6 +48,50 @@ test("writeSuggestedTests writes a real JavaScript smoke test through policy", (
   assert.match(fs.readFileSync(path.join(root, "src", "math.test.js"), "utf8"), /exports expected functions/);
 });
 
+test("writeSuggestedTests focuses generated assertions on uncovered functions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), `export function covered() {
+  return true;
+}
+
+export function uncovered() {
+  return false;
+}
+`, "utf8");
+  const coveragePath = path.join(root, "coverage.json");
+  fs.writeFileSync(coveragePath, JSON.stringify({
+    files: {
+      "src/math.js": {
+        missing_lines: [6],
+        summary: { percent_covered: 50 }
+      }
+    }
+  }), "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, coverageFile: coveragePath });
+  const generated = fs.readFileSync(path.join(root, "src", "math.test.js"), "utf8");
+  assert.equal(result.coverageTargets[0].sourceFile, "src/math.js");
+  assert.deepEqual(result.coverageTargets[0].uncoveredFunctions, ["uncovered"]);
+  assert.doesNotMatch(generated, /typeof mod\.covered/);
+  assert.match(generated, /typeof mod\.uncovered/);
+});
+
+test("writeSuggestedTests can run a generated JavaScript test through policy", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  assert.equal(result.written.length, 1);
+  assert.equal(result.testRuns.length, 1);
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.testRuns[0].command, "node --test src/math.test.js");
+});
+
 test("writeOnboardingDocs writes onboarding and architecture docs through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "README.md"), "# Demo\n", "utf8");
