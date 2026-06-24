@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, createPullRequestWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildFixGitPlan, checkGitPlanPolicy } from "../src/integrations/gitPlan.js";
 import { buildPrSummary } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
+import { PolicyEngine } from "../src/policy/engine.js";
 
 test("hook templates include pre-commit policy check", () => {
   assert.ok(listHooks().includes("pre-commit"));
@@ -97,4 +99,57 @@ test("GitHub PR creation is dry-run by default", () => {
   const result = createPullRequestWithGh(process.cwd(), { title: "Fix bug" });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh pr create/);
+});
+
+test("buildFixGitPlan includes push and PR commands for Codex review", () => {
+  const plan = buildFixGitPlan({
+    patch: `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`,
+    branch: "codex/fix-error",
+    commitMessage: "fix: error",
+    title: "Fix error",
+    body: "body",
+    createBranch: true,
+    commit: true,
+    push: true,
+    prDryRun: true
+  });
+
+  assert.deepEqual(plan.commands.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "push_branch",
+    "create_pr"
+  ]);
+  assert.match(plan.commands.find((command) => command.step === "push_branch").command, /git push -u origin codex\/fix-error/);
+});
+
+test("checkGitPlanPolicy requires confirmation for external git and PR actions", () => {
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["git switch -c", "git commit", "git push", "gh pr create"]
+    }
+  });
+  const plan = buildFixGitPlan({
+    changedFiles: ["src/app.js"],
+    branch: "codex/fix-error",
+    commitMessage: "fix: error",
+    title: "Fix error",
+    body: "body",
+    createBranch: true,
+    commit: true,
+    push: true,
+    prDryRun: true
+  });
+
+  assert.equal(checkGitPlanPolicy(plan, engine).status, "require_confirmation");
+  assert.equal(checkGitPlanPolicy(plan, engine, { confirmed: true }).status, "allow");
 });

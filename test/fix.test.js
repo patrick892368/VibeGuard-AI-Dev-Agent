@@ -229,6 +229,61 @@ test("fix CLI returns branch commit PR dry-run plan", () => {
   assert.ok(result.gitPlan.commands.at(-1).argv.includes("--body-file"));
 });
 
+test("fix CLI blocks git plan execution without confirmation before patch apply", () => {
+  const root = copyFixture("node-bug");
+  const before = fs.readFileSync(path.join(root, "src", "user.js"), "utf8");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--create-branch",
+    "--commit",
+    "--execute-git-plan",
+    "--apply",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "git_plan_policy");
+  assert.equal(result.gitPolicy.status, "require_confirmation");
+  assert.equal(fs.readFileSync(path.join(root, "src", "user.js"), "utf8"), before);
+});
+
+test("fix CLI executes confirmed local branch and commit plan after patch apply", () => {
+  const root = copyFixture("node-bug");
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root, encoding: "utf8" });
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--create-branch",
+    "--commit",
+    "--execute-git-plan",
+    "--confirm",
+    "--apply",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.gitExecution.status, "executed");
+  assert.deepEqual(result.gitExecution.results.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit"
+  ]);
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim(), "codex/fix-referenceerror");
+  assert.equal(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: root, encoding: "utf8" }).trim(), "fix: address ReferenceError");
+});
+
 test("fix CLI applies Node fixture patch and runs tests", () => {
   const root = copyFixture("node-bug");
   const result = runCli([

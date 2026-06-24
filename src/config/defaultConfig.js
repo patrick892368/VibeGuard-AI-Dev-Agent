@@ -27,7 +27,11 @@ export const defaultConfig = {
       "pnpm add",
       "docker compose up",
       "alembic upgrade",
-      "python manage.py migrate"
+      "python manage.py migrate",
+      "git switch -c",
+      "git commit",
+      "git push",
+      "gh pr create"
     ]
   },
   agents: {

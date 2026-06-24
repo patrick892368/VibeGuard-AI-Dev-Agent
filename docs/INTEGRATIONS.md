@@ -54,7 +54,7 @@ See `docs/CODEX.md` for the focused Codex workflow.
 
 Grok is the current priority model provider. Other agent/provider integrations stay deferred until the Codex + Grok flow is stable.
 
-The current Codex flow supports patch artifact output and Git/PR dry-run planning. It does not execute branch creation, commits, pushes, or PR creation from `fix`.
+The current Codex flow supports patch artifact output, Git/PR dry-run planning, and confirmed execution of branch/commit/push/PR commands from `fix`. Execution requires `--execute-git-plan --confirm --apply`; remote push and PR creation also require `--push --create-pr`, a GitHub remote, and authenticated `gh`.
 
 ## Deferred Agent Integrations
 

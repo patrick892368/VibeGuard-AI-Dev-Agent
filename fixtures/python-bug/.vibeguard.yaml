@@ -21,4 +21,8 @@ commands:
     - "git reset --hard"
     - "git push --force"
 
-  require_confirmation: []
+  require_confirmation:
+    - "git switch -c"
+    - "git commit"
+    - "git push"
+    - "gh pr create"

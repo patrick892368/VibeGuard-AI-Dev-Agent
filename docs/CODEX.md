@@ -50,6 +50,18 @@ Ask VibeGuard for the branch, commit, and PR dry-run plan:
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --pr-dry-run --pr-body-file patches/pr-body.md --dry-run --json
 ```
 
+Execute the local branch and commit plan after the patch and tests pass:
+
+```bash
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --execute-git-plan --confirm --apply --json
+```
+
+Include remote push and draft PR creation only when the repo remote and `gh` auth are ready:
+
+```bash
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --json
+```
+
 Run deterministic fixture demos:
 
 ```bash
@@ -97,7 +109,8 @@ node ./bin/vibeguard.js pr summary --diff change.diff --json
 - Do not modify denied paths.
 - Use `--check-only` before applying patches.
 - Prefer `fix --dry-run` before `fix --apply`.
-- Treat `gitPlan` output as a reviewable plan, not an executed operation.
+- Treat `gitPlan` output as a reviewable plan until `--execute-git-plan --confirm --apply` is present.
+- Execute remote `--push --create-pr` only after local branch, commit, tests, and PR body are reviewed.
 - Use `run --command` for commands that should go through policy.
 - Keep `ROADMAP.md` local and uncommitted.
 

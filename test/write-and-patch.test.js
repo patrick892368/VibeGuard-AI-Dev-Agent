@@ -9,7 +9,7 @@ import { writeFileWithPolicy } from "../src/policy/safeWrite.js";
 import { writeSuggestedTests } from "../src/agents/testWriter.js";
 import { writeOnboardingDocs } from "../src/agents/onboard.js";
 import { applyPatchWithPolicy } from "../src/patch/safeApply.js";
-import { runCommandWithPolicy } from "../src/runner/safeCommand.js";
+import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../src/runner/safeCommand.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-write-"));
@@ -94,4 +94,22 @@ test("runCommandWithPolicy checks command policy before execution", () => {
 
   const confirmed = runCommandWithPolicy(root, "npm install", engine, { dryRun: true, confirmed: true });
   assert.equal(confirmed.status, "checked");
+});
+
+test("runArgvWithPolicy checks command policy and keeps argv structured", () => {
+  const root = tempRepo();
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: ["bad command"], require_confirmation: ["node --version"] }
+  }, { root });
+
+  assert.equal(commandDisplay(["git", "commit", "-m", "fix bug"]), 'git commit -m "fix bug"');
+  assert.throws(() => runArgvWithPolicy(root, ["node", "--version"], engine, { dryRun: true }), /requires human confirmation/);
+
+  const result = runArgvWithPolicy(root, ["node", "--version"], engine, {
+    dryRun: true,
+    confirmed: true
+  });
+  assert.equal(result.status, "checked");
+  assert.deepEqual(result.argv, ["node", "--version"]);
 });

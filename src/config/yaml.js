@@ -21,6 +21,7 @@ function parseScalar(rawValue) {
   if (value === "true") return true;
   if (value === "false") return false;
   if (value === "null") return null;
+  if (value === "[]") return [];
   if (/^-?\d+(\.\d+)?$/.test(value)) return Number(value);
   return value;
 }

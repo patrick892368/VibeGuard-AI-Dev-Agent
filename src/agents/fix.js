@@ -7,7 +7,7 @@ import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
-import { buildFixGitPlan } from "../integrations/gitPlan.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
 
 function buildFixTitle(debug) {
   const type = debug.summary?.type || "bug";
@@ -28,7 +28,7 @@ function buildBranchName(debug) {
   return `codex/fix-${type}`;
 }
 
-function buildDecisionSummary({ status, stage = null, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan }) {
+function buildDecisionSummary({ status, stage = null, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan, gitPolicy, gitExecution }) {
   const nextActions = [];
   if (status === "dry_run" || status === "ready") {
     nextActions.push("review_patch");
@@ -37,9 +37,12 @@ function buildDecisionSummary({ status, stage = null, validation, policy, applyC
   }
   if (status === "passed") {
     nextActions.push("review_pr_summary");
+    if (gitPlan && !gitExecution) nextActions.push("execute_git_plan_with_confirm");
+    if (gitExecution?.status === "executed") nextActions.push("inspect_created_branch_or_pr");
   }
   if (status === "deny" || status === "require_confirmation") {
     nextActions.push("stop_for_policy");
+    if (gitPolicy?.status === "require_confirmation") nextActions.push("confirm_git_plan");
   }
   if (status === "blocked") {
     nextActions.push("configure_provider_or_supply_patch");
@@ -58,6 +61,8 @@ function buildDecisionSummary({ status, stage = null, validation, policy, applyC
     outputPatchPath: outputPatch?.path || null,
     prBodyPath: prBody?.path || null,
     hasGitPlan: Boolean(gitPlan),
+    gitPolicyStatus: gitPolicy?.status || null,
+    gitExecutionStatus: gitExecution?.status || null,
     nextActions
   };
 }
@@ -212,7 +217,7 @@ export async function runFixWorkflow(options = {}) {
     });
   }
 
-  const gitPlan = (options.createBranch || options.commit || options.prDryRun)
+  const gitPlan = (options.createBranch || options.commit || options.push || options.prDryRun || options.createPr)
     ? buildFixGitPlan({
       patch: patchSource.patch,
       branch: pr.branch,
@@ -222,15 +227,37 @@ export async function runFixWorkflow(options = {}) {
       bodyFile: options.prBodyFile,
       createBranch: Boolean(options.createBranch),
       commit: Boolean(options.commit),
-      prDryRun: Boolean(options.prDryRun)
+      push: Boolean(options.push),
+      prDryRun: Boolean(options.prDryRun || options.createPr)
     })
     : null;
+
+  let gitPolicy = null;
+  if (options.executeGitPlan && options.apply && !options.dryRun && gitPlan) {
+    gitPolicy = checkGitPlanPolicy(gitPlan, engine, {
+      confirmed: Boolean(options.confirmed)
+    });
+    if (gitPolicy.status !== "allow") {
+      const status = gitPolicy.status;
+      return {
+        status,
+        stage: "git_plan_policy",
+        ...base,
+        outputPatch,
+        prBody,
+        gitPlan,
+        gitPolicy,
+        decision: buildDecisionSummary({ status, stage: "git_plan_policy", validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy })
+      };
+    }
+  }
 
   const plannedBase = {
     ...base,
     outputPatch,
     prBody,
-    gitPlan
+    gitPlan,
+    gitPolicy
   };
 
   if (options.dryRun || !options.apply) {
@@ -238,7 +265,7 @@ export async function runFixWorkflow(options = {}) {
     return {
       status,
       ...plannedBase,
-      decision: buildDecisionSummary({ status, validation, policy, applyCheck, outputPatch, prBody, gitPlan })
+      decision: buildDecisionSummary({ status, validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy })
     };
   }
 
@@ -254,7 +281,7 @@ export async function runFixWorkflow(options = {}) {
       stage: "patch_apply",
       ...plannedBase,
       error: error.message,
-      decision: buildDecisionSummary({ status: "failed", stage: "patch_apply", validation, policy, applyCheck, outputPatch, prBody, gitPlan })
+      decision: buildDecisionSummary({ status: "failed", stage: "patch_apply", validation, policy, applyCheck, outputPatch, prBody, gitPlan, gitPolicy })
     };
   }
 
@@ -273,13 +300,38 @@ export async function runFixWorkflow(options = {}) {
     }
   }
 
-  const status = tests && tests.status !== "passed" ? "failed" : "passed";
+  let status = tests && tests.status !== "passed" ? "failed" : "passed";
+  let gitExecution = null;
+  if (status === "passed" && options.executeGitPlan && gitPlan) {
+    gitExecution = executeGitPlan(root, gitPlan, engine, {
+      confirmed: Boolean(options.confirmed)
+    });
+    if (gitExecution.status !== "executed") {
+      status = gitExecution.status === "deny" || gitExecution.status === "require_confirmation"
+        ? gitExecution.status
+        : "failed";
+    }
+  }
+
   return {
     status,
     ...plannedBase,
     applyResult,
     tests,
-    decision: buildDecisionSummary({ status, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan })
+    gitExecution,
+    decision: buildDecisionSummary({
+      status,
+      stage: gitExecution && gitExecution.status !== "executed" ? gitExecution.stage : null,
+      validation,
+      policy,
+      applyCheck,
+      tests,
+      outputPatch,
+      prBody,
+      gitPlan,
+      gitPolicy,
+      gitExecution
+    })
   };
 }
 

@@ -33,3 +33,15 @@ commands:
 
   assert.deepEqual(parsed.commands.deny, ["curl * | sh"]);
 });
+
+test("parseYamlSubset parses inline empty arrays", () => {
+  const parsed = parseYamlSubset(`
+paths:
+  require_confirmation: []
+commands:
+  require_confirmation: []
+`);
+
+  assert.deepEqual(parsed.paths.require_confirmation, []);
+  assert.deepEqual(parsed.commands.require_confirmation, []);
+});
