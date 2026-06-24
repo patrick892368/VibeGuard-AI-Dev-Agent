@@ -172,6 +172,43 @@ test("writeSuggestedTests writes simple Python branch assertions", () => {
   assert.match(generated, /self\.assertEqual\(module\.display_name\(" Ada "\), "Ada"\)/);
 });
 
+test("writeSuggestedTests writes JavaScript object property branch assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.js"), `export function displayName(user) {
+  if (user == null) {
+    return "unknown";
+  }
+  return user.name;
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "user.test.js"), "utf8");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /assert\.equal\(mod\.displayName\(null\), "unknown"\)/);
+  assert.match(generated, /assert\.equal\(mod\.displayName\(\{"name":"Ada"\}\), "Ada"\)/);
+});
+
+test("writeSuggestedTests writes Python dictionary field branch assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.py"), `def display_name(user):
+    if user is None:
+        return "unknown"
+    return user["name"]
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_user.py"), "utf8");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /self\.assertEqual\(module\.display_name\(None\), "unknown"\)/);
+  assert.match(generated, /self\.assertEqual\(module\.display_name\(\{"name":"Ada"\}\), "Ada"\)/);
+});
+
 test("writeSuggestedTests writes JavaScript numeric boundary assertions", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");

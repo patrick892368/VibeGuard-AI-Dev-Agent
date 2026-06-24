@@ -107,11 +107,39 @@ function literalValue(expression) {
   return undefined;
 }
 
+function propertyAccess(expression, param) {
+  const escaped = param.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`^${escaped}\\.([a-zA-Z_$][\\w$]*)$`),
+    new RegExp(`^${escaped}\\[['"]([^'"]+)['"]\\]$`),
+    new RegExp(`^${escaped}\\.get\\(['"]([^'"]+)['"]\\)$`)
+  ];
+  for (const pattern of patterns) {
+    const match = expression.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+function sampleValueForProperty(property) {
+  return /(?:^id$|Id$|_id$)/.test(property) ? 123 : "Ada";
+}
+
+function objectSampleForExpression(param, expression) {
+  const property = propertyAccess(expression.trim().replace(/;$/, ""), param);
+  if (!property) return null;
+  return { [property]: sampleValueForProperty(property) };
+}
+
 function expectedFromExpression(param, expression, sample) {
   const normalized = expression.trim().replace(/;$/, "");
   const literal = literalValue(normalized);
   if (literal !== undefined) return literal;
   if (normalized === param) return sample;
+  const property = propertyAccess(normalized, param);
+  if (property && sample && typeof sample === "object" && !Array.isArray(sample) && Object.prototype.hasOwnProperty.call(sample, property)) {
+    return sample[property];
+  }
   if (typeof sample === "string" && (normalized === `${param}.trim()` || normalized === `${param}.strip()`)) {
     return sample.trim();
   }
@@ -140,7 +168,7 @@ function branchAssertions(name, params, condition, trueExpression, falseExpressi
 
   if ([`${param} == null`, `${param} === null`, `${param} is None`].includes(normalized)) {
     cases.push({ args: [null], expression: trueExpression });
-    cases.push({ args: [" Ada "], expression: falseExpression });
+    cases.push({ args: [objectSampleForExpression(param, falseExpression) || " Ada "], expression: falseExpression });
   } else if (normalized === `${param} < 0`) {
     cases.push({ args: [-2], expression: trueExpression });
     cases.push({ args: [3], expression: falseExpression });
@@ -192,6 +220,10 @@ function simpleAssertion(name, params, expression) {
     }
     if (normalized === `${value}.trim().toLowerCase()` || normalized === `${value}.strip().lower()`) {
       return { name, args: [" Ada "], expected: "ada" };
+    }
+    const objectSample = objectSampleForExpression(value, normalized);
+    if (objectSample) {
+      return { name, args: [objectSample], expected: expectedFromExpression(value, normalized, objectSample) };
     }
   }
   if (params.length === 2) {
