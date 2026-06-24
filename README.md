@@ -21,7 +21,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
 - `vibeguard debug`: 解析 Python、Django、Node.js、Java/Spring Boot 报错日志，定位可能文件并解释失败上下文。Parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and explains context.
 - Debug snippets 会先包含 stack frame，再补充 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件。Debug snippets include stack frames first, then short previews of framework-related likely files so AI patch generation can see the file that likely needs the change.
-- `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff 和 hunk count。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, and hunk counts.
+- `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
 - `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块，会为简单纯函数、明确分支、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并输出失败分类和结构化 `repairPlan`。Writes basic tests after policy checks, supports ESM/CommonJS Node modules, generates behavior assertions for simple pure functions, clear branches, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, and returns failed-run categories plus a structured `repairPlan`.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings、recommendations、actionItems 和 PR comment Markdown。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings, recommendations, actionItems, and PR-comment Markdown.
@@ -34,7 +34,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
 - `vibeguard eval fixtures` / `eval history`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider，并按 fixture 汇总历史结果。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures, with per-fixture history summaries.
-- `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, `gh`, and GitHub token presence without printing secrets.
+- `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在；provider HTTP 失败会返回短错误摘要，但不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, `gh`, and GitHub token presence; provider HTTP failures return short error summaries without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema 和 structured tool output。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, and structured tool output.
 
 项目当前保持 dependency-light，CLI 基于 Node.js built-ins，clone 后即可测试。
@@ -161,9 +161,9 @@ node ./bin/vibeguard.js --root fixtures/django-bug fix --log error.log --patch f
 node ./bin/vibeguard.js --root fixtures/spring-boot-bug fix --log error.log --patch fixes/service-annotation.patch --auto-test --dry-run --json
 ```
 
-`fix` 总是先校验 patch shape、检查 policy、运行 `git apply --check`，只有传入 `--apply` 才真正应用 patch。
+`fix` 总是先校验 patch shape、检查 policy、运行 `git apply --check`，只有传入 `--apply` 才真正应用 patch。对 AI/provider 生成的 patch，如果 `git apply --check` 失败且命中明确的 Django TemplateDoesNotExist 字符串替换场景，`fix` 会生成一个本地 fallback patch，再重新经过 validation、policy 和 apply check；用户手动提供的 patch 不会被静默替换。
 
-`fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present.
+`fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present. For AI/provider-generated patches, if `git apply --check` fails and the error matches a clear Django TemplateDoesNotExist string replacement case, `fix` generates a local fallback patch and runs validation, policy, and apply check again; user-provided patches are not silently replaced.
 
 `--auto-test` 会在 apply 后优先运行 stack trace 或源码文件对应的最小相关测试；如果找不到单文件测试，再回退到仓库分析建议的第一个测试命令。所有测试命令仍经过 command policy。
 
@@ -185,9 +185,9 @@ node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --jso
 node ./bin/vibeguard.js eval history --file reports/eval-history.jsonl --json
 ```
 
-评测会报告成功率、patch validation 失败、policy deny、patch check 失败和 provider blocked。
+评测会报告成功率、patch validation 失败、policy deny、patch check 失败、provider blocked，以及 `patchRecoveryStatus` / `patchRecoveryStrategy` 等恢复诊断。
 
-Evaluation reports success rate, patch validation failures, policy denials, patch check failures, and blocked provider calls.
+Evaluation reports success rate, patch validation failures, policy denials, patch check failures, blocked provider calls, and recovery diagnostics such as `patchRecoveryStatus` / `patchRecoveryStrategy`.
 
 `--output` 和 `--history` 都经过 Policy-as-Code；`.env` 等 denied 路径会被阻止。`reports/*.json` 和 `reports/*.jsonl` 是本地输出，默认不提交。
 
@@ -281,6 +281,7 @@ The test suite covers:
 - 路径和命令 policy。Path and command policy checks.
 - Policy Engine 和 policy-gated 文件操作的仓库 root containment。Repository-root containment for the Policy Engine and policy-gated file operations.
 - Patch 安全检查。Patch file safety checks.
+- Patch 输出规范化和生成补丁失败后的 Django fallback 恢复。Patch output normalization and Django fallback recovery after generated patch-check failures.
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
 - Python / Django / Node / Java / Spring Boot 报错解析。Python / Django / Node / Java / Spring Boot error parsing.

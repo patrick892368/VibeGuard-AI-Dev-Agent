@@ -24,14 +24,16 @@ export function applyPatchWithPolicy(root, patchText, engine, options = {}) {
   execFileSync("git", ["apply", "--check"], {
     cwd: root,
     input: normalizedPatch,
-    encoding: "utf8"
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"]
   });
 
   if (!options.checkOnly) {
     execFileSync("git", ["apply"], {
       cwd: root,
       input: normalizedPatch,
-      encoding: "utf8"
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"]
     });
   }
 

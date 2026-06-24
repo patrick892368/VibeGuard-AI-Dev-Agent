@@ -65,9 +65,13 @@ node ./bin/vibeguard.js fix --log error.log --test "npm test" --apply --json
 node ./bin/vibeguard.js fix --log error.log --auto-test --apply --json
 ```
 
-`fix` normalizes fenced diffs, plain unified diffs, and incorrect hunk counts before policy and `git apply --check`.
+`fix` normalizes fenced diffs, plain unified diffs, non-standard `diff a/file b/file` headers, and incorrect hunk counts before policy and `git apply --check`.
 
-`fix` 会在 policy 和 `git apply --check` 前规范化 fenced diff、plain unified diff 和错误的 hunk count。
+`fix` 会在 policy 和 `git apply --check` 前规范化 fenced diff、plain unified diff、非标准 `diff a/file b/file` header 和错误的 hunk count。
+
+When an AI/provider-generated patch fails `git apply --check`, Codex should inspect `patchDiagnostics` and `recovery`. VibeGuard can recover a clear Django `TemplateDoesNotExist` case by replacing a missing template string with the single matching existing template path; the fallback patch still goes through validation, policy, and apply check. User-provided patches are not silently replaced.
+
+当 AI/provider 生成的 patch 在 `git apply --check` 失败时，Codex 应检查 `patchDiagnostics` 和 `recovery`。VibeGuard 可以恢复明确的 Django `TemplateDoesNotExist` 场景：把缺失模板字符串替换为仓库中唯一匹配的现有模板路径；fallback patch 仍会经过 validation、policy 和 apply check。用户手动提供的 patch 不会被静默替换。
 
 Write generated patch artifacts after validation and policy checks:
 
@@ -146,9 +150,13 @@ If provider proxy environment variables are not set, Codex runs inherit Git `htt
 
 如果 provider 代理环境变量未设置，Codex 运行会继承 Git `https.proxy` / `http.proxy` 作为 provider 请求代理。
 
-Codex should inspect `summary.successRate`, fixture `outcome`, `policyStatus`, `stage`, and `patchSourceReason` before applying generated patches.
+If a provider request returns HTTP 4xx/5xx, `patchSourceReason` includes a bounded provider error summary. It does not include API keys.
 
-Codex 应该先检查 `summary.successRate`、fixture `outcome`、`policyStatus`、`stage` 和 `patchSourceReason`，再决定是否应用生成的 patch。
+如果 provider 请求返回 HTTP 4xx/5xx，`patchSourceReason` 会包含长度受限的 provider 错误摘要，不包含 API key。
+
+Codex should inspect `summary.successRate`, fixture `outcome`, `policyStatus`, `stage`, `patchSourceReason`, `patchRecoveryStatus`, and `patchRecoveryStrategy` before applying generated patches.
+
+Codex 应该先检查 `summary.successRate`、fixture `outcome`、`policyStatus`、`stage`、`patchSourceReason`、`patchRecoveryStatus` 和 `patchRecoveryStrategy`，再决定是否应用生成的 patch。
 
 For trend checks, inspect `summary.fixtureOutcomeCounts` from `eval history` to identify which fixture is regressing.
 

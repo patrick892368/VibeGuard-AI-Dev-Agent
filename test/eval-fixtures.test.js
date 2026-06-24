@@ -17,6 +17,24 @@ function fixturePatchMap() {
   });
 }
 
+function staleDjangoProviderPatch() {
+  return [
+    "```diff",
+    "diff a/accounts/views.py b/accounts/views.py",
+    "index 1234567..89abcde 100644",
+    "--- a/accounts/views.py",
+    "+++ b/accounts/views.py",
+    "@@ -2,7 +2,7 @@ from django.shortcuts import render",
+    " ",
+    " PROFILE_TEMPLATE = \"accounts/detail.html\"",
+    " ",
+    "-",
+    " def profile_template():",
+    "     return PROFILE_TEMPLATE",
+    "```"
+  ].join("\n");
+}
+
 function copyRepoWithoutSecrets() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-eval-output-"));
   fs.cpSync(path.resolve("."), root, {
@@ -77,6 +95,26 @@ test("evaluateFixFixtures applies all fixture provider patches and runs tests", 
   assert.equal(result.summary.counts.passed, 4);
   assert.equal(result.summary.successRate, 1);
   assert.ok(result.results.every((item) => item.testStatus === "passed"));
+});
+
+test("evaluateFixFixtures recovers a stale generated Django template patch", async () => {
+  const result = await evaluateFixFixtures({
+    root: process.cwd(),
+    fixture: "django-bug",
+    env: {
+      VIBEGUARD_LLM_PROVIDER: "fixture",
+      VIBEGUARD_FIXTURE_PATCH_MAP: JSON.stringify({
+        "django.template.exceptions.TemplateDoesNotExist": staleDjangoProviderPatch()
+      })
+    }
+  });
+
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.summary.counts.passed, 1);
+  assert.equal(result.results[0].outcome, "passed");
+  assert.equal(result.results[0].patchSourceStatus, "recovered");
+  assert.equal(result.results[0].patchRecoveryStatus, "recovered");
+  assert.equal(result.results[0].patchRecoveryStrategy, "django_template_literal_replacement");
 });
 
 test("CLI eval fixtures supports selecting one fixture", () => {

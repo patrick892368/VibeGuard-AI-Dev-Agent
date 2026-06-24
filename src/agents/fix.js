@@ -9,6 +9,7 @@ import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
 import { scanRepository } from "../repo/scan.js";
+import { generateFallbackPatch } from "./fallbackPatch.js";
 
 function buildFixTitle(debug) {
   const type = debug.summary?.type || "bug";
@@ -67,6 +68,87 @@ function buildDecisionSummary({ status, stage = null, validation, policy, applyC
     gitExecutionStatus: gitExecution?.status || null,
     nextActions
   };
+}
+
+function summarizePatchSource(patchSource) {
+  if (!patchSource) return null;
+  const { patch, ...summary } = patchSource;
+  return {
+    ...summary,
+    patchLength: patch ? patch.length : 0
+  };
+}
+
+function buildPatchDiagnostics(patchText, error) {
+  const lines = String(patchText || "").replace(/\r\n/g, "\n").split("\n");
+  return {
+    error: error?.message || String(error || ""),
+    lineCount: patchText ? lines.length : 0,
+    hunkHeaders: lines.filter((line) => line.startsWith("@@ ")).slice(0, 5)
+  };
+}
+
+function canRecoverPatchCheck(patchSource) {
+  return patchSource?.status && patchSource.status !== "provided";
+}
+
+function attemptPatchCheckRecovery(root, debug, engine, options = {}) {
+  const fallback = generateFallbackPatch(debug, { root });
+  if (!fallback?.patch) {
+    return {
+      status: "unavailable",
+      reason: "No deterministic fallback patch matched this error."
+    };
+  }
+
+  fallback.patch = normalizeUnifiedDiff(fallback.patch);
+  const validation = validateUnifiedDiff(fallback.patch);
+  if (!validation.valid) {
+    return {
+      status: "failed",
+      stage: "patch_validation",
+      patchSource: summarizePatchSource(fallback),
+      validation,
+      reason: validation.reason
+    };
+  }
+
+  const policy = engine.checkPatch(fallback.patch);
+  if (policy.status !== "allow" && !(policy.status === "require_confirmation" && options.confirmed)) {
+    return {
+      status: policy.status,
+      stage: "policy",
+      patchSource: summarizePatchSource(fallback),
+      validation,
+      policy,
+      reason: policy.reason
+    };
+  }
+
+  try {
+    const applyCheck = applyPatchWithPolicy(root, fallback.patch, engine, {
+      confirmed: Boolean(options.confirmed),
+      checkOnly: true,
+      auditLog: options.auditLog
+    });
+    return {
+      status: "recovered",
+      patchSource: fallback,
+      validation,
+      policy,
+      applyCheck
+    };
+  } catch (error) {
+    return {
+      status: "failed",
+      stage: "patch_check",
+      patchSource: summarizePatchSource(fallback),
+      validation,
+      policy,
+      error: error.message,
+      diagnostics: buildPatchDiagnostics(fallback.patch, error)
+    };
+  }
 }
 
 function resolveRootPath(root, filePath) {
@@ -189,7 +271,7 @@ export async function runFixWorkflow(options = {}) {
   const debug = analyzeDebugLog(logText, { root });
   const selectedTestCommand = options.testCommand || (options.autoTest ? selectAutoTestCommand(debug, root) : null);
   const providedPatch = patchFromOptions(options);
-  const patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
+  let patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
 
   if (!patchSource.patch) {
     const status = "blocked";
@@ -203,26 +285,27 @@ export async function runFixWorkflow(options = {}) {
   }
 
   patchSource.patch = normalizeUnifiedDiff(patchSource.patch);
-  const validation = validateUnifiedDiff(patchSource.patch);
+  let validation = validateUnifiedDiff(patchSource.patch);
   if (!validation.valid) {
     const status = "deny";
     return {
       status,
       stage: "patch_validation",
       debug,
-      patchSource: { ...patchSource, patch: undefined },
+      patchSource: summarizePatchSource(patchSource),
       validation,
       decision: buildDecisionSummary({ status, stage: "patch_validation", validation, selectedTestCommand })
     };
   }
 
-  const policy = engine.checkPatch(patchSource.patch);
+  let policy = engine.checkPatch(patchSource.patch);
   if (policy.status !== "allow" && !(policy.status === "require_confirmation" && options.confirmed)) {
     const status = policy.status;
     return {
       status,
       stage: "policy",
       debug,
+      patchSource: summarizePatchSource(patchSource),
       validation,
       policy,
       decision: buildDecisionSummary({ status, stage: "policy", validation, policy, selectedTestCommand })
@@ -230,6 +313,7 @@ export async function runFixWorkflow(options = {}) {
   }
 
   let applyCheck;
+  let recovery = null;
   try {
     applyCheck = applyPatchWithPolicy(root, patchSource.patch, engine, {
       confirmed: Boolean(options.confirmed),
@@ -237,16 +321,42 @@ export async function runFixWorkflow(options = {}) {
       auditLog: options.auditLog
     });
   } catch (error) {
-    const status = "failed";
-    return {
-      status,
-      stage: "patch_check",
-      debug,
-      validation,
-      policy,
-      error: error.message,
-      decision: buildDecisionSummary({ status, stage: "patch_check", validation, policy, selectedTestCommand })
-    };
+    const patchDiagnostics = buildPatchDiagnostics(patchSource.patch, error);
+    recovery = canRecoverPatchCheck(patchSource)
+      ? attemptPatchCheckRecovery(root, debug, engine, {
+        confirmed: Boolean(options.confirmed),
+        auditLog: options.auditLog
+      })
+      : {
+        status: "skipped",
+        reason: "Patch recovery is only attempted for generated patches."
+      };
+
+    if (recovery.status === "recovered") {
+      patchSource = recovery.patchSource;
+      validation = recovery.validation;
+      policy = recovery.policy;
+      applyCheck = recovery.applyCheck;
+    } else {
+      const status = recovery.status === "require_confirmation" || recovery.status === "deny"
+        ? recovery.status
+        : "failed";
+      const stage = recovery.status === "require_confirmation" || recovery.status === "deny"
+        ? "patch_recovery_policy"
+        : "patch_check";
+      return {
+        status,
+        stage,
+        debug,
+        patchSource: summarizePatchSource(patchSource),
+        validation,
+        policy,
+        error: error.message,
+        patchDiagnostics,
+        recovery,
+        decision: buildDecisionSummary({ status, stage, validation, policy, selectedTestCommand })
+      };
+    }
   }
 
   const pr = buildPrSummary(patchSource.patch);
@@ -256,9 +366,11 @@ export async function runFixWorkflow(options = {}) {
 
   const base = {
     debug,
+    patchSource: summarizePatchSource(patchSource),
     validation,
     policy,
     applyCheck,
+    recovery,
     pr,
     selectedTestCommand
   };

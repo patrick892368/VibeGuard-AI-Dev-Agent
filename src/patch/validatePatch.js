@@ -24,6 +24,18 @@ function addGitHeaderIfMissing(text) {
   return `diff --git a/${oldPath || target} b/${newPath || target}\n${text}`;
 }
 
+function normalizeDiffHeaderLines(text) {
+  return text
+    .replace(/^diff\s+(a\/\S+)\s+(b\/\S+)$/gm, "diff --git $1 $2")
+    .replace(/^diff\s+(\S+)\s+(\S+)$/gm, (line, oldPath, newPath) => {
+      if (line.startsWith("diff --git ")) return line;
+      const cleanOld = cleanHeaderPath(oldPath);
+      const cleanNew = cleanHeaderPath(newPath);
+      if (!cleanOld || !cleanNew) return line;
+      return `diff --git a/${cleanOld} b/${cleanNew}`;
+    });
+}
+
 function countHunkLines(lines) {
   let oldCount = 0;
   let newCount = 0;
@@ -37,7 +49,7 @@ function countHunkLines(lines) {
 
 export function normalizeUnifiedDiff(patchText) {
   if (!patchText || !patchText.trim()) return "";
-  const lines = addGitHeaderIfMissing(stripToDiff(patchText)).split("\n");
+  const lines = addGitHeaderIfMissing(normalizeDiffHeaderLines(stripToDiff(patchText))).split("\n");
   const output = [];
 
   for (let index = 0; index < lines.length; index += 1) {

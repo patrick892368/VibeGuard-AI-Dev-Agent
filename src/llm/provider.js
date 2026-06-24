@@ -15,6 +15,31 @@ function extractResponsesText(data) {
     .join("\n");
 }
 
+function summarizeErrorBody(text) {
+  if (!text) return "";
+  let value = text;
+  try {
+    const data = JSON.parse(text);
+    value = data.error?.message || data.message || data.detail || JSON.stringify(data.error || data);
+  } catch {
+    value = text;
+  }
+  return String(value).replace(/\s+/g, " ").trim().slice(0, 500);
+}
+
+async function responseErrorReason(response) {
+  let body = "";
+  if (typeof response.text === "function") {
+    try {
+      body = await response.text();
+    } catch {
+      body = "";
+    }
+  }
+  const summary = summarizeErrorBody(body);
+  return `LLM request failed with HTTP ${response.status}${summary ? `: ${summary}` : ""}`;
+}
+
 function resolveProvider(env) {
   if (env.VIBEGUARD_LLM_PROVIDER) return env.VIBEGUARD_LLM_PROVIDER;
   if (env.XAI_API_KEY || env.GROK_API_KEY) return "grok";
@@ -79,6 +104,9 @@ function postJsonViaProxy(endpoint, headers, body, proxyUrl) {
         resolve({
           ok: response.statusCode >= 200 && response.statusCode < 300,
           status: response.statusCode,
+          async text() {
+            return text;
+          },
           async json() {
             return JSON.parse(text);
           }
@@ -130,7 +158,7 @@ async function callResponsesApi({ endpoint, apiKey, model, context, proxyUrl }) 
   if (!response.ok) {
     return {
       status: "error",
-      reason: `LLM request failed with HTTP ${response.status}`
+      reason: await responseErrorReason(response)
     };
   }
 

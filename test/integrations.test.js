@@ -89,6 +89,30 @@ test("generateDebugPatch uses Grok-compatible Responses API", async () => {
   }
 });
 
+test("generateDebugPatch summarizes provider HTTP error bodies without secrets", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 400,
+    async text() {
+      return JSON.stringify({ error: { message: "Unsupported model: grok-old" } });
+    }
+  });
+
+  try {
+    const result = await generateDebugPatch({ summary: { type: "ReferenceError" } }, {
+      XAI_API_KEY: "xai-secret",
+      VIBEGUARD_MODEL: "grok-old"
+    });
+
+    assert.equal(result.status, "error");
+    assert.match(result.reason, /HTTP 400: Unsupported model: grok-old/);
+    assert.equal(result.reason.includes("xai-secret"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("parseGitHubRemote supports https and ssh remotes", () => {
   assert.deepEqual(parseGitHubRemote("https://github.com/patrick892368/VibeGuard-AI-Dev-Agent.git"), {
     owner: "patrick892368",
