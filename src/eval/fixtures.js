@@ -22,6 +22,20 @@ export const defaultEvalFixtures = [
     root: "fixtures/node-bug",
     log: "error.log",
     testCommand: "npm test"
+  },
+  {
+    id: "django-bug",
+    language: "django",
+    root: "fixtures/django-bug",
+    log: "error.log",
+    testCommand: "python -m unittest tests/test_views.py"
+  },
+  {
+    id: "spring-boot-bug",
+    language: "spring-boot",
+    root: "fixtures/spring-boot-bug",
+    log: "error.log",
+    testCommand: "node --test tests/UserService.test.js"
   }
 ];
 

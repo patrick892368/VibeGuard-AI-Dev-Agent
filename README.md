@@ -32,7 +32,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
-- `vibeguard eval fixtures`: 用 Python / Node fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python and Node fixtures.
+- `vibeguard eval fixtures`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures.
 - `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote 和 `gh`，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, and `gh` without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema 和 structured tool output。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, and structured tool output.
 
@@ -166,9 +166,9 @@ node ./bin/vibeguard.js --root fixtures/spring-boot-bug fix --log error.log --pa
 
 ## 评测 / Evaluation
 
-用真实 provider 评测 Python / Node fixtures：
+用真实 provider 评测 Python / Node / Django-style / Spring Boot-style fixtures：
 
-Evaluate a real provider against Python / Node fixtures:
+Evaluate a real provider against Python, Node, Django-style, and Spring Boot-style fixtures:
 
 ```bash
 export VIBEGUARD_LLM_PROVIDER=grok

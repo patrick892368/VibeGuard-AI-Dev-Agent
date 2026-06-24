@@ -119,6 +119,10 @@ node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --jso
 node ./bin/vibeguard.js eval history --file reports/eval-history.jsonl --json
 ```
 
+The baseline fixture set covers Python, Node, Django-style, and Spring Boot-style repair flows.
+
+baseline fixture 集合覆盖 Python、Node、Django-style 和 Spring Boot-style 修复流程。
+
 Use a real Grok provider:
 
 使用真实 Grok provider：
