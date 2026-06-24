@@ -14,6 +14,7 @@ test("analyzeReviewDiff reports risky source changes without tests", () => {
   const result = analyzeReviewDiff(diff);
   assert.equal(result.files.length, 1);
   assert.ok(result.findings.some((finding) => finding.category === "security" && finding.file === "src/db.js"));
+  assert.ok(result.findings.some((finding) => finding.category === "security" && finding.line === 2));
   assert.ok(result.findings.some((finding) => finding.category === "testing"));
 });
 
@@ -35,4 +36,22 @@ diff --git a/.env b/.env
   const result = analyzeReviewDiff(diff);
   assert.ok(result.findings.some((finding) => finding.category === "deployment"));
   assert.ok(result.findings.some((finding) => finding.category === "security"));
+});
+
+test("analyzeReviewDiff flags secret literals, html sinks, and sync filesystem calls", () => {
+  const diff = `diff --git a/src/view.js b/src/view.js
+--- a/src/view.js
++++ b/src/view.js
+@@ -10,2 +10,5 @@
+ export function render(el, html) {
++  const token = "abcdefghijklmnop"
++  el.innerHTML = html
++  fs.readFileSync("data.json", "utf8")
+ }
+`;
+
+  const result = analyzeReviewDiff(diff);
+  assert.ok(result.findings.some((finding) => finding.message.includes("Secret-looking literal") && finding.line === 11));
+  assert.ok(result.findings.some((finding) => finding.message.includes("HTML injection") && finding.line === 12));
+  assert.ok(result.findings.some((finding) => finding.category === "performance" && finding.line === 13));
 });

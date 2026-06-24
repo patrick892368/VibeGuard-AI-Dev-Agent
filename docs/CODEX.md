@@ -181,6 +181,10 @@ node ./bin/vibeguard.js review --json
 node ./bin/vibeguard.js pr summary --diff change.diff --json
 ```
 
+Review findings include `file`, `line`, `severity`, `category`, and `message` when line information is available.
+
+Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category` 和 `message`。
+
 Read GitHub Actions status:
 
 读取 GitHub Actions 状态：

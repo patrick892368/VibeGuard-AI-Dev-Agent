@@ -25,6 +25,10 @@ vibeguard policy check --path src/index.js
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 ```
 
+`review` returns line-level findings when the diff hunk contains line metadata.
+
+`review` 会在 diff hunk 提供行号时返回行号级 findings。
+
 ## Git Hooks / Git Hooks
 
 Print a hook without writing to `.git`:
