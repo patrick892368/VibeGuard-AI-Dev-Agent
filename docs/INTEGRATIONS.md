@@ -74,6 +74,7 @@ Available tools:
 - `review_pr`
 - `summarize_pr`
 - `detect_github`
+- `github_pr`
 - `github_checks`
 - `github_comment`
 - `eval_fixtures`
@@ -92,6 +93,10 @@ Available tools:
 `onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, and structured `firstTasks` with low-risk commands and files for newcomers.
 
 `onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown，以及包含低风险命令和文件的新手任务 `firstTasks`。
+
+`github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution.
+
+`github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。
 
 `write_tests` can analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware tests with simple behavior and exception assertions, optionally run them through command policy, and return `failureAnalysis.repairPlan` for failed runs.
 

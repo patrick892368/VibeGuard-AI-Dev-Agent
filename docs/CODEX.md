@@ -250,6 +250,10 @@ node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --json
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --json
 ```
 
+The MCP-style server exposes the same GitHub PR path as `github_pr`, which returns a dry-run `gh pr create` command unless `execute` is true and policy confirmation is present.
+
+MCP-style server 也通过 `github_pr` 暴露同一条 GitHub PR 路径；默认返回 dry-run 的 `gh pr create` 命令，只有 `execute` 为 true 且通过 policy 确认时才执行。
+
 When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` through the GitHub REST API fallback. Policy confirmation is still required for PR creation and PR comments.
 
 当本机没有 `gh` 时，execute 模式可以使用 `GITHUB_TOKEN` 或 `GH_TOKEN` 通过 GitHub REST API fallback 执行。创建 PR 和发布 PR comment 仍然需要 policy 确认。

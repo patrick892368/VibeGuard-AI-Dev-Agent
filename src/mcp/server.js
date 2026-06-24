@@ -11,7 +11,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
 import { analyzeReviewDiff } from "../agents/review.js";
 import { buildPrSummary } from "../agents/pr.js";
-import { commentPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 
 const stringSchema = { type: "string" };
@@ -107,6 +107,20 @@ const tools = [
     name: "detect_github",
     description: "Detect the GitHub origin repository for the current repo.",
     inputSchema: objectSchema()
+  },
+  {
+    name: "github_pr",
+    description: "Create a GitHub PR through gh pr create. Dry-run by default.",
+    inputSchema: objectSchema({
+      title: stringSchema,
+      bodyFile: stringSchema,
+      body: stringSchema,
+      base: stringSchema,
+      head: stringSchema,
+      draft: booleanSchema,
+      execute: booleanSchema,
+      confirmed: booleanSchema
+    })
   },
   {
     name: "github_checks",
@@ -271,6 +285,42 @@ async function callTool(name, args, root) {
   if (name === "review_pr") return analyzeReviewDiff(args.diff || "");
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
+  if (name === "github_pr") {
+    const env = loadRuntimeEnv(root);
+    const dryRun = await createPullRequestWithGh(root, {
+      title: args.title,
+      bodyFile: args.bodyFile,
+      body: args.body,
+      base: args.base,
+      head: args.head,
+      draft: Boolean(args.draft),
+      env,
+      dryRun: true
+    });
+    if (args.execute === true) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      const policy = engine.checkCommand(dryRun.command);
+      if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
+        return {
+          status: policy.status,
+          stage: "github_pr_policy",
+          command: dryRun.command,
+          policy
+        };
+      }
+    }
+    return createPullRequestWithGh(root, {
+      title: args.title,
+      bodyFile: args.bodyFile,
+      body: args.body,
+      base: args.base,
+      head: args.head,
+      draft: Boolean(args.draft),
+      env,
+      dryRun: args.execute !== true
+    });
+  }
   if (name === "github_comment") {
     const env = loadRuntimeEnv(root);
     const dryRun = await commentPullRequestWithGh(root, {

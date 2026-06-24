@@ -14,6 +14,7 @@ test("MCP tools expose input schemas", () => {
     assert.equal(tool.inputSchema.type, "object");
     assert.ok(tool.description);
   }
+  assert.ok(mcpInternals.tools.some((tool) => tool.name === "github_pr"));
 });
 
 test("MCP initialize returns server info and tool capabilities", async () => {
@@ -52,4 +53,24 @@ test("MCP initialized notification does not produce a response", async () => {
   }, tempRepo());
 
   assert.equal(response, null);
+});
+
+test("MCP github_pr returns a dry-run PR command", async () => {
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 3,
+    method: "tools/call",
+    params: {
+      name: "github_pr",
+      arguments: {
+        title: "Fix bug",
+        body: "body",
+        draft: true
+      }
+    }
+  }, tempRepo());
+
+  assert.equal(response.result.structuredContent.status, "dry_run");
+  assert.match(response.result.structuredContent.command, /gh pr create/);
+  assert.match(response.result.structuredContent.command, /--draft/);
 });
