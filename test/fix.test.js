@@ -31,7 +31,8 @@ function runCli(args, options = {}) {
   try {
     const output = execFileSync(process.execPath, [bin, ...args], {
       cwd: process.cwd(),
-      encoding: "utf8"
+      encoding: "utf8",
+      env: options.env || process.env
     });
     return JSON.parse(output);
   } catch (error) {

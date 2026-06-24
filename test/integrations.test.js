@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, createPullRequestWithGh, parseGitHubRemote } from "../src/integrations/github.js";
-import { buildFixGitPlan, checkGitPlanPolicy } from "../src/integrations/gitPlan.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
@@ -152,4 +152,44 @@ test("checkGitPlanPolicy requires confirmation for external git and PR actions",
 
   assert.equal(checkGitPlanPolicy(plan, engine).status, "require_confirmation");
   assert.equal(checkGitPlanPolicy(plan, engine, { confirmed: true }).status, "allow");
+});
+
+test("executeGitPlan dispatches create_pr through the protected command runner", () => {
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["gh pr create"]
+    }
+  });
+  const plan = buildFixGitPlan({
+    changedFiles: ["src/app.js"],
+    branch: "codex/fix-error",
+    commitMessage: "fix: error",
+    title: "Fix error",
+    bodyFile: "fixes/pr-body.md",
+    prDryRun: true
+  });
+  const calls = [];
+  const result = executeGitPlan(process.cwd(), plan, engine, {
+    confirmed: true,
+    runArgvWithPolicy(root, argv, policyEngine, options) {
+      calls.push({ root, argv, status: policyEngine.checkCommand(argv.join(" ")).status, confirmed: options.confirmed });
+      return {
+        status: "passed",
+        exitCode: 0,
+        command: argv.join(" "),
+        argv,
+        stdout: "https://example.com/pull/1\n",
+        stderr: "",
+        policy: policyEngine.checkCommand(argv.join(" "))
+      };
+    }
+  });
+
+  assert.equal(result.status, "executed");
+  assert.equal(result.results[0].step, "create_pr");
+  assert.equal(calls[0].argv[0], "gh");
+  assert.deepEqual(calls[0].argv.slice(0, 3), ["gh", "pr", "create"]);
+  assert.equal(calls[0].confirmed, true);
 });

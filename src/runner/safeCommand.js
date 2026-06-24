@@ -60,6 +60,7 @@ export function runArgvWithPolicy(root, argv, engine, options = {}) {
     argv,
     stdout: result.stdout,
     stderr: result.stderr,
+    error: result.error?.message || null,
     policy
   };
 }

@@ -78,10 +78,11 @@ export function executeGitPlan(root, gitPlan, engine, options = {}) {
   }
 
   const results = [];
+  const run = options.runArgvWithPolicy || runArgvWithPolicy;
   for (const command of gitPlan.commands || []) {
     let result;
     try {
-      result = runArgvWithPolicy(root, command.argv, engine, {
+      result = run(root, command.argv, engine, {
         confirmed: Boolean(options.confirmed),
         dryRun: Boolean(options.dryRun)
       });
