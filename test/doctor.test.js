@@ -22,3 +22,16 @@ test("runDoctor reports readiness without exposing provider secrets", () => {
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
   assert.equal(JSON.stringify(result).includes("github-secret"), false);
 });
+
+test("runDoctor reports the Grok default model when no model is configured", () => {
+  const result = runDoctor({
+    root: process.cwd(),
+    env: {
+      XAI_API_KEY: "secret-value"
+    }
+  });
+
+  assert.equal(result.provider.provider, "grok");
+  assert.equal(result.provider.model, "grok-4.3");
+  assert.equal(JSON.stringify(result).includes("secret-value"), false);
+});

@@ -34,7 +34,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
 - `vibeguard eval fixtures` / `eval history`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider，并按 fixture 汇总历史结果。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures, with per-fixture history summaries.
-- `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在；provider HTTP 失败会返回短错误摘要，但不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, `gh`, and GitHub token presence; provider HTTP failures return short error summaries without printing secrets.
+- `vibeguard doctor`: 检查 policy、provider、默认模型、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在；provider HTTP 失败会返回短错误摘要，但不会打印密钥。Checks policy, provider, default model, proxy, Git, GitHub remote, `gh`, and GitHub token presence; provider HTTP failures return short error summaries without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema、structured tool output，以及 GitHub PR dry-run/comment/checks 等 Codex 工作流工具。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, structured tool output, and Codex workflow tools such as GitHub PR dry-runs, comments, and checks.
 
 项目当前保持 dependency-light，CLI 基于 Node.js built-ins，clone 后即可测试。

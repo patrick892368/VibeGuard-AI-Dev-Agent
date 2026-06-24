@@ -19,9 +19,12 @@ function commandAvailable(command, args = ["--version"]) {
 
 function providerStatus(env) {
   const provider = env.VIBEGUARD_LLM_PROVIDER || ((env.XAI_API_KEY || env.GROK_API_KEY) ? "grok" : "unset");
+  const model = provider === "grok" || provider === "xai"
+    ? env.VIBEGUARD_MODEL || env.XAI_MODEL || env.GROK_MODEL || "grok-4.3"
+    : env.VIBEGUARD_MODEL || null;
   return {
     provider,
-    model: env.VIBEGUARD_MODEL || env.XAI_MODEL || env.GROK_MODEL || null,
+    model,
     hasGrokKey: Boolean(env.XAI_API_KEY || env.GROK_API_KEY),
     hasOpenAIKey: Boolean(env.OPENAI_API_KEY)
   };

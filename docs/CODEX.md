@@ -39,6 +39,10 @@ node ./bin/vibeguard.js policy check --command "npm test" --json
 node ./bin/vibeguard.js policy check --path src/index.js --audit-log reports/audit.jsonl --json
 ```
 
+`doctor` reports provider presence and the effective default model without exposing API keys.
+
+`doctor` 会报告 provider 是否存在以及实际默认模型，但不会暴露 API key。
+
 Analyze an error log:
 
 分析报错日志：
