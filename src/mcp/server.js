@@ -235,6 +235,23 @@ function toolContent(result) {
   };
 }
 
+function toolErrorContent(error) {
+  const message = error.message || String(error);
+  return {
+    content: [
+      {
+        type: "text",
+        text: message
+      }
+    ],
+    isError: true,
+    structuredContent: {
+      status: "error",
+      error: message
+    }
+  };
+}
+
 function initializeResult(params = {}) {
   return {
     protocolVersion: params.protocolVersion || "2024-11-05",
@@ -490,8 +507,12 @@ export async function handleMcpRequest(request, root = process.cwd()) {
   if (request.method === "initialize") return ok(request.id, initializeResult(request.params || {}));
   if (request.method === "tools/list") return ok(request.id, { tools });
   if (request.method === "tools/call") {
-    const result = await callTool(request.params?.name, request.params?.arguments || {}, root);
-    return ok(request.id, toolContent(result));
+    try {
+      const result = await callTool(request.params?.name, request.params?.arguments || {}, root);
+      return ok(request.id, toolContent(result));
+    } catch (error) {
+      return ok(request.id, toolErrorContent(error));
+    }
   }
   return fail(request.id, new Error(`Unsupported method: ${request.method}`));
 }
@@ -517,5 +538,6 @@ export const mcpInternals = {
   tools,
   initializeResult,
   toolContent,
+  toolErrorContent,
   callTool
 };

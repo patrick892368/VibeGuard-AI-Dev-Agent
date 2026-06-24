@@ -46,6 +46,23 @@ test("MCP tools/call returns text content and structured content", async () => {
   assert.equal(response.result.structuredContent.status, "allow");
 });
 
+test("MCP tools/call returns structured tool errors", async () => {
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 4,
+    method: "tools/call",
+    params: {
+      name: "check_policy",
+      arguments: {}
+    }
+  }, tempRepo());
+
+  assert.equal(response.error, undefined);
+  assert.equal(response.result.isError, true);
+  assert.equal(response.result.structuredContent.status, "error");
+  assert.match(response.result.structuredContent.error, /requires path, command, or patch/);
+});
+
 test("MCP initialized notification does not produce a response", async () => {
   const response = await handleMcpRequest({
     jsonrpc: "2.0",
