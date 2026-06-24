@@ -110,6 +110,10 @@ Through MCP, use `apply_patch_safely` for patch validation. It checks only by de
 
 通过 MCP 时，使用 `apply_patch_safely` 做 patch 校验。它默认只检查，只有 `apply` 为 true 时才会应用。
 
+Through MCP, `debug_error` can also generate an AI patch by passing `aiPatch: true`; if `outputPatch` is provided, the patch is normalized, validated, checked by policy, and written as an artifact without applying it.
+
+通过 MCP 时，`debug_error` 也可以通过 `aiPatch: true` 生成 AI patch；如果传入 `outputPatch`，patch 会先规范化、校验并经过 policy 检查，然后作为 artifact 写出，不会直接应用。
+
 Generate a branch, commit, and PR dry-run plan:
 
 生成 branch、commit、PR dry-run 计划：

@@ -143,6 +143,57 @@ test("MCP github_pr returns a dry-run PR command", async () => {
   assert.match(response.result.structuredContent.command, /--draft/);
 });
 
+test("MCP debug_error can generate and write a policy-gated AI patch artifact", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
+  const patch = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+  const envKeys = [
+    "VIBEGUARD_LLM_PROVIDER",
+    "VIBEGUARD_FIXTURE_PATCH",
+    "VIBEGUARD_FIXTURE_PATCH_FILE",
+    "VIBEGUARD_FIXTURE_PATCH_MAP"
+  ];
+  const oldEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  try {
+    process.env.VIBEGUARD_LLM_PROVIDER = "fixture";
+    process.env.VIBEGUARD_FIXTURE_PATCH = patch;
+    delete process.env.VIBEGUARD_FIXTURE_PATCH_FILE;
+    delete process.env.VIBEGUARD_FIXTURE_PATCH_MAP;
+
+    const response = await handleMcpRequest({
+      jsonrpc: "2.0",
+      id: 11,
+      method: "tools/call",
+      params: {
+        name: "debug_error",
+        arguments: {
+          log: "ReferenceError: oldName is not defined",
+          aiPatch: true,
+          outputPatch: "reports/generated.patch"
+        }
+      }
+    }, root);
+    const result = response.result.structuredContent;
+
+    assert.equal(result.aiPatch.validation.valid, true);
+    assert.equal(result.aiPatch.policy.status, "allow");
+    assert.equal(result.aiPatch.outputPatch.path, "reports/generated.patch");
+    assert.match(fs.readFileSync(path.join(root, "reports", "generated.patch"), "utf8"), /diff --git a\/src\/app\.js b\/src\/app\.js/);
+  } finally {
+    for (const [key, value] of Object.entries(oldEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("MCP write_tests can repair generated Python test imports", async () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

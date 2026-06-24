@@ -14,6 +14,8 @@ import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
+import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
+import { generateDebugPatch } from "../llm/provider.js";
 
 const stringSchema = { type: "string" };
 const booleanSchema = { type: "boolean" };
@@ -40,9 +42,13 @@ const tools = [
   },
   {
     name: "debug_error",
-    description: "Parse an error log and return likely files, stack frames, and fix hints.",
+    description: "Parse an error log and optionally generate a policy-checked AI patch artifact.",
     inputSchema: objectSchema({
-      log: stringSchema
+      log: stringSchema,
+      aiPatch: booleanSchema,
+      outputPatch: stringSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
@@ -327,7 +333,36 @@ async function callTool(name, args, root) {
   if (name === "debug_error") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    return analyzeDebugLog(args.log || "", { root, engine });
+    const logText = args.log || "";
+    const result = analyzeDebugLog(logText, { root, engine });
+    if (args.aiPatch) {
+      const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
+      result.aiPatch = ai;
+      if (ai.patch) {
+        const normalizedPatch = normalizeUnifiedDiff(ai.patch);
+        result.aiPatch.patch = normalizedPatch;
+        result.aiPatch.validation = validateUnifiedDiff(normalizedPatch);
+        result.aiPatch.policy = result.aiPatch.validation.valid
+          ? engine.checkPatch(normalizedPatch)
+          : { status: "deny", reason: result.aiPatch.validation.reason, files: result.aiPatch.validation.files };
+        if (args.outputPatch) {
+          if (result.aiPatch.policy.status !== "allow" && !(result.aiPatch.policy.status === "require_confirmation" && args.confirmed)) {
+            result.aiPatch.outputPatch = {
+              status: result.aiPatch.policy.status,
+              stage: "patch_policy",
+              path: args.outputPatch,
+              policy: result.aiPatch.policy
+            };
+          } else if (result.aiPatch.validation.valid) {
+            result.aiPatch.outputPatch = writeFileWithPolicy(root, args.outputPatch, normalizedPatch, engine, {
+              confirmed: Boolean(args.confirmed),
+              auditLog: args.auditLog
+            });
+          }
+        }
+      }
+    }
+    return result;
   }
   if (name === "fix_error") {
     const { config } = loadConfig(root);

@@ -106,6 +106,10 @@ Available tools:
 
 `eval_history` 会汇总 JSONL 历史记录，方便看趋势。
 
+`debug_error` can parse pasted logs, and when `aiPatch` is true it calls the configured provider, normalizes and validates the generated diff, checks patch policy, and can write a patch artifact through `outputPatch`.
+
+`debug_error` 可以解析粘贴的日志；当 `aiPatch` 为 true 时，会调用配置的 provider，规范化并校验生成的 diff，执行 patch policy 检查，并可通过 `outputPatch` 写出 patch artifact。
+
 `onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
 
 `onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。

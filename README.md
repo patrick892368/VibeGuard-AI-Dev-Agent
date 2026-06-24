@@ -35,7 +35,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard audit summary` / `audit report`: 汇总 JSONL 审计日志，或写出 Markdown 审计报告。Summarizes JSONL audit logs or writes a Markdown audit report.
 - `vibeguard eval fixtures` / `eval history`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider，并按 fixture 汇总历史结果。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures, with per-fixture history summaries.
 - `vibeguard doctor`: 检查 policy、provider、默认模型、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在；provider HTTP 失败会返回短错误摘要，但不会打印密钥。Checks policy, provider, default model, proxy, Git, GitHub remote, `gh`, and GitHub token presence; provider HTTP failures return short error summaries without printing secrets.
-- `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema、structured tool output、`apply_patch_safely`，以及 GitHub PR dry-run/comment/checks 等 Codex 工作流工具。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, structured tool output, `apply_patch_safely`, and Codex workflow tools such as GitHub PR dry-runs, comments, and checks.
+- `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema、structured tool output、`debug_error` AI patch artifact、`apply_patch_safely`，以及 GitHub PR dry-run/comment/checks 等 Codex 工作流工具。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, structured tool output, `debug_error` AI patch artifacts, `apply_patch_safely`, and Codex workflow tools such as GitHub PR dry-runs, comments, and checks.
 
 项目当前保持 dependency-light，CLI 基于 Node.js built-ins，clone 后即可测试。
 
