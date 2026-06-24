@@ -20,6 +20,9 @@ test("analyzeReviewDiff reports risky source changes without tests", () => {
   assert.ok(result.actionItems.some((item) => item.file === "src/db.js" && /parameterized queries/.test(item.action)));
   assert.equal(result.summaryBySeverity.high, 1);
   assert.equal(result.summaryBySeverity.medium, 1);
+  assert.match(result.markdown, /VibeGuard Review/);
+  assert.match(result.markdown, /src\/db\.js:2/);
+  assert.match(result.markdown, /Recommendation: Use parameterized queries/);
 });
 
 test("analyzeReviewDiff flags sensitive and deployment files", () => {

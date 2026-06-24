@@ -80,6 +80,31 @@ function actionItems(findings) {
   }));
 }
 
+function findingLocation(item) {
+  return item.line ? `${item.file}:${item.line}` : item.file;
+}
+
+function buildReviewMarkdown(files, findings, summaryBySeverity) {
+  const changedFiles = files.map((file) => `- \`${file}\``).join("\n") || "- No files detected";
+  const findingLines = findings.map((item) =>
+    `- **${item.severity.toUpperCase()} ${item.category}** at \`${findingLocation(item)}\`: ${item.message}\n  Recommendation: ${item.recommendation}`
+  ).join("\n") || "- No findings.";
+
+  return `## VibeGuard Review
+
+Changed files: ${files.length}
+Findings: ${findings.length} (high: ${summaryBySeverity.high}, medium: ${summaryBySeverity.medium}, low: ${summaryBySeverity.low})
+
+### Changed Files
+
+${changedFiles}
+
+### Findings
+
+${findingLines}
+`;
+}
+
 export function analyzeReviewDiff(diffText, options = {}) {
   const files = parsePatchFiles(diffText);
   const additions = changedEntries(diffText);
@@ -134,11 +159,13 @@ export function analyzeReviewDiff(diffText, options = {}) {
   const severityOrder = { high: 0, medium: 1, low: 2 };
   findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity] || a.file.localeCompare(b.file));
 
+  const summaryBySeverity = summarizeBySeverity(findings);
   return {
     files,
     summary: `${files.length} changed file(s), ${findings.length} finding(s).`,
-    summaryBySeverity: summarizeBySeverity(findings),
+    summaryBySeverity,
     actionItems: actionItems(findings),
+    markdown: buildReviewMarkdown(files, findings, summaryBySeverity),
     findings
   };
 }

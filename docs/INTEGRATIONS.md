@@ -26,9 +26,9 @@ vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard audit summary --file reports/audit.jsonl
 ```
 
-`review` returns line-level findings, recommendations, severity summaries, and actionItems when the diff hunk contains line metadata.
+`review` returns line-level findings, recommendations, severity summaries, actionItems, and PR-comment Markdown when the diff hunk contains line metadata.
 
-`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总和 actionItems。
+`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems 和 PR 评论 Markdown。
 
 ## Git Hooks / Git Hooks
 
