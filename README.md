@@ -23,7 +23,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - Debug snippets 会先包含 stack frame，再补充 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件。Debug snippets include stack frames first, then short previews of framework-related likely files so AI patch generation can see the file that likely needs the change.
 - `vibeguard fix`: 编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff 和 hunk count。Orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, and hunk counts.
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
-- `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块，会为简单纯函数和明确分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并输出失败分类和结构化 `repairPlan`。Writes basic tests after policy checks, supports ESM/CommonJS Node modules, generates behavior assertions for simple pure functions and clear branches, can use `--run` to execute generated tests through command policy, and returns failed-run categories plus a structured `repairPlan`.
+- `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块，会为简单纯函数、明确分支和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并输出失败分类和结构化 `repairPlan`。Writes basic tests after policy checks, supports ESM/CommonJS Node modules, generates behavior assertions for simple pure functions, clear branches, and clear exception branches, can use `--run` to execute generated tests through command policy, and returns failed-run categories plus a structured `repairPlan`.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings.
 - `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档。Scans a repository and can generate bilingual onboarding / architecture docs.
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
@@ -288,7 +288,7 @@ The test suite covers:
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
 - Policy-gated JSONL 审计日志。Policy-gated JSONL audit logs.
 - coverage.py JSON / LCOV 解析、未覆盖文件排序、missing line 到函数映射、before/after coverage delta，以及生成测试后的 policy-gated test run。coverage.py JSON / LCOV parsing, uncovered file prioritization, missing-line-to-function mapping, before/after coverage deltas, and policy-gated test runs after generating tests.
-- 简单纯函数和明确分支行为断言生成。Simple pure-function and clear-branch behavior assertion generation.
+- 简单纯函数、明确分支和明确异常分支行为断言生成。Simple pure-function, clear-branch, and clear-exception-branch behavior assertion generation.
 - 生成测试失败后的结构化修复计划。Structured repair plans after generated test failures.
 
 ## 集成目标 / Integration Targets

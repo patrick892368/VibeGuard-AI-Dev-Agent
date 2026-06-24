@@ -121,6 +121,14 @@ function expectedFromExpression(param, expression, sample) {
   return undefined;
 }
 
+function trueBranchArgs(param, condition) {
+  const normalized = condition.trim();
+  if ([`${param} == null`, `${param} === null`, `${param} is None`].includes(normalized)) return [null];
+  if ([`${param} < 0`, `${param} <= 0`].includes(normalized)) return [-2];
+  if ([`${param} == ""`, `${param} === ""`].includes(normalized)) return [""];
+  return null;
+}
+
 function branchAssertions(name, params, condition, trueExpression, falseExpression) {
   if (params.length !== 1) return [];
   const [param] = params;
@@ -145,6 +153,18 @@ function branchAssertions(name, params, condition, trueExpression, falseExpressi
       expected: expectedFromExpression(param, item.expression, item.args[0])
     }))
     .filter((item) => item.expected !== undefined);
+}
+
+function exceptionAssertions(name, params, condition, errorName) {
+  if (params.length !== 1) return [];
+  const [param] = params;
+  const args = trueBranchArgs(param, condition);
+  if (!args) return [];
+  return [{
+    name,
+    args,
+    throws: errorName.split(".").pop()
+  }];
 }
 
 function simpleAssertion(name, params, expression) {
@@ -184,6 +204,10 @@ function inferPythonAssertions(text) {
   for (const match of text.matchAll(branchPattern)) {
     hints.push(...branchAssertions(match[1], splitParams(match[2]), match[3], match[4], match[5]));
   }
+  const exceptionPattern = /^def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\):\s*\n\s+if\s+(.+):\s*\n\s+raise\s+([a-zA-Z_][\w.]*)\s*\([^)]*\)\s*\n\s+return\s+(.+)$/gm;
+  for (const match of text.matchAll(exceptionPattern)) {
+    hints.push(...exceptionAssertions(match[1], splitParams(match[2]), match[3], match[4]));
+  }
   return hints;
 }
 
@@ -202,6 +226,10 @@ function inferJavaScriptAssertions(text) {
   const branchPattern = /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*if\s*\(([^)]*)\)\s*(?:{\s*)?return\s+([^;{}]+);?\s*(?:}\s*)?return\s+([^;{}]+);?\s*}/g;
   for (const match of text.matchAll(branchPattern)) {
     hints.push(...branchAssertions(match[1], splitParams(match[2]), match[3], match[4], match[5]));
+  }
+  const exceptionPattern = /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*if\s*\(([^)]*)\)\s*(?:{\s*)?throw\s+new\s+([a-zA-Z_$][\w$]*)\s*\([^;{}]*\);?\s*(?:}\s*)?return\s+([^;{}]+);?\s*}/g;
+  for (const match of text.matchAll(exceptionPattern)) {
+    hints.push(...exceptionAssertions(match[1], splitParams(match[2]), match[3], match[4]));
   }
   return hints;
 }
@@ -424,6 +452,30 @@ function loadCoverageAfter(options, root) {
   return loadCoverageInput(options, root, "coverageAfterFile", "coverageAfterText");
 }
 
+function pythonBehaviorAssertion(hint) {
+  const call = `module.${hint.name}(${hint.args.map(pythonLiteral).join(", ")})`;
+  if (hint.throws) {
+    return `    try:
+        ${call}
+    except ${hint.throws}:
+        pass
+    else:
+        raise AssertionError("expected ${hint.throws}")`;
+  }
+  return `    assert ${call} == ${pythonLiteral(hint.expected)}`;
+}
+
+function jsErrorConstructor(errorName) {
+  const builtIns = new Set(["Error", "TypeError", "RangeError", "ReferenceError", "SyntaxError", "URIError", "EvalError"]);
+  return builtIns.has(errorName) ? errorName : "Error";
+}
+
+function jsBehaviorAssertion(hint) {
+  const call = `mod.${hint.name}(${hint.args.map(jsLiteral).join(", ")})`;
+  if (hint.throws) return `  assert.throws(() => ${call}, ${jsErrorConstructor(hint.throws)});`;
+  return `  assert.equal(${call}, ${jsLiteral(hint.expected)});`;
+}
+
 export function generateTestContent(candidate) {
   const sourceFile = candidate.sourceFile.replace(/\\/g, "/");
   const testFile = candidate.suggestedTestFile.replace(/\\/g, "/");
@@ -433,9 +485,7 @@ export function generateTestContent(candidate) {
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
     const assertions = functions.map((name) => `    assert hasattr(module, "${name}")`).join("\n");
-    const behaviorAssertions = assertionHints.map((hint) =>
-      `    assert module.${hint.name}(${hint.args.map(pythonLiteral).join(", ")}) == ${pythonLiteral(hint.expected)}`
-    ).join("\n");
+    const behaviorAssertions = assertionHints.map(pythonBehaviorAssertion).join("\n");
     return `import importlib.util
 import pathlib
 
@@ -475,9 +525,7 @@ class ${className}Test {
 
   const importPath = relativeImport(testFile, sourceFile);
   const assertions = functions.map((name) => `  assert.equal(typeof mod.${name}, "function");`).join("\n");
-  const behaviorAssertions = assertionHints.map((hint) =>
-    `  assert.equal(mod.${hint.name}(${hint.args.map(jsLiteral).join(", ")}), ${jsLiteral(hint.expected)});`
-  ).join("\n");
+  const behaviorAssertions = assertionHints.map(jsBehaviorAssertion).join("\n");
   if (candidate.metadata?.moduleSystem === "commonjs") {
     return `const test = require("node:test");
 const assert = require("node:assert/strict");

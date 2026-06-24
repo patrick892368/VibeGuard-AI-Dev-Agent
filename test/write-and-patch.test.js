@@ -160,6 +160,43 @@ test("writeSuggestedTests writes simple Python branch assertions", () => {
   assert.match(generated, /assert module\.display_name\(" Ada "\) == "Ada"/);
 });
 
+test("writeSuggestedTests writes simple JavaScript exception assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "number.js"), `export function requirePositive(value) {
+  if (value < 0) {
+    throw new RangeError("negative");
+  }
+  return value;
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "number.test.js"), "utf8");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /assert\.throws\(\(\) => mod\.requirePositive\(-2\), RangeError\)/);
+});
+
+test("writeSuggestedTests writes simple Python exception assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "number.py"), `def require_positive(value):
+    if value < 0:
+        raise ValueError("negative")
+    return value
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_number.py"), "utf8");
+  assert.equal(result.written.length, 1);
+  assert.match(generated, /module\.require_positive\(-2\)/);
+  assert.match(generated, /except ValueError/);
+  assert.match(generated, /raise AssertionError\("expected ValueError"\)/);
+});
+
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
