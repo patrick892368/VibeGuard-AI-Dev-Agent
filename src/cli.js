@@ -99,6 +99,15 @@ function resolveInputPath(root, filePath) {
   return path.isAbsolute(filePath) ? filePath : path.join(root, filePath);
 }
 
+function readInputFileWithPolicy(root, filePath, parsed) {
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  return readFileWithPolicy(root, filePath, engine, {
+    confirmed: Boolean(parsed.confirm),
+    auditLog: parsed["audit-log"]
+  }).content;
+}
+
 function withAudit(root, engine, auditLog, result, event, confirmed = false) {
   if (!auditLog) return result;
   return {
@@ -202,7 +211,7 @@ async function fixCommand(parsed, root) {
 function reviewCommand(parsed, root) {
   let diffText = "";
   if (parsed.diff) {
-    diffText = fs.readFileSync(resolveInputPath(root, parsed.diff), "utf8");
+    diffText = readInputFileWithPolicy(root, parsed.diff, parsed);
   } else {
     try {
       diffText = execFileSync("git", ["diff", "--cached"], { cwd: root, encoding: "utf8" });
@@ -224,7 +233,7 @@ function reviewCommand(parsed, root) {
 }
 
 function diffInput(parsed, root) {
-  if (parsed.diff) return fs.readFileSync(resolveInputPath(root, parsed.diff), "utf8");
+  if (parsed.diff) return readInputFileWithPolicy(root, parsed.diff, parsed);
   const stdin = readStdinIfAvailable();
   if (stdin.trim()) return stdin;
   return execFileSync("git", ["diff"], { cwd: root, encoding: "utf8" });

@@ -81,14 +81,14 @@ vibeguard test --write --run --test-command "node --test {testFile}"
 vibeguard test --write --create-branch --commit --pr-dry-run --json
 vibeguard test --write --run --create-branch --commit --execute-git-plan --confirm --json
 vibeguard review
-vibeguard review --diff change.diff --write-comment reports/review.md
+vibeguard review --diff reports/change.diff --write-comment reports/review.md
 vibeguard onboard
 vibeguard onboard --write
 vibeguard patch check --file fix.diff
 vibeguard patch apply --file fix.diff --check-only
 vibeguard hooks list
 vibeguard hooks print pre-commit
-vibeguard pr summary --diff change.diff
+vibeguard pr summary --diff reports/change.diff
 vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 vibeguard github comment --pr 12 --body-file review.md

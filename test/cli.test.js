@@ -211,6 +211,7 @@ test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
 
 test("CLI review can write a policy-gated comment body", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-comment-"));
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
   const diff = `diff --git a/src/db.js b/src/db.js
 --- a/src/db.js
 +++ b/src/db.js
@@ -218,7 +219,7 @@ test("CLI review can write a policy-gated comment body", () => {
  export function run() {}
 +db.query("SELECT * FROM users WHERE id = " + id)
 `;
-  fs.writeFileSync(path.join(root, "change.diff"), diff, "utf8");
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), diff, "utf8");
 
   const output = execFileSync(process.execPath, [
     bin,
@@ -226,7 +227,7 @@ test("CLI review can write a policy-gated comment body", () => {
     root,
     "review",
     "--diff",
-    "change.diff",
+    "reports/change.diff",
     "--write-comment",
     "reports/review.md",
     "--json"
@@ -239,4 +240,22 @@ test("CLI review can write a policy-gated comment body", () => {
   assert.equal(parsed.writtenComment.path, "reports/review.md");
   assert.equal(parsed.writtenComment.policy.status, "allow");
   assert.match(fs.readFileSync(path.join(root, "reports", "review.md"), "utf8"), /VibeGuard Review/);
+});
+
+test("CLI review blocks denied diff input paths", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-denied-"));
+  fs.writeFileSync(path.join(root, ".env"), "diff --git a/src/app.js b/src/app.js\n", "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "review",
+    "--diff",
+    ".env",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
 });
