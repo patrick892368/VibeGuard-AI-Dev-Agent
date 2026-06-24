@@ -261,6 +261,40 @@ test("writeSuggestedTests can run a generated Python unittest through policy", (
   assert.equal(result.testRuns[0].command, "python -m unittest tests/test_math.py");
 });
 
+test("writeSuggestedTests can prepare a Git and PR dry-run plan", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["src/**"], deny: [], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["git switch -c", "git commit", "gh pr create"]
+    }
+  }, { root });
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    createBranch: true,
+    commit: true,
+    prDryRun: true
+  });
+
+  assert.equal(result.written.length, 1);
+  assert.equal(result.gitPlan.status, "dry_run");
+  assert.equal(result.gitPlan.branch, "codex/add-generated-tests");
+  assert.deepEqual(result.gitPlan.changedFiles, ["src/math.test.js"]);
+  assert.deepEqual(result.gitPlan.commands.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.equal(result.gitPolicy.status, "require_confirmation");
+  assert.ok(result.gitPlan.commands.at(-1).argv.includes("--body"));
+});
+
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");

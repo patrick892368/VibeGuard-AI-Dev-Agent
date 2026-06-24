@@ -31,7 +31,7 @@ Usage:
   vibeguard debug --log <file>
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run]
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
@@ -409,6 +409,15 @@ async function dispatch(parsed) {
         coverageAfterFile: parsed["coverage-after"],
         runTests: Boolean(parsed.run),
         testCommand: parsed["test-command"],
+        createBranch: Boolean(parsed["create-branch"]),
+        commit: Boolean(parsed.commit),
+        push: Boolean(parsed.push),
+        prDryRun: Boolean(parsed["pr-dry-run"]),
+        createPr: Boolean(parsed["create-pr"]),
+        branch: parsed.branch,
+        commitMessage: parsed["commit-message"],
+        prTitle: parsed["pr-title"],
+        prBodyFile: parsed["pr-body-file"],
         dryRun: Boolean(parsed["dry-run"]),
         confirmed: Boolean(parsed.confirm),
         auditLog: parsed["audit-log"]

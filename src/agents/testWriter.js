@@ -4,6 +4,7 @@ import { listRepoFiles, readTextIfExists } from "../repo/files.js";
 import { scanRepository } from "../repo/scan.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../runner/safeCommand.js";
+import { buildFixGitPlan, checkGitPlanPolicy } from "../integrations/gitPlan.js";
 
 function extractPythonFunctions(text) {
   return [...text.matchAll(/^\s*def\s+([a-zA-Z_]\w*)\s*\(/gm)].map((match) => match[1]);
@@ -757,6 +758,50 @@ function coverageTargets(candidates) {
     }));
 }
 
+function buildTestWriterPrBody(written, testRuns) {
+  const files = written.map((item) => `- ${item.path}`).join("\n") || "- No generated tests";
+  const validation = testRuns.length === 0
+    ? "- [ ] Generated tests were not run"
+    : testRuns.map((run) => `- [${run.status === "passed" ? "x" : " "}] ${run.command || run.testFile}: ${run.status}`).join("\n");
+
+  return `## Summary
+
+VibeGuard generated focused tests for uncovered or untested code.
+
+## Generated Tests
+
+${files}
+
+## Validation
+
+${validation}
+
+## Policy
+
+- [ ] Generated files passed Policy-as-Code checks
+- [ ] Git/PR plan reviewed before execution
+`;
+}
+
+function buildTestWriterGitPlan(written, testRuns, options = {}) {
+  const changedFiles = written.map((item) => item.path);
+  if (changedFiles.length === 0) return null;
+  if (!options.createBranch && !options.commit && !options.push && !options.prDryRun && !options.createPr) return null;
+
+  return buildFixGitPlan({
+    changedFiles,
+    branch: options.branch || "codex/add-generated-tests",
+    commitMessage: options.commitMessage || "test: add generated coverage tests",
+    title: options.prTitle || "Add generated tests",
+    body: options.prBody || buildTestWriterPrBody(written, testRuns),
+    bodyFile: options.prBodyFile,
+    createBranch: Boolean(options.createBranch),
+    commit: Boolean(options.commit),
+    push: Boolean(options.push),
+    prDryRun: Boolean(options.prDryRun || options.createPr)
+  });
+}
+
 export function analyzeTestTargets(options = {}) {
   const root = options.root || process.cwd();
   const files = listRepoFiles(root);
@@ -832,9 +877,15 @@ export function writeSuggestedTests(root, engine, options = {}) {
   const testRuns = options.runTests
     ? writable.map((candidate) => runGeneratedTest(root, candidate, engine, { suggestedCommands: analysis.frameworkHints }, options))
     : [];
+  const gitPlan = buildTestWriterGitPlan(written, testRuns, options);
+  const gitPolicy = gitPlan
+    ? checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) })
+    : null;
   return {
     ...analysis,
     written,
-    testRuns
+    testRuns,
+    gitPlan,
+    gitPolicy
   };
 }

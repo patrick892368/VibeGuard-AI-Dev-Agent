@@ -206,11 +206,12 @@ node ./bin/vibeguard.js test --coverage coverage.json --json
 node ./bin/vibeguard.js test --coverage coverage/lcov.info --json
 node ./bin/vibeguard.js test --coverage coverage-before.json --coverage-after coverage-after.json --json
 node ./bin/vibeguard.js test --write --coverage coverage.json --run --limit 1 --json
+node ./bin/vibeguard.js test --write --create-branch --commit --pr-dry-run --json
 ```
 
-Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `uncoveredFunctions`, and JavaScript `metadata.moduleSystem` before asking VibeGuard to write new tests. If before/after reports are available, inspect `coverageDelta.summary.averagePercentDelta`, `coverageDelta.summary.missingLinesReduced`, and file-level `status`. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, `stderr`, `failureAnalysis`, and `failureAnalysis.repairPlan` before proposing a commit.
+Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `uncoveredFunctions`, and JavaScript `metadata.moduleSystem` before asking VibeGuard to write new tests. If before/after reports are available, inspect `coverageDelta.summary.averagePercentDelta`, `coverageDelta.summary.missingLinesReduced`, and file-level `status`. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, `stderr`, `failureAnalysis`, and `failureAnalysis.repairPlan` before proposing a commit. When asking for a test PR, inspect `gitPlan` and `gitPolicy`; Git state changes and PR creation still require policy confirmation.
 
-Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr`、`failureAnalysis` 和 `failureAnalysis.repairPlan`。
+Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr`、`failureAnalysis` 和 `failureAnalysis.repairPlan`。生成测试 PR 时，还要检查 `gitPlan` 和 `gitPolicy`；Git 状态变更和 PR 创建仍然需要 policy 确认。
 
 When generated tests fail, `failureAnalysis.repairPlan` tells Codex whether a test-only retry is safe, which actions to take next, and which guardrails must not be violated.
 
