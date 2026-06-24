@@ -42,6 +42,10 @@ Analyze an error log:
 node ./bin/vibeguard.js debug --log error.log --json
 ```
 
+For Django tracebacks, Codex should inspect `frameworkContext`, `likelyFiles`, `hints`, and `suggestedTestCommands`. Django projects can include `python manage.py check` and `python manage.py test` when policy allows those commands.
+
+Django traceback 场景下，Codex 应检查 `frameworkContext`、`likelyFiles`、`hints` 和 `suggestedTestCommands`。Django 项目会在 policy 允许时给出 `python manage.py check` 和 `python manage.py test`。
+
 Run the safe fix workflow:
 
 运行安全修复工作流：

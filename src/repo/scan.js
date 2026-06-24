@@ -34,12 +34,13 @@ export function scanRepository(root = process.cwd()) {
   const packageJson = readTextIfExists(root, "package.json") || "";
   const pyproject = readTextIfExists(root, "pyproject.toml") || "";
   const requirements = readTextIfExists(root, "requirements.txt") || "";
+  const isDjango = /django/i.test(pyproject + requirements) || files.includes("manage.py");
 
   if (/express/i.test(packageJson)) frameworks.push("Express");
   if (/react/i.test(packageJson)) frameworks.push("React");
   if (/vite/i.test(packageJson)) frameworks.push("Vite");
   if (/next/i.test(packageJson)) frameworks.push("Next.js");
-  if (/django/i.test(pyproject + requirements) || files.includes("manage.py")) frameworks.push("Django");
+  if (isDjango) frameworks.push("Django");
   if (/fastapi/i.test(pyproject + requirements)) frameworks.push("FastAPI");
   if (files.some((file) => file.endsWith("pom.xml"))) frameworks.push("Maven");
   if (files.some((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"))) frameworks.push("Gradle");
@@ -69,6 +70,7 @@ export function scanRepository(root = process.cwd()) {
   const suggestedCommands = [];
   if (scripts.test) suggestedCommands.push("npm test");
   if (scripts.lint) suggestedCommands.push("npm run lint");
+  if (isDjango) suggestedCommands.push("python manage.py check", "python manage.py test");
   if (files.includes("pytest.ini") || files.includes("pyproject.toml") || testFiles.some((file) => file.endsWith(".py"))) suggestedCommands.push("python -m pytest");
   if (files.some((file) => file.endsWith("pom.xml"))) suggestedCommands.push("mvn test");
   if (files.some((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"))) suggestedCommands.push("./gradlew test");

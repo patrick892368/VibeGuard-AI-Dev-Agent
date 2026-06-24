@@ -6,6 +6,7 @@ import { listRepoFiles } from "../repo/files.js";
 const PYTHON_FRAME = /^\s*File "([^"]+)", line (\d+), in (.+)$/;
 const NODE_FRAME = /^\s*at (?:(.*?) \()?(.+?):(\d+):(\d+)\)?$/;
 const JAVA_FRAME = /^\s*at\s+([\w.$]+)\(([^:()]+\.java):(\d+)\)$/;
+const DJANGO_ERROR_WORDS = /DoesNotExist|DisallowedHost|NoReverseMatch|ImproperlyConfigured|PermissionDenied|SuspiciousOperation|TemplateDoesNotExist/;
 
 function normalizeFramePath(framePath, root) {
   if (!framePath) return null;
@@ -78,7 +79,7 @@ export function parseJavaStack(logText, root = process.cwd(), repoFiles = listRe
 
 export function detectErrorSummary(logText) {
   const lines = logText.trim().split(/\r?\n/).filter(Boolean);
-  const last = [...lines].reverse().find((line) => /Error|Exception|Traceback|TypeError|ReferenceError|SyntaxError|ModuleNotFoundError|Caused by:/.test(line));
+  const last = [...lines].reverse().find((line) => /Error|Exception|Traceback|TypeError|ReferenceError|SyntaxError|ModuleNotFoundError|Caused by:/.test(line) || DJANGO_ERROR_WORDS.test(line));
   if (!last) return { type: "UnknownError", message: lines.at(-1) || "No error text provided" };
 
   const causedBy = last.match(/^Caused by:\s+([\w.$]+(?:Error|Exception))(?::\s*(.*))?$/);
@@ -87,13 +88,69 @@ export function detectErrorSummary(logText) {
   const javaStyle = last.match(/^(?:Exception in thread "[^"]+"\s+)?([\w.$]+(?:Error|Exception))(?::\s*(.*))?$/);
   if (javaStyle) return { type: javaStyle[1], message: javaStyle[2] || "" };
 
-  const pythonStyle = last.match(/^([\w.]+(?:Error|Exception)):\s*(.*)$/);
+  const pythonStyle = last.match(/^([\w.]+(?:Error|Exception|DoesNotExist|DisallowedHost|NoReverseMatch|ImproperlyConfigured|PermissionDenied|SuspiciousOperation)):\s*(.*)$/);
   if (pythonStyle) return { type: pythonStyle[1], message: pythonStyle[2] };
 
   const nodeStyle = last.match(/^(\w*Error):\s*(.*)$/);
   if (nodeStyle) return { type: nodeStyle[1], message: nodeStyle[2] };
 
   return { type: "Error", message: last.trim() };
+}
+
+function djangoProjectFiles(repoFiles) {
+  return {
+    settings: repoFiles.filter((file) => file.endsWith("settings.py")),
+    urls: repoFiles.filter((file) => file.endsWith("urls.py")),
+    views: repoFiles.filter((file) => file.endsWith("views.py")),
+    models: repoFiles.filter((file) => file.endsWith("models.py")),
+    templates: repoFiles.filter((file) => /(^|\/)templates\//.test(file))
+  };
+}
+
+function firstFew(values, limit = 5) {
+  return values.slice(0, limit);
+}
+
+function djangoDebugContext(summary, logText, repo) {
+  const isDjango = repo.frameworks.includes("Django") || /django\./i.test(logText) || DJANGO_ERROR_WORDS.test(summary.type);
+  if (!isDjango) return null;
+
+  const projectFiles = djangoProjectFiles(repo.files);
+  const likelyFiles = [];
+  const hints = [];
+
+  if (/TemplateDoesNotExist/.test(summary.type)) {
+    const templateName = summary.message.trim().split(/\s+/)[0];
+    const matchingTemplates = projectFiles.templates.filter((file) => file.endsWith(`/${templateName}`) || file.endsWith(templateName));
+    likelyFiles.push(...matchingTemplates, ...firstFew(projectFiles.views), ...firstFew(projectFiles.settings, 2));
+    hints.push("For Django TemplateDoesNotExist, verify the template path, app template directory, and TEMPLATES DIRS/APP_DIRS settings.");
+  }
+  if (/NoReverseMatch/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.urls), ...firstFew(projectFiles.views));
+    hints.push("For Django NoReverseMatch, verify url names, app_name namespaces, and arguments passed to reverse or the url template tag.");
+  }
+  if (/DisallowedHost|ImproperlyConfigured/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.settings));
+    hints.push("Check Django settings for ALLOWED_HOSTS, INSTALLED_APPS, middleware, database, template, or environment configuration.");
+  }
+  if (!/TemplateDoesNotExist/.test(summary.type) && /DoesNotExist|OperationalError|IntegrityError/.test(summary.type)) {
+    likelyFiles.push(...firstFew(projectFiles.models), ...firstFew(projectFiles.views));
+    hints.push("Check the Django model/query assumptions, fixture data, and whether the test database schema matches the code.");
+  }
+
+  if (likelyFiles.length === 0) {
+    likelyFiles.push(...firstFew(projectFiles.views), ...firstFew(projectFiles.urls), ...firstFew(projectFiles.settings, 2));
+  }
+  if (hints.length === 0) {
+    hints.push("Start with the first in-repository Django frame, then inspect the related view, URL route, settings, model, or template.");
+  }
+
+  return {
+    framework: "Django",
+    likelyFiles: [...new Set(likelyFiles)],
+    hints,
+    suggestedCommands: ["python manage.py check", "python manage.py test"]
+  };
 }
 
 function likelyFixHints(summary) {
@@ -145,7 +202,8 @@ export function analyzeDebugLog(logText, options = {}) {
   const javaFrames = parseJavaStack(logText, root, repo.files);
   const frames = [...pythonFrames, ...nodeFrames, ...javaFrames];
   const summary = detectErrorSummary(logText);
-  const uniqueFiles = [...new Set(frames.map((frame) => frame.file))];
+  const djangoContext = djangoDebugContext(summary, logText, repo);
+  const uniqueFiles = [...new Set([...frames.map((frame) => frame.file), ...(djangoContext?.likelyFiles || [])])];
   const snippets = frames.slice(0, 5).map((frame) => sourceSnippet(root, frame.file, frame.line)).filter(Boolean);
 
   return {
@@ -153,7 +211,8 @@ export function analyzeDebugLog(logText, options = {}) {
     frames,
     likelyFiles: uniqueFiles,
     snippets,
-    hints: likelyFixHints(summary),
-    suggestedTestCommands: repo.suggestedCommands
+    hints: [...likelyFixHints(summary), ...(djangoContext?.hints || [])],
+    suggestedTestCommands: [...new Set([...repo.suggestedCommands, ...(djangoContext?.suggestedCommands || [])])],
+    frameworkContext: djangoContext
   };
 }

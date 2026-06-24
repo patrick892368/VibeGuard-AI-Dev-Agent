@@ -8,6 +8,7 @@ VibeGuard 采用 CLI-first 内核，因此所有集成都复用同一套 policy 
 
 ```bash
 vibeguard debug --log error.log
+vibeguard debug --log django-error.log
 vibeguard test --write
 vibeguard test --write --run --limit 1
 vibeguard test --coverage coverage.json
@@ -93,6 +94,10 @@ Codex 专用流程见 `docs/CODEX.md`。
 Grok is the current priority model provider. Other agent/provider integrations are deferred until Codex + Grok is stable.
 
 Grok 是当前优先模型 provider。其他 agent/provider 集成等 Codex + Grok 稳定后再做。
+
+Django support is exposed through the same CLI and MCP-style paths; integrations should inspect `frameworkContext` and must still honor `.vibeguard.yaml`.
+
+Django 支持通过同一套 CLI 和 MCP-style 路径暴露；集成侧应检查 `frameworkContext`，并且仍必须遵守 `.vibeguard.yaml`。
 
 The current Codex flow supports patch artifact output, Git/PR dry-run planning, confirmed branch/commit/push/PR execution, fixture evaluation history, and environment diagnosis.
 

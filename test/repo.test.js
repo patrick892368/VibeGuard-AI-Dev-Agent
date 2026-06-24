@@ -26,6 +26,18 @@ test("scanRepository detects JavaScript project metadata", () => {
   assert.ok(scan.entrypoints.includes("src/index.js"));
 });
 
+test("scanRepository detects Django project commands", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "manage.py"), "from django.core.management import execute_from_command_line\n", "utf8");
+  fs.writeFileSync(path.join(root, "requirements.txt"), "Django==5.0\n", "utf8");
+
+  const scan = scanRepository(root);
+  assert.ok(scan.frameworks.includes("Django"));
+  assert.ok(scan.entrypoints.includes("manage.py"));
+  assert.ok(scan.suggestedCommands.includes("python manage.py check"));
+  assert.ok(scan.suggestedCommands.includes("python manage.py test"));
+});
+
 test("analyzeTestTargets finds source functions without likely tests", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
