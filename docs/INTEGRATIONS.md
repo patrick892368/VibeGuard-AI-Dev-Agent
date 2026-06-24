@@ -86,9 +86,9 @@ Available tools:
 - `doctor`
 - `audit_summary`
 
-`eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking.
+`eval_fixtures` supports policy-checked `output` reports, compact JSONL `history` appends, and `repeat` runs for Codex/Grok quality tracking.
 
-`eval_fixtures` 支持经过 policy 检查的 `output` 报告，也支持 JSONL `history` 追加，用于 Codex/Grok 质量跟踪。
+`eval_fixtures` 支持经过 policy 检查的 `output` 报告、JSONL `history` 追加和 `repeat` 多轮运行，用于 Codex/Grok 质量跟踪。
 
 `eval_history` summarizes those JSONL records for trend review.
 

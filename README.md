@@ -94,6 +94,7 @@ vibeguard run --command "npm test" --dry-run
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard audit summary --file reports/audit.jsonl
 vibeguard eval fixtures --json
+vibeguard eval fixtures --repeat 3 --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json
 vibeguard eval fixtures --history reports/eval-history.jsonl --json
 vibeguard eval history --file reports/eval-history.jsonl --json
@@ -180,14 +181,15 @@ export VIBEGUARD_LLM_PROVIDER=grok
 export XAI_API_KEY=...
 export VIBEGUARD_MODEL=...
 node ./bin/vibeguard.js eval fixtures --json
+node ./bin/vibeguard.js eval fixtures --repeat 3 --json
 node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
 node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --json
 node ./bin/vibeguard.js eval history --file reports/eval-history.jsonl --json
 ```
 
-评测会报告成功率、patch validation 失败、policy deny、patch check 失败、provider blocked，以及 `patchRecoveryStatus` / `patchRecoveryStrategy` 等恢复诊断。
+评测会报告成功率、patch validation 失败、policy deny、patch check 失败、provider blocked，以及 `patchRecoveryStatus` / `patchRecoveryStrategy` 等恢复诊断；`--repeat <n>` 可做多轮稳定性评测。
 
-Evaluation reports success rate, patch validation failures, policy denials, patch check failures, blocked provider calls, and recovery diagnostics such as `patchRecoveryStatus` / `patchRecoveryStrategy`.
+Evaluation reports success rate, patch validation failures, policy denials, patch check failures, blocked provider calls, and recovery diagnostics such as `patchRecoveryStatus` / `patchRecoveryStrategy`; use `--repeat <n>` for multi-run stability checks.
 
 `--output` 和 `--history` 都经过 Policy-as-Code；`.env` 等 denied 路径会被阻止。`reports/*.json` 和 `reports/*.jsonl` 是本地输出，默认不提交。
 

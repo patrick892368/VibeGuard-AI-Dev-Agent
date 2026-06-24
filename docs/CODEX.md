@@ -130,6 +130,7 @@ Evaluate the configured LLM provider:
 
 ```bash
 node ./bin/vibeguard.js eval fixtures --json
+node ./bin/vibeguard.js eval fixtures --repeat 3 --json
 node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
 node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --json
 node ./bin/vibeguard.js eval history --file reports/eval-history.jsonl --json
@@ -138,6 +139,10 @@ node ./bin/vibeguard.js eval history --file reports/eval-history.jsonl --json
 The baseline fixture set covers Python, Node, Django-style, and Spring Boot-style repair flows.
 
 baseline fixture 集合覆盖 Python、Node、Django-style 和 Spring Boot-style 修复流程。
+
+Use `--repeat <n>` to measure provider stability across repeated fixture runs; each result includes `run`.
+
+使用 `--repeat <n>` 可以跨多轮 fixture run 衡量 provider 稳定性；每条结果都会包含 `run`。
 
 Use a real Grok provider:
 

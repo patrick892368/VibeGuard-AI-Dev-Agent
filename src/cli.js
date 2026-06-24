@@ -45,7 +45,7 @@ Usage:
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm]
   vibeguard github checks [--branch <branch>] [--limit <n>] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
-  vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
+  vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
   vibeguard audit summary [--file <audit.jsonl>]
   vibeguard doctor
@@ -347,6 +347,7 @@ async function evalCommand(parsed, root, subcommand) {
     return evaluateFixFixtures({
       root,
       fixture: parsed.fixture,
+      repeat: parsed.repeat,
       apply: Boolean(parsed.apply),
       output: parsed.output,
       history: parsed.history,

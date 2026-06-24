@@ -145,9 +145,10 @@ const tools = [
   },
   {
     name: "eval_fixtures",
-    description: "Evaluate the configured LLM provider against Python and Node fix fixtures.",
+    description: "Evaluate the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fix fixtures.",
     inputSchema: objectSchema({
       fixture: stringSchema,
+      repeat: numberSchema,
       apply: booleanSchema,
       output: stringSchema,
       history: stringSchema,
@@ -368,6 +369,7 @@ async function callTool(name, args, root) {
     return evaluateFixFixtures({
       root,
       fixture: args.fixture,
+      repeat: args.repeat,
       apply: Boolean(args.apply),
       output: args.output,
       history: args.history,

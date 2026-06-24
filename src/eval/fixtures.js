@@ -74,11 +74,12 @@ function classifyResult(result, apply) {
   return "unknown";
 }
 
-function summarizeFixture(fixture, tempRoot, result, apply) {
+function summarizeFixture(fixture, tempRoot, result, apply, run = 1) {
   const outcome = classifyResult(result, apply);
   return {
     id: fixture.id,
     language: fixture.language,
+    run,
     outcome,
     status: result.status,
     stage: result.stage || null,
@@ -158,10 +159,12 @@ function buildHistoryEntry(report) {
     mode: report.mode,
     provider: report.provider,
     model: report.model,
+    repeat: report.repeat || 1,
     summary: report.summary,
     results: report.results.map((result) => ({
       id: result.id,
       language: result.language,
+      run: result.run,
       outcome: result.outcome,
       status: result.status,
       stage: result.stage,
@@ -345,21 +348,24 @@ export async function evaluateFixFixtures(options = {}) {
   }
 
   const results = [];
-  for (const fixture of selected) {
-    const tempRoot = copyFixtureToTemp(repoRoot, fixture);
-    const { config } = loadConfig(tempRoot);
-    const engine = new PolicyEngine(config, { root: tempRoot });
-    const result = await runFixWorkflow({
-      root: tempRoot,
-      engine,
-      logFile: fixture.log,
-      testCommand: fixture.testCommand,
-      dryRun: !options.apply,
-      apply: Boolean(options.apply),
-      env: runtimeEnv
-    });
+  const repeat = Math.max(1, Number(options.repeat || 1));
+  for (let run = 1; run <= repeat; run += 1) {
+    for (const fixture of selected) {
+      const tempRoot = copyFixtureToTemp(repoRoot, fixture);
+      const { config } = loadConfig(tempRoot);
+      const engine = new PolicyEngine(config, { root: tempRoot });
+      const result = await runFixWorkflow({
+        root: tempRoot,
+        engine,
+        logFile: fixture.log,
+        testCommand: fixture.testCommand,
+        dryRun: !options.apply,
+        apply: Boolean(options.apply),
+        env: runtimeEnv
+      });
 
-    results.push(summarizeFixture(fixture, tempRoot, result, Boolean(options.apply)));
+      results.push(summarizeFixture(fixture, tempRoot, result, Boolean(options.apply), run));
+    }
   }
 
   const provider = resolveProviderName(runtimeEnv);
@@ -368,6 +374,7 @@ export async function evaluateFixFixtures(options = {}) {
     mode: options.apply ? "apply" : "dry_run",
     provider,
     model: resolveProviderModel(runtimeEnv, provider),
+    repeat,
     summary: aggregateResults(results),
     results
   };
