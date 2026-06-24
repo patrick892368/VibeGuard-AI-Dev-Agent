@@ -4,7 +4,7 @@ import { analyzeDebugLog } from "./debug.js";
 import { buildPrSummary } from "./pr.js";
 import { generateDebugPatch } from "../llm/provider.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
-import { validateUnifiedDiff } from "../patch/validatePatch.js";
+import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
 import { buildFixGitPlan } from "../integrations/gitPlan.js";
@@ -26,6 +26,40 @@ function buildBranchName(debug) {
     .toLowerCase()
     .slice(0, 40) || "bug";
   return `codex/fix-${type}`;
+}
+
+function buildDecisionSummary({ status, stage = null, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan }) {
+  const nextActions = [];
+  if (status === "dry_run" || status === "ready") {
+    nextActions.push("review_patch");
+    if (applyCheck?.status === "checked") nextActions.push("apply_with_confirm");
+    if (gitPlan) nextActions.push("review_git_plan");
+  }
+  if (status === "passed") {
+    nextActions.push("review_pr_summary");
+  }
+  if (status === "deny" || status === "require_confirmation") {
+    nextActions.push("stop_for_policy");
+  }
+  if (status === "blocked") {
+    nextActions.push("configure_provider_or_supply_patch");
+  }
+  if (status === "failed") {
+    nextActions.push("inspect_stage_error");
+  }
+
+  return {
+    status,
+    stage,
+    patchValid: Boolean(validation?.valid),
+    policyStatus: policy?.status || null,
+    applyCheckStatus: applyCheck?.status || null,
+    testStatus: tests?.status || null,
+    outputPatchPath: outputPatch?.path || null,
+    prBodyPath: prBody?.path || null,
+    hasGitPlan: Boolean(gitPlan),
+    nextActions
+  };
 }
 
 function resolveRootPath(root, filePath) {
@@ -67,33 +101,40 @@ export async function runFixWorkflow(options = {}) {
   const patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
 
   if (!patchSource.patch) {
+    const status = "blocked";
     return {
-      status: "blocked",
+      status,
       stage: "patch_generation",
       debug,
-      patchSource
+      patchSource,
+      decision: buildDecisionSummary({ status, stage: "patch_generation" })
     };
   }
 
+  patchSource.patch = normalizeUnifiedDiff(patchSource.patch);
   const validation = validateUnifiedDiff(patchSource.patch);
   if (!validation.valid) {
+    const status = "deny";
     return {
-      status: "deny",
+      status,
       stage: "patch_validation",
       debug,
       patchSource: { ...patchSource, patch: undefined },
-      validation
+      validation,
+      decision: buildDecisionSummary({ status, stage: "patch_validation", validation })
     };
   }
 
   const policy = engine.checkPatch(patchSource.patch);
   if (policy.status !== "allow" && !(policy.status === "require_confirmation" && options.confirmed)) {
+    const status = policy.status;
     return {
-      status: policy.status,
+      status,
       stage: "policy",
       debug,
       validation,
-      policy
+      policy,
+      decision: buildDecisionSummary({ status, stage: "policy", validation, policy })
     };
   }
 
@@ -104,13 +145,15 @@ export async function runFixWorkflow(options = {}) {
       checkOnly: true
     });
   } catch (error) {
+    const status = "failed";
     return {
-      status: "failed",
+      status,
       stage: "patch_check",
       debug,
       validation,
       policy,
-      error: error.message
+      error: error.message,
+      decision: buildDecisionSummary({ status, stage: "patch_check", validation, policy })
     };
   }
 
@@ -138,10 +181,33 @@ export async function runFixWorkflow(options = {}) {
         outputPatch: {
           path: options.outputPatch,
           policy: outputPatchPolicy
-        }
+        },
+        decision: buildDecisionSummary({ status: outputPatchPolicy.status, stage: "output_patch", validation, policy, applyCheck })
       };
     }
     outputPatch = writeFileWithPolicy(root, options.outputPatch, patchSource.patch, engine, {
+      confirmed: Boolean(options.confirmed)
+    });
+  }
+
+  let prBody = null;
+  if (options.writePrBody) {
+    const prBodyPolicy = engine.checkPath(options.writePrBody, "write_pr_body");
+    if (prBodyPolicy.status !== "allow" && !(prBodyPolicy.status === "require_confirmation" && options.confirmed)) {
+      const status = prBodyPolicy.status;
+      return {
+        status,
+        stage: "pr_body",
+        ...base,
+        outputPatch,
+        prBody: {
+          path: options.writePrBody,
+          policy: prBodyPolicy
+        },
+        decision: buildDecisionSummary({ status, stage: "pr_body", validation, policy, applyCheck, outputPatch })
+      };
+    }
+    prBody = writeFileWithPolicy(root, options.writePrBody, pr.body, engine, {
       confirmed: Boolean(options.confirmed)
     });
   }
@@ -163,13 +229,16 @@ export async function runFixWorkflow(options = {}) {
   const plannedBase = {
     ...base,
     outputPatch,
+    prBody,
     gitPlan
   };
 
   if (options.dryRun || !options.apply) {
+    const status = options.dryRun ? "dry_run" : "ready";
     return {
-      status: options.dryRun ? "dry_run" : "ready",
-      ...plannedBase
+      status,
+      ...plannedBase,
+      decision: buildDecisionSummary({ status, validation, policy, applyCheck, outputPatch, prBody, gitPlan })
     };
   }
 
@@ -184,7 +253,8 @@ export async function runFixWorkflow(options = {}) {
       status: "failed",
       stage: "patch_apply",
       ...plannedBase,
-      error: error.message
+      error: error.message,
+      decision: buildDecisionSummary({ status: "failed", stage: "patch_apply", validation, policy, applyCheck, outputPatch, prBody, gitPlan })
     };
   }
 
@@ -203,16 +273,19 @@ export async function runFixWorkflow(options = {}) {
     }
   }
 
+  const status = tests && tests.status !== "passed" ? "failed" : "passed";
   return {
-    status: tests && tests.status !== "passed" ? "failed" : "passed",
+    status,
     ...plannedBase,
     applyResult,
-    tests
+    tests,
+    decision: buildDecisionSummary({ status, validation, policy, applyCheck, tests, outputPatch, prBody, gitPlan })
   };
 }
 
 export const fixInternals = {
   buildBranchName,
   buildCommitMessage,
-  buildFixTitle
+  buildFixTitle,
+  buildDecisionSummary
 };

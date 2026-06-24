@@ -1,26 +1,27 @@
 import { execFileSync } from "node:child_process";
 import { assertPolicyAllowed } from "../policy/safeWrite.js";
-import { validateUnifiedDiff } from "./validatePatch.js";
+import { normalizeUnifiedDiff, validateUnifiedDiff } from "./validatePatch.js";
 
 export function applyPatchWithPolicy(root, patchText, engine, options = {}) {
-  const validation = validateUnifiedDiff(patchText);
+  const normalizedPatch = normalizeUnifiedDiff(patchText);
+  const validation = validateUnifiedDiff(normalizedPatch);
   if (!validation.valid) {
     throw new Error(validation.reason);
   }
 
-  const policy = engine.checkPatch(patchText);
+  const policy = engine.checkPatch(normalizedPatch);
   assertPolicyAllowed(policy, { confirmed: options.confirmed });
 
   execFileSync("git", ["apply", "--check"], {
     cwd: root,
-    input: patchText,
+    input: normalizedPatch,
     encoding: "utf8"
   });
 
   if (!options.checkOnly) {
     execFileSync("git", ["apply"], {
       cwd: root,
-      input: patchText,
+      input: normalizedPatch,
       encoding: "utf8"
     });
   }

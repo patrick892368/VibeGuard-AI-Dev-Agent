@@ -38,6 +38,39 @@ test("generateDebugPatch fixture provider returns local patch text", async () =>
   assert.equal(result.patch, "not a diff");
 });
 
+test("generateDebugPatch uses Grok-compatible Responses API", async () => {
+  const originalFetch = globalThis.fetch;
+  let request;
+  globalThis.fetch = async (endpoint, options) => {
+    request = {
+      endpoint,
+      headers: options.headers,
+      body: JSON.parse(options.body)
+    };
+    return {
+      ok: true,
+      async json() {
+        return { output_text: "diff --git a/src/app.js b/src/app.js\n@@ -1 +1 @@\n-old\n+new\n" };
+      }
+    };
+  };
+
+  try {
+    const result = await generateDebugPatch({ summary: { type: "ReferenceError" } }, {
+      XAI_API_KEY: "xai-secret",
+      VIBEGUARD_MODEL: "grok-test"
+    });
+
+    assert.equal(result.status, "ok");
+    assert.equal(request.endpoint, "https://api.x.ai/v1/responses");
+    assert.equal(request.headers.authorization, "Bearer xai-secret");
+    assert.equal(request.body.model, "grok-test");
+    assert.match(request.body.input[0].content, /unified diff/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("parseGitHubRemote supports https and ssh remotes", () => {
   assert.deepEqual(parseGitHubRemote("https://github.com/patrick892368/VibeGuard-AI-Dev-Agent.git"), {
     owner: "patrick892368",

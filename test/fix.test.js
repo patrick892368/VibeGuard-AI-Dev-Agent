@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { PolicyEngine } from "../src/policy/engine.js";
 import { runFixWorkflow } from "../src/agents/fix.js";
-import { validateUnifiedDiff } from "../src/patch/validatePatch.js";
+import { normalizeUnifiedDiff, validateUnifiedDiff } from "../src/patch/validatePatch.js";
 
 const bin = path.resolve("bin/vibeguard.js");
 
@@ -43,6 +43,25 @@ function runCli(args, options = {}) {
 test("validateUnifiedDiff rejects empty and non-diff patch text", () => {
   assert.equal(validateUnifiedDiff("").valid, false);
   assert.equal(validateUnifiedDiff("change src/app.js").valid, false);
+});
+
+test("normalizeUnifiedDiff extracts fenced patch and repairs hunk counts", () => {
+  const patch = `Here is the fix:
+
+\`\`\`diff
+diff --git a/src/greeter.py b/src/greeter.py
+--- a/src/greeter.py
++++ b/src/greeter.py
+@@ -1,3 +1,3 @@
+ def greet(name):
+-    return f"hello {user_name.strip().lower()}"
++    return f"hello {name.strip().lower()}"
+\`\`\``;
+
+  const normalized = normalizeUnifiedDiff(patch);
+  assert.match(normalized, /^diff --git/m);
+  assert.match(normalized, /@@ -1,2 \+1,2 @@/);
+  assert.equal(validateUnifiedDiff(normalized).valid, true);
 });
 
 test("fix workflow blocks non-diff patch output", async () => {

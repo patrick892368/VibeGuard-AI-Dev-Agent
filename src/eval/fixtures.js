@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { loadConfig } from "../config/loadConfig.js";
+import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { runFixWorkflow } from "../agents/fix.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
@@ -112,6 +113,29 @@ function aggregateResults(results) {
 
 export async function evaluateFixFixtures(options = {}) {
   const repoRoot = options.root || process.cwd();
+  const runtimeEnv = options.env || loadRuntimeEnv(repoRoot);
+  let outputPolicy = null;
+
+  if (options.output) {
+    const { config } = loadConfig(repoRoot);
+    const engine = new PolicyEngine(config, { root: repoRoot });
+    outputPolicy = engine.checkPath(options.output, "write_eval_report");
+    if (outputPolicy.status !== "allow" && !(outputPolicy.status === "require_confirmation" && options.confirmed)) {
+      return {
+        status: outputPolicy.status,
+        stage: "output_report",
+        mode: options.apply ? "apply" : "dry_run",
+        provider: runtimeEnv.VIBEGUARD_LLM_PROVIDER || ((runtimeEnv.XAI_API_KEY || runtimeEnv.GROK_API_KEY) ? "grok" : "unset"),
+        summary: aggregateResults([]),
+        results: [],
+        output: {
+          path: options.output,
+          policy: outputPolicy
+        }
+      };
+    }
+  }
+
   const selected = options.fixture
     ? defaultEvalFixtures.filter((fixture) => fixture.id === options.fixture)
     : defaultEvalFixtures;
@@ -132,7 +156,7 @@ export async function evaluateFixFixtures(options = {}) {
       testCommand: fixture.testCommand,
       dryRun: !options.apply,
       apply: Boolean(options.apply),
-      env: options.env || process.env
+      env: runtimeEnv
     });
 
     results.push(summarizeFixture(fixture, tempRoot, result, Boolean(options.apply)));
@@ -141,7 +165,7 @@ export async function evaluateFixFixtures(options = {}) {
   const report = {
     status: "completed",
     mode: options.apply ? "apply" : "dry_run",
-    provider: (options.env || process.env).VIBEGUARD_LLM_PROVIDER || "unset",
+    provider: runtimeEnv.VIBEGUARD_LLM_PROVIDER || ((runtimeEnv.XAI_API_KEY || runtimeEnv.GROK_API_KEY) ? "grok" : "unset"),
     summary: aggregateResults(results),
     results
   };
@@ -152,19 +176,6 @@ export async function evaluateFixFixtures(options = {}) {
 
   const { config } = loadConfig(repoRoot);
   const engine = new PolicyEngine(config, { root: repoRoot });
-  const outputPolicy = engine.checkPath(options.output, "write_eval_report");
-  if (outputPolicy.status !== "allow" && !(outputPolicy.status === "require_confirmation" && options.confirmed)) {
-    return {
-      ...report,
-      status: outputPolicy.status,
-      stage: "output_report",
-      output: {
-        path: options.output,
-        policy: outputPolicy
-      }
-    };
-  }
-
   const output = writeFileWithPolicy(repoRoot, options.output, `${JSON.stringify(report, null, 2)}\n`, engine, {
     confirmed: Boolean(options.confirmed)
   });

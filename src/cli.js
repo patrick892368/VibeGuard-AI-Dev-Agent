@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { loadConfig } from "./config/loadConfig.js";
+import { loadRuntimeEnv } from "./config/env.js";
 import { PolicyEngine } from "./policy/engine.js";
 import { analyzeDebugLog } from "./agents/debug.js";
 import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
@@ -10,7 +11,7 @@ import { analyzeReviewDiff } from "./agents/review.js";
 import { buildPrSummary } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
-import { validateUnifiedDiff } from "./patch/validatePatch.js";
+import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { createPullRequestWithGh, detectGitHubRepository } from "./integrations/github.js";
@@ -24,7 +25,7 @@ function printHelp() {
 Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file>
-  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--dry-run] [--apply] [--output-patch <file>]
+  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>]
   vibeguard test
   vibeguard review [--diff <file>]
   vibeguard onboard [--write]
@@ -107,9 +108,10 @@ async function debugCommand(parsed, root) {
   if (parsed["ai-patch"]) {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    const ai = await generateDebugPatch({ ...result, log: logText });
+    const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
     result.aiPatch = ai;
     if (ai.patch) {
+      result.aiPatch.patch = normalizeUnifiedDiff(ai.patch);
       result.aiPatch.validation = validateUnifiedDiff(ai.patch);
       result.aiPatch.policy = result.aiPatch.validation.valid
         ? engine.checkPatch(ai.patch)
@@ -129,13 +131,15 @@ async function fixCommand(parsed, root) {
     patchFile: parsed.patch,
     testCommand: parsed.test,
     outputPatch: parsed["output-patch"],
+    writePrBody: parsed["write-pr-body"],
     createBranch: Boolean(parsed["create-branch"]),
     commit: Boolean(parsed.commit),
     prDryRun: Boolean(parsed["pr-dry-run"]),
     prBodyFile: parsed["pr-body-file"],
     dryRun: Boolean(parsed["dry-run"]),
     apply: Boolean(parsed.apply),
-    confirmed: Boolean(parsed.confirm)
+    confirmed: Boolean(parsed.confirm),
+    env: loadRuntimeEnv(root)
   });
 }
 
@@ -221,7 +225,8 @@ async function evalCommand(parsed, root, subcommand) {
       fixture: parsed.fixture,
       apply: Boolean(parsed.apply),
       output: parsed.output,
-      confirmed: Boolean(parsed.confirm)
+      confirmed: Boolean(parsed.confirm),
+      env: loadRuntimeEnv(root)
     });
   }
   throw new Error(`Unknown eval command: ${subcommand || ""}`);

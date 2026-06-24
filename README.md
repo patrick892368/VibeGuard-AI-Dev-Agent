@@ -67,7 +67,19 @@ vibeguard mcp
 
 ## AI Patch Provider
 
-`vibeguard debug --ai-patch` can call an OpenAI-compatible Responses API endpoint when these variables are set:
+`vibeguard debug --ai-patch`, `vibeguard fix`, and `vibeguard eval fixtures` can call an AI provider to generate patches.
+
+Grok is supported through xAI's OpenAI-compatible Responses API. Put this in your local `.env` file:
+
+```bash
+XAI_API_KEY=...
+VIBEGUARD_LLM_PROVIDER=grok
+VIBEGUARD_MODEL=grok-4.3
+```
+
+`.env` is ignored by Git and denied by policy. Do not commit it.
+
+OpenAI-compatible providers are also supported:
 
 ```bash
 export VIBEGUARD_LLM_PROVIDER=openai-compatible
@@ -97,8 +109,8 @@ node ./bin/vibeguard.js --root fixtures/node-bug fix --log error.log --patch fix
 To evaluate a real OpenAI-compatible provider against both fixtures:
 
 ```bash
-export VIBEGUARD_LLM_PROVIDER=openai-compatible
-export OPENAI_API_KEY=...
+export VIBEGUARD_LLM_PROVIDER=grok
+export XAI_API_KEY=...
 export VIBEGUARD_MODEL=...
 node ./bin/vibeguard.js eval fixtures --json
 node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json

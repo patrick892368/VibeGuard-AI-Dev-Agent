@@ -1,5 +1,6 @@
 import readline from "node:readline";
 import { loadConfig } from "../config/loadConfig.js";
+import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { analyzeDebugLog } from "../agents/debug.js";
 import { runFixWorkflow } from "../agents/fix.js";
@@ -84,13 +85,15 @@ function callTool(name, args, root) {
       patchText: args.patch,
       testCommand: args.testCommand,
       outputPatch: args.outputPatch,
+      writePrBody: args.writePrBody,
       createBranch: Boolean(args.createBranch),
       commit: Boolean(args.commit),
       prDryRun: Boolean(args.prDryRun),
       prBodyFile: args.prBodyFile,
       dryRun: args.dryRun !== false,
       apply: Boolean(args.apply),
-      confirmed: Boolean(args.confirmed)
+      confirmed: Boolean(args.confirmed),
+      env: loadRuntimeEnv(root)
     });
   }
   if (name === "onboard_repo") return analyzeRepository({ root });
@@ -104,7 +107,8 @@ function callTool(name, args, root) {
       fixture: args.fixture,
       apply: Boolean(args.apply),
       output: args.output,
-      confirmed: Boolean(args.confirmed)
+      confirmed: Boolean(args.confirmed),
+      env: loadRuntimeEnv(root)
     });
   }
   throw new Error(`Unknown tool: ${name}`);

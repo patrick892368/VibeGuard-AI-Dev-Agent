@@ -15,6 +15,17 @@ function fixturePatchMap() {
   });
 }
 
+function copyRepoWithoutSecrets() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-eval-output-"));
+  fs.cpSync(path.resolve("."), root, {
+    recursive: true,
+    filter: (source) => !source.includes(`${path.sep}.git${path.sep}`) &&
+      !source.endsWith(`${path.sep}.git`) &&
+      !source.endsWith(`${path.sep}.env`)
+  });
+  return root;
+}
+
 test("evaluateFixFixtures records blocked results when provider is not configured", async () => {
   const result = await evaluateFixFixtures({
     root: process.cwd(),
@@ -64,16 +75,16 @@ test("CLI eval fixtures supports selecting one fixture", () => {
 });
 
 test("CLI eval fixtures writes report output through policy", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-eval-output-"));
-  fs.cpSync(path.resolve("."), root, {
-    recursive: true,
-    filter: (source) => !source.includes(`${path.sep}.git${path.sep}`) && !source.endsWith(`${path.sep}.git`)
-  });
+  const root = copyRepoWithoutSecrets();
   const outputPath = "reports/eval-fixtures.json";
 
   const output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "fixtures", "--output", outputPath, "--json"], {
     cwd: root,
-    encoding: "utf8"
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VIBEGUARD_DISABLE_DOTENV: "1"
+    }
   });
   const result = JSON.parse(output);
   const reportText = fs.readFileSync(path.join(root, outputPath), "utf8");
@@ -86,11 +97,16 @@ test("CLI eval fixtures writes report output through policy", () => {
 });
 
 test("CLI eval fixtures blocks report output on denied path", () => {
+  const root = copyRepoWithoutSecrets();
   let output;
   try {
-    output = execFileSync(process.execPath, [bin, "eval", "fixtures", "--output", ".env", "--json"], {
-      cwd: process.cwd(),
-      encoding: "utf8"
+    output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "fixtures", "--output", ".env", "--json"], {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        VIBEGUARD_DISABLE_DOTENV: "1"
+      }
     });
   } catch (error) {
     output = error.stdout;
@@ -100,5 +116,6 @@ test("CLI eval fixtures blocks report output on denied path", () => {
   assert.equal(result.status, "deny");
   assert.equal(result.stage, "output_report");
   assert.equal(result.output.policy.status, "deny");
-  assert.equal(fs.existsSync(path.resolve(".env")), false);
+  assert.equal(result.summary.total, 0);
+  assert.equal(fs.existsSync(path.join(root, ".env")), false);
 });

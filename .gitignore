@@ -1,6 +1,8 @@
 node_modules/
 coverage/
 .vibeguard-cache/
+.env
+.env.*
 .DS_Store
 Thumbs.db
 

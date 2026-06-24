@@ -9,6 +9,13 @@ The integration model is CLI-first:
 3. VibeGuard checks `.vibeguard.yaml` before writes, patches, and risky commands.
 4. Codex uses the JSON output to decide the next action.
 
+Project constraint:
+
+- Every completed work part must update the relevant docs.
+- Current agent/provider priority is Codex and Grok only.
+- Cursor, Claude Code, and Cline remain deferred.
+- `.env` may contain the local Grok API key; do not print, edit, or commit it.
+
 ## Recommended Commands
 
 Check policy:
@@ -60,11 +67,13 @@ node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
 With a real provider:
 
 ```bash
-export VIBEGUARD_LLM_PROVIDER=openai-compatible
-export OPENAI_API_KEY=...
-export VIBEGUARD_MODEL=...
+export VIBEGUARD_LLM_PROVIDER=grok
+export XAI_API_KEY=...
+export VIBEGUARD_MODEL=grok-4.3
 node ./bin/vibeguard.js eval fixtures --json
 ```
+
+The CLI also loads a local `.env` file by default, so the same values can live there for local Codex runs.
 
 Codex should inspect `summary.successRate`, each fixture `outcome`, and any `policyStatus`, `stage`, or `patchSourceReason` before deciding whether to apply a generated patch.
 When `--output` is used, VibeGuard writes the report through `.vibeguard.yaml` path policy.
