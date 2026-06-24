@@ -141,7 +141,11 @@ function policyCommand(parsed, root) {
     }, Boolean(parsed.confirm));
   }
   if (parsed.patch) {
-    const result = engine.checkPatch(fs.readFileSync(resolveInputPath(root, parsed.patch), "utf8"));
+    const patchFile = readFileWithPolicy(root, parsed.patch, engine, {
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
+    const result = engine.checkPatch(patchFile.content);
     return withAudit(root, engine, parsed["audit-log"], result, {
       operation: "policy_check_patch",
       files: result.files,
@@ -256,10 +260,15 @@ function diffInput(parsed, root) {
 }
 
 function patchCommand(parsed, root, subcommand) {
-  const patchText = parsed.file ? fs.readFileSync(resolveInputPath(root, parsed.file), "utf8") : readStdinIfAvailable();
-  if (!patchText.trim()) throw new Error("patch command requires --file <patch> or patch text on stdin");
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
+  const patchText = parsed.file
+    ? readFileWithPolicy(root, parsed.file, engine, {
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    }).content
+    : readStdinIfAvailable();
+  if (!patchText.trim()) throw new Error("patch command requires --file <patch> or patch text on stdin");
 
   if (subcommand === "check") {
     const result = engine.checkPatch(patchText);

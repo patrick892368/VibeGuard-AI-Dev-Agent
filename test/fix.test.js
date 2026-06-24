@@ -226,6 +226,32 @@ test("fix CLI blocks output patch artifact on denied path", () => {
   assert.equal(fs.existsSync(path.join(root, ".env")), false);
 });
 
+test("fix CLI blocks denied patch input files", () => {
+  const root = copyFixture("node-bug");
+  fs.writeFileSync(path.join(root, ".env"), `diff --git a/src/user.js b/src/user.js
+--- a/src/user.js
++++ b/src/user.js
+@@ -1 +1 @@
+-old
++new
+`, "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    ".env",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
+});
+
 test("fix CLI returns branch commit PR dry-run plan", () => {
   const root = copyFixture("node-bug");
   const result = runCli([

@@ -114,6 +114,10 @@ Available tools:
 
 `apply_patch_safely` 默认通过 patch validation、路径 policy 和 `git apply --check` 校验 unified diff；只有 `apply` 为 true 时才会真正应用。
 
+CLI patch input files, including `policy check --patch`, `patch check/apply --file`, and `fix --patch <file>`, are read through path policy before their contents are parsed.
+
+CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --file` 和 `fix --patch <file>`，都会先经过路径 policy 读取，然后才解析内容。
+
 `summarize_pr` can return a GitHub-ready PR body and, when `writeBody` is provided, write that body through policy.
 
 `summarize_pr` 可以返回 GitHub-ready PR body；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。

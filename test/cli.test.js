@@ -49,6 +49,31 @@ test("CLI policy check can write audit JSONL", () => {
   assert.equal(events[0].target, "src/index.js");
 });
 
+test("CLI policy check blocks denied patch input files", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-policy-patch-denied-"));
+  fs.writeFileSync(path.join(root, ".env"), `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`, "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "policy",
+    "check",
+    "--patch",
+    ".env",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
+});
+
 test("CLI audit summary reads policy-gated audit logs", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-audit-summary-"));
   execFileSync(process.execPath, [
@@ -406,4 +431,29 @@ test("CLI pr summary can write a policy-gated body file", () => {
   assert.equal(parsed.writtenBody.path, "reports/pr-body.md");
   assert.equal(parsed.writtenBody.policy.status, "allow");
   assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
+});
+
+test("CLI patch check blocks denied patch input files", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-patch-file-denied-"));
+  fs.writeFileSync(path.join(root, ".env"), `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`, "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "patch",
+    "check",
+    "--file",
+    ".env",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
 });

@@ -26,7 +26,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块（包含 `exports["name"]` bracket export）和 stdlib `unittest` Python 测试，会为简单纯函数、明确分支、对象属性/字典字段 fallback、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，`--repair` 可对安全的生成测试失败做一轮 test-only 修复，并可生成 branch/commit/PR dry-run plan；只有最终生成测试通过且 `--execute-git-plan --confirm` 通过策略后才执行本地 Git plan。Writes basic tests after policy checks, supports ESM/CommonJS Node modules including `exports["name"]` bracket exports and stdlib `unittest` Python tests, generates behavior assertions for simple pure functions, clear branches, object-property/dictionary-field fallbacks, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, `--repair` can run one safe test-only repair retry for generated-test failures, can generate a branch/commit/PR dry-run plan, and only executes the local Git plan after final generated tests pass and `--execute-git-plan --confirm` passes policy.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings、recommendations、actionItems 和 PR comment Markdown；可用 `--write-comment` 经过 policy 写出评论正文文件。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings, recommendations, actionItems, and PR-comment Markdown; `--write-comment` can write the comment body file through policy.
 - `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档、结构化 firstTasks 新人任务建议和 `commandChecks` 命令可用性说明。Scans a repository and can generate bilingual onboarding / architecture docs, structured firstTasks for newcomer work, and `commandChecks` for command readiness notes.
-- `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
+- `vibeguard patch`: 通过 policy 检查或应用 unified diff；`--file` 输入路径本身也会先经过 read policy。Checks or applies unified diffs through policy; `--file` input paths also pass read policy first.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
 - `vibeguard pr summary`: 从 diff 生成包含 review findings 和 actionItems 的 GitHub-ready PR body；可用 `--write-body` 经过 policy 写出 PR body 文件。Builds a GitHub-ready PR body with review findings and actionItems from a diff; `--write-body` can write the PR body file through policy.
 - `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback。Detects GitHub remotes, creates PRs/comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback.
@@ -168,9 +168,9 @@ node ./bin/vibeguard.js --root fixtures/django-bug fix --log error.log --patch f
 node ./bin/vibeguard.js --root fixtures/spring-boot-bug fix --log error.log --patch fixes/service-annotation.patch --auto-test --dry-run --json
 ```
 
-`fix` 总是先校验 patch shape、检查 policy、运行 `git apply --check`，只有传入 `--apply` 才真正应用 patch。对 AI/provider 生成的 patch，如果 `git apply --check` 失败且命中明确的 Django TemplateDoesNotExist 字符串替换场景，`fix` 会生成一个本地 fallback patch，再重新经过 validation、policy 和 apply check；用户手动提供的 patch 不会被静默替换。
+`fix` 总是先校验 patch shape、检查 policy、运行 `git apply --check`，只有传入 `--apply` 才真正应用 patch。`--patch <file>` 的输入文件读取也会先经过 read policy。对 AI/provider 生成的 patch，如果 `git apply --check` 失败且命中明确的 Django TemplateDoesNotExist 字符串替换场景，`fix` 会生成一个本地 fallback patch，再重新经过 validation、policy 和 apply check；用户手动提供的 patch 不会被静默替换。
 
-`fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present. For AI/provider-generated patches, if `git apply --check` fails and the error matches a clear Django TemplateDoesNotExist string replacement case, `fix` generates a local fallback patch and runs validation, policy, and apply check again; user-provided patches are not silently replaced.
+`fix` always validates patch shape, checks policy, runs `git apply --check`, and only applies the patch when `--apply` is present. `--patch <file>` input file reads also pass read policy first. For AI/provider-generated patches, if `git apply --check` fails and the error matches a clear Django TemplateDoesNotExist string replacement case, `fix` generates a local fallback patch and runs validation, policy, and apply check again; user-provided patches are not silently replaced.
 
 `--auto-test` 会在 apply 后优先运行 stack trace 或源码文件对应的最小相关测试；如果找不到单文件测试，再回退到仓库分析建议的第一个测试命令。所有测试命令仍经过 command policy。
 
@@ -291,6 +291,7 @@ The test suite covers:
 - 路径和命令 policy。Path and command policy checks.
 - Policy Engine 和 policy-gated 文件操作的仓库 root containment。Repository-root containment for the Policy Engine and policy-gated file operations.
 - Patch 安全检查。Patch file safety checks.
+- Patch 输入文件读取的 Policy-as-Code 边界。Policy-as-Code boundaries for reading patch input files.
 - Patch 输出规范化和生成补丁失败后的 Django fallback 恢复。Patch output normalization and Django fallback recovery after generated patch-check failures.
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.

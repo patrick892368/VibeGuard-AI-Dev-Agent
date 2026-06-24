@@ -5,7 +5,7 @@ import { buildPrSummary } from "./pr.js";
 import { generateDebugPatch } from "../llm/provider.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
-import { writeFileWithPolicy } from "../policy/safeWrite.js";
+import { readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
 import { scanRepository } from "../repo/scan.js";
@@ -238,7 +238,7 @@ function selectAutoTestCommand(debug, root) {
   return debug.suggestedTestCommands?.[0] || null;
 }
 
-function patchFromOptions(options) {
+function patchFromOptions(options, engine) {
   if (options.patchText) {
     return {
       status: "provided",
@@ -246,11 +246,20 @@ function patchFromOptions(options) {
     };
   }
   if (options.patchFile) {
-    const patchFile = resolveRootPath(options.root || process.cwd(), options.patchFile);
+    if (!engine) throw new Error("patch file reads require a PolicyEngine");
+    const patchFile = readFileWithPolicy(options.root || process.cwd(), options.patchFile, engine, {
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
+    });
     return {
       status: "provided",
-      patch: fs.readFileSync(patchFile, "utf8"),
-      patchFile
+      patch: patchFile.content,
+      patchFile: patchFile.path,
+      patchFileRead: {
+        path: patchFile.path,
+        policy: patchFile.policy,
+        auditLog: patchFile.auditLog
+      }
     };
   }
   return null;
@@ -270,7 +279,7 @@ export async function runFixWorkflow(options = {}) {
 
   const debug = analyzeDebugLog(logText, { root, engine });
   const selectedTestCommand = options.testCommand || (options.autoTest ? selectAutoTestCommand(debug, root) : null);
-  const providedPatch = patchFromOptions(options);
+  const providedPatch = patchFromOptions(options, engine);
   let patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
 
   if (!patchSource.patch) {
