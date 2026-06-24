@@ -521,6 +521,71 @@ function customTestCommand(command, candidate) {
     .replaceAll("{sourceFile}", candidate.sourceFile);
 }
 
+function buildRepairPlan(category, result, evidence) {
+  const command = result.command || null;
+  const common = {
+    status: "needs_repair",
+    category,
+    safeToAutoRetry: false,
+    command,
+    evidence,
+    guardrails: [
+      "Do not delete assertions, skip tests, or lower coverage thresholds to make generated tests pass.",
+      "Any production-code fix must pass Policy-as-Code checks before it is applied."
+    ]
+  };
+  const plans = {
+    module_system_mismatch: {
+      safeToAutoRetry: true,
+      actions: [
+        "Regenerate only the generated test file with the detected ESM/CommonJS module system.",
+        "Check package.json type plus .mjs/.cjs/.js extensions before choosing import or require.",
+        command ? `Rerun ${command} after regenerating the test file.` : "Rerun the smallest generated test command after regenerating the test file."
+      ]
+    },
+    missing_module_or_bad_import: {
+      actions: [
+        "Verify the generated relative import path from the test file to the source file.",
+        "Check whether the source module has import-time dependencies or package aliases that need test setup.",
+        "Install missing test dependencies only after command policy and human confirmation allow it."
+      ]
+    },
+    missing_test_runner: {
+      actions: [
+        "Pass a repository-specific --test-command that exists in this workspace.",
+        "If installing a runner is required, run the package-manager command only after policy confirmation.",
+        "Rerun the generated test through VibeGuard command policy."
+      ]
+    },
+    assertion_failed: {
+      actions: [
+        "Inspect the generated assertion inputs and the source behavior side by side.",
+        "If the assertion reflects intended behavior, fix the source bug through the debug/fix workflow.",
+        "If the assertion is wrong, update the generated test to a stronger correct assertion instead of weakening coverage."
+      ]
+    },
+    runtime_error: {
+      actions: [
+        "Inspect the stack trace and identify whether failure happens during import, setup, or function execution.",
+        "Add required setup or mocks for IO, database, environment, and dependency-injection boundaries.",
+        "If the runtime error is a source bug, route it through the debug/fix workflow with the failing command."
+      ]
+    },
+    unknown_failure: {
+      actions: [
+        "Read stdout and stderr from the generated test run.",
+        "Rerun the smallest failing command after correcting test setup or source behavior.",
+        "Escalate to manual review if the failure needs IO, database, network, or framework-specific fixtures."
+      ]
+    }
+  };
+
+  return {
+    ...common,
+    ...(plans[category] || plans.unknown_failure)
+  };
+}
+
 function analyzeTestFailure(result) {
   if (result.status !== "failed" && result.status !== "blocked") return null;
   const output = `${result.error || ""}\n${result.stderr || ""}\n${result.stdout || ""}`;
@@ -552,10 +617,16 @@ function analyzeTestFailure(result) {
     }
   ];
   const matched = rules.find((rule) => rule.pattern.test(output));
+  const category = matched?.category || "unknown_failure";
+  const lines = output.split(/\r?\n/);
+  const evidence = (matched
+    ? lines.find((line) => matched.pattern.test(line))
+    : lines.find((line) => line.trim()))?.trim() || null;
   return {
-    category: matched?.category || "unknown_failure",
+    category,
     nextAction: matched?.nextAction || "Inspect stdout/stderr and rerun the smallest failing test command after correcting the generated test or setup.",
-    evidence: output.split(/\r?\n/).find((line) => line.trim())?.trim() || null
+    evidence,
+    repairPlan: buildRepairPlan(category, result, evidence)
   };
 }
 

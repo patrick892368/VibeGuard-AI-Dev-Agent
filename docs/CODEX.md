@@ -179,9 +179,13 @@ node ./bin/vibeguard.js test --coverage coverage-before.json --coverage-after co
 node ./bin/vibeguard.js test --write --coverage coverage.json --run --limit 1 --json
 ```
 
-Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `uncoveredFunctions`, and JavaScript `metadata.moduleSystem` before asking VibeGuard to write new tests. If before/after reports are available, inspect `coverageDelta.summary.averagePercentDelta`, `coverageDelta.summary.missingLinesReduced`, and file-level `status`. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, `stderr`, and `failureAnalysis` before proposing a commit.
+Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `uncoveredFunctions`, and JavaScript `metadata.moduleSystem` before asking VibeGuard to write new tests. If before/after reports are available, inspect `coverageDelta.summary.averagePercentDelta`, `coverageDelta.summary.missingLinesReduced`, and file-level `status`. When using `--run`, inspect `testRuns.status`, `testRuns.command`, `stdout`, `stderr`, `failureAnalysis`, and `failureAnalysis.repairPlan` before proposing a commit.
 
-Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr` 和 `failureAnalysis`。
+Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout`、`stderr`、`failureAnalysis` 和 `failureAnalysis.repairPlan`。
+
+When generated tests fail, `failureAnalysis.repairPlan` tells Codex whether a test-only retry is safe, which actions to take next, and which guardrails must not be violated.
+
+生成测试失败时，`failureAnalysis.repairPlan` 会告诉 Codex 是否适合只重试测试文件、下一步动作是什么，以及哪些 guardrail 不能违反。
 
 Generated tests may include behavior assertions for simple pure functions and clear branches such as null/None checks or numeric lower-bound branches. More complex IO, database, dependency injection, and mock-heavy cases still require review.
 

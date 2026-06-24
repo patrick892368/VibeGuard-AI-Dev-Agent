@@ -208,6 +208,29 @@ test("writeSuggestedTests classifies failed generated test runs", () => {
   assert.equal(result.testRuns[0].status, "failed");
   assert.equal(result.testRuns[0].failureAnalysis.category, "missing_module_or_bad_import");
   assert.match(result.testRuns[0].failureAnalysis.nextAction, /import path|test dependencies/);
+  assert.equal(result.testRuns[0].failureAnalysis.repairPlan.status, "needs_repair");
+  assert.equal(result.testRuns[0].failureAnalysis.repairPlan.safeToAutoRetry, false);
+  assert.match(result.testRuns[0].failureAnalysis.repairPlan.actions.join("\n"), /relative import path|dependencies/);
+  assert.match(result.testRuns[0].failureAnalysis.repairPlan.guardrails.join("\n"), /Do not delete assertions/);
+});
+
+test("writeSuggestedTests returns a repair plan for assertion failures", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    runTests: true,
+    testCommand: "node -e \"throw new Error('AssertionError: mismatch')\""
+  });
+  assert.equal(result.testRuns[0].status, "failed");
+  assert.equal(result.testRuns[0].failureAnalysis.category, "assertion_failed");
+  assert.match(result.testRuns[0].failureAnalysis.evidence, /AssertionError/);
+  assert.equal(result.testRuns[0].failureAnalysis.repairPlan.safeToAutoRetry, false);
+  assert.match(result.testRuns[0].failureAnalysis.repairPlan.actions.join("\n"), /fix the source bug|stronger correct assertion/);
 });
 
 test("writeOnboardingDocs writes onboarding and architecture docs through policy", () => {
