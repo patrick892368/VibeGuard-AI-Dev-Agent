@@ -29,12 +29,12 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
 - `vibeguard pr summary`: 从 diff 生成 GitHub-ready PR body。Builds a GitHub-ready PR body from a diff.
-- `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态。Detects GitHub remotes, creates PRs/comments, and reads Actions status.
+- `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback。Detects GitHub remotes, creates PRs/comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
 - `vibeguard eval fixtures`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures.
-- `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote 和 `gh`，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, and `gh` without printing secrets.
+- `vibeguard doctor`: 检查 policy、provider、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在，不会打印密钥。Checks policy, provider, proxy, Git, GitHub remote, `gh`, and GitHub token presence without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema 和 structured tool output。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, and structured tool output.
 
 项目当前保持 dependency-light，CLI 基于 Node.js built-ins，clone 后即可测试。

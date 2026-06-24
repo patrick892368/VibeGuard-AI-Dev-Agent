@@ -218,6 +218,10 @@ node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --json
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --json
 ```
 
+When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` through the GitHub REST API fallback. Policy confirmation is still required for PR creation and PR comments.
+
+当本机没有 `gh` 时，execute 模式可以使用 `GITHUB_TOKEN` 或 `GH_TOKEN` 通过 GitHub REST API fallback 执行。创建 PR 和发布 PR comment 仍然需要 policy 确认。
+
 ## Operating Rules / 操作规则
 
 - Do not bypass `.vibeguard.yaml`. / 不要绕过 `.vibeguard.yaml`。

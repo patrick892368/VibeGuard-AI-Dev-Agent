@@ -272,10 +272,12 @@ async function callTool(name, args, root) {
   if (name === "summarize_pr") return buildPrSummary(args.diff || "");
   if (name === "detect_github") return detectGitHubRepository(root);
   if (name === "github_comment") {
-    const dryRun = commentPullRequestWithGh(root, {
+    const env = loadRuntimeEnv(root);
+    const dryRun = await commentPullRequestWithGh(root, {
       pr: args.pr,
       bodyFile: args.bodyFile,
       body: args.body,
+      env,
       dryRun: true
     });
     if (args.execute === true) {
@@ -295,6 +297,7 @@ async function callTool(name, args, root) {
       pr: args.pr,
       bodyFile: args.bodyFile,
       body: args.body,
+      env,
       dryRun: args.execute !== true
     });
   }
@@ -303,6 +306,7 @@ async function callTool(name, args, root) {
       branch: args.branch,
       workflow: args.workflow,
       limit: args.limit,
+      env: loadRuntimeEnv(root),
       dryRun: args.execute !== true
     });
   }

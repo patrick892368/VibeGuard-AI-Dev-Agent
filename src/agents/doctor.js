@@ -74,6 +74,9 @@ export function runDoctor(options = {}) {
       gh: commandAvailable("gh", ["--version"])
     },
     github,
+    githubAuth: {
+      hasToken: Boolean(env.GITHUB_TOKEN || env.GH_TOKEN)
+    },
     provider: providerStatus(env),
     proxy: {
       https: env.VIBEGUARD_HTTPS_PROXY || env.HTTPS_PROXY || env.https_proxy || null,

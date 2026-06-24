@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 export function parseGitHubRemote(remoteUrl) {
@@ -57,7 +59,126 @@ export function buildGhRunListArgs(options = {}) {
   return args;
 }
 
-export function createPullRequestWithGh(root = process.cwd(), options = {}) {
+function isMissingGh(error) {
+  return error?.code === "ENOENT" || /ENOENT|not recognized|not found/i.test(error?.message || "");
+}
+
+function resolveToken(env = process.env) {
+  return env.GITHUB_TOKEN || env.GH_TOKEN || null;
+}
+
+function currentBranch(root) {
+  return execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
+}
+
+function readBody(root, options = {}) {
+  if (options.body) return options.body;
+  if (!options.bodyFile) return "";
+  const bodyPath = path.isAbsolute(options.bodyFile) ? options.bodyFile : path.join(root, options.bodyFile);
+  return fs.readFileSync(bodyPath, "utf8");
+}
+
+async function githubApiRequest(root, apiOptions = {}) {
+  const env = apiOptions.env || process.env;
+  const token = resolveToken(env);
+  if (!token) throw new Error("GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API fallback");
+
+  const repository = apiOptions.repository || detectGitHubRepository(root);
+  const baseUrl = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
+  const fetchImpl = apiOptions.fetch || globalThis.fetch;
+  if (!fetchImpl) throw new Error("fetch is required for GitHub REST API fallback");
+
+  const response = await fetchImpl(`${baseUrl}/repos/${repository.owner}/${repository.repo}${apiOptions.path}`, {
+    method: apiOptions.method || "GET",
+    headers: {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+      "x-github-api-version": "2022-11-28"
+    },
+    body: apiOptions.body ? JSON.stringify(apiOptions.body) : undefined
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub API request failed with HTTP ${response.status}`);
+  }
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+async function createPullRequestWithApi(root, options = {}) {
+  if (!options.title) throw new Error("GitHub PR title is required");
+  const payload = {
+    title: options.title,
+    body: readBody(root, options),
+    base: options.base || "main",
+    head: options.head || currentBranch(root),
+    draft: Boolean(options.draft)
+  };
+  const data = await githubApiRequest(root, {
+    ...options,
+    method: "POST",
+    path: "/pulls",
+    body: payload
+  });
+  return {
+    status: "created",
+    method: "api",
+    url: data.html_url || data.url,
+    number: data.number || null
+  };
+}
+
+async function commentPullRequestWithApi(root, options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  const body = readBody(root, options);
+  if (!body) throw new Error("GitHub PR comment body or bodyFile is required");
+  const data = await githubApiRequest(root, {
+    ...options,
+    method: "POST",
+    path: `/issues/${options.pr}/comments`,
+    body: { body }
+  });
+  return {
+    status: "commented",
+    method: "api",
+    url: data.html_url || data.url,
+    id: data.id || null
+  };
+}
+
+async function listWorkflowRunsWithApi(root, options = {}) {
+  const params = new URLSearchParams({
+    per_page: String(options.limit || 10)
+  });
+  if (options.branch) params.set("branch", options.branch);
+  const data = await githubApiRequest(root, {
+    ...options,
+    method: "GET",
+    path: `/actions/runs?${params.toString()}`
+  });
+  let runs = data.workflow_runs || [];
+  if (options.workflow) {
+    runs = runs.filter((run) => run.name === options.workflow || run.workflow_name === options.workflow);
+  }
+  return {
+    status: "completed",
+    method: "api",
+    runs: runs.map((run) => ({
+      databaseId: run.id,
+      status: run.status,
+      conclusion: run.conclusion,
+      name: run.name,
+      headBranch: run.head_branch,
+      event: run.event,
+      workflowName: run.workflow_name || run.name,
+      url: run.html_url || run.url,
+      createdAt: run.created_at,
+      updatedAt: run.updated_at
+    }))
+  };
+}
+
+export async function createPullRequestWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrArgs(options);
   if (options.dryRun !== false) {
     return {
@@ -65,14 +186,21 @@ export function createPullRequestWithGh(root = process.cwd(), options = {}) {
       command: `gh ${args.join(" ")}`
     };
   }
-  const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
-  return {
-    status: "created",
-    url: stdout.trim()
-  };
+  if (options.useApi) return createPullRequestWithApi(root, options);
+  try {
+    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    return {
+      status: "created",
+      method: "gh",
+      url: stdout.trim()
+    };
+  } catch (error) {
+    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+    return createPullRequestWithApi(root, options);
+  }
 }
 
-export function commentPullRequestWithGh(root = process.cwd(), options = {}) {
+export async function commentPullRequestWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrCommentArgs(options);
   if (options.dryRun !== false) {
     return {
@@ -80,14 +208,21 @@ export function commentPullRequestWithGh(root = process.cwd(), options = {}) {
       command: `gh ${args.join(" ")}`
     };
   }
-  const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
-  return {
-    status: "commented",
-    output: stdout.trim()
-  };
+  if (options.useApi) return commentPullRequestWithApi(root, options);
+  try {
+    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    return {
+      status: "commented",
+      method: "gh",
+      output: stdout.trim()
+    };
+  } catch (error) {
+    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+    return commentPullRequestWithApi(root, options);
+  }
 }
 
-export function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
+export async function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
   const args = buildGhRunListArgs(options);
   if (options.dryRun !== false) {
     return {
@@ -95,10 +230,17 @@ export function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
       command: `gh ${args.join(" ")}`
     };
   }
+  if (options.useApi) return listWorkflowRunsWithApi(root, options);
 
-  const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
-  return {
-    status: "completed",
-    runs: JSON.parse(stdout)
-  };
+  try {
+    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    return {
+      status: "completed",
+      method: "gh",
+      runs: JSON.parse(stdout)
+    };
+  } catch (error) {
+    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+    return listWorkflowRunsWithApi(root, options);
+  }
 }

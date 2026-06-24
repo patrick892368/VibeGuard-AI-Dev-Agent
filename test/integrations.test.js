@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import os from "node:os";
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -10,6 +12,13 @@ import { generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
 
 const bin = path.resolve("bin/vibeguard.js");
+
+function tempGitHubRepo() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-github-api-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  return root;
+}
 
 test("hook templates include pre-commit policy check", () => {
   assert.ok(listHooks().includes("pre-commit"));
@@ -90,7 +99,7 @@ test("parseGitHubRemote supports https and ssh remotes", () => {
   });
 });
 
-test("GitHub PR creation is dry-run by default", () => {
+test("GitHub PR creation is dry-run by default", async () => {
   assert.deepEqual(buildGhPrArgs({ title: "Fix bug", bodyFile: "pr.md", draft: true }), [
     "pr",
     "create",
@@ -100,12 +109,50 @@ test("GitHub PR creation is dry-run by default", () => {
     "pr.md",
     "--draft"
   ]);
-  const result = createPullRequestWithGh(process.cwd(), { title: "Fix bug" });
+  const result = await createPullRequestWithGh(process.cwd(), { title: "Fix bug" });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh pr create/);
 });
 
-test("GitHub PR comments are dry-run by default", () => {
+test("GitHub PR creation can use REST API fallback", async () => {
+  const root = tempGitHubRepo();
+  let request;
+  const result = await createPullRequestWithGh(root, {
+    title: "Fix bug",
+    body: "body",
+    base: "main",
+    head: "codex/fix-bug",
+    draft: true,
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/1", number: 1 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "created");
+  assert.equal(result.method, "api");
+  assert.equal(result.url, "https://github.com/owner/repo/pull/1");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(request.options.headers.authorization, "Bearer token");
+  assert.deepEqual(request.body, {
+    title: "Fix bug",
+    body: "body",
+    base: "main",
+    head: "codex/fix-bug",
+    draft: true
+  });
+});
+
+test("GitHub PR comments are dry-run by default", async () => {
   assert.deepEqual(buildGhPrCommentArgs({ pr: 12, bodyFile: "review.md" }), [
     "pr",
     "comment",
@@ -113,9 +160,36 @@ test("GitHub PR comments are dry-run by default", () => {
     "--body-file",
     "review.md"
   ]);
-  const result = commentPullRequestWithGh(process.cwd(), { pr: 12, body: "Looks good" });
+  const result = await commentPullRequestWithGh(process.cwd(), { pr: 12, body: "Looks good" });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh pr comment 12/);
+});
+
+test("GitHub PR comments can use REST API fallback", async () => {
+  const root = tempGitHubRepo();
+  let request;
+  const result = await commentPullRequestWithGh(root, {
+    pr: 12,
+    body: "review",
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/1#issuecomment-1", id: 1 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "commented");
+  assert.equal(result.method, "api");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/issues/12/comments");
+  assert.deepEqual(request.body, { body: "review" });
 });
 
 test("CLI GitHub PR comment execute requires command confirmation", () => {
@@ -129,7 +203,7 @@ test("CLI GitHub PR comment execute requires command confirmation", () => {
   assert.match(result.command, /gh pr comment 12/);
 });
 
-test("GitHub checks are dry-run by default", () => {
+test("GitHub checks are dry-run by default", async () => {
   assert.deepEqual(buildGhRunListArgs({ branch: "codex/fix-bug", limit: 5 }), [
     "run",
     "list",
@@ -140,9 +214,60 @@ test("GitHub checks are dry-run by default", () => {
     "--branch",
     "codex/fix-bug"
   ]);
-  const result = listWorkflowRunsWithGh(process.cwd(), { branch: "codex/fix-bug" });
+  const result = await listWorkflowRunsWithGh(process.cwd(), { branch: "codex/fix-bug" });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh run list/);
+});
+
+test("GitHub checks can use REST API fallback", async () => {
+  const root = tempGitHubRepo();
+  let requestUrl;
+  const result = await listWorkflowRunsWithGh(root, {
+    branch: "codex/fix-bug",
+    limit: 5,
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url) {
+      requestUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            workflow_runs: [{
+              id: 123,
+              status: "completed",
+              conclusion: "success",
+              name: "CI",
+              head_branch: "codex/fix-bug",
+              event: "pull_request",
+              workflow_name: "CI",
+              html_url: "https://github.com/owner/repo/actions/runs/123",
+              created_at: "2026-06-24T00:00:00Z",
+              updated_at: "2026-06-24T00:01:00Z"
+            }]
+          };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.method, "api");
+  assert.match(requestUrl, /\/repos\/owner\/repo\/actions\/runs\?per_page=5&branch=codex%2Ffix-bug$/);
+  assert.deepEqual(result.runs[0], {
+    databaseId: 123,
+    status: "completed",
+    conclusion: "success",
+    name: "CI",
+    headBranch: "codex/fix-bug",
+    event: "pull_request",
+    workflowName: "CI",
+    url: "https://github.com/owner/repo/actions/runs/123",
+    createdAt: "2026-06-24T00:00:00Z",
+    updatedAt: "2026-06-24T00:01:00Z"
+  });
 });
 
 test("buildFixGitPlan includes push and PR commands for Codex review", () => {

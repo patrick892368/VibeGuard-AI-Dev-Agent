@@ -282,7 +282,8 @@ function githubMutationPolicy(root, command, stage, confirmed) {
   return null;
 }
 
-function githubCommand(parsed, root, subcommand) {
+async function githubCommand(parsed, root, subcommand) {
+  const env = loadRuntimeEnv(root);
   if (subcommand === "detect") return detectGitHubRepository(root);
   if (subcommand === "pr") {
     const options = {
@@ -293,8 +294,9 @@ function githubCommand(parsed, root, subcommand) {
       head: parsed.head,
       draft: Boolean(parsed.draft)
     };
-    const dryRun = createPullRequestWithGh(root, {
+    const dryRun = await createPullRequestWithGh(root, {
       ...options,
+      env,
       dryRun: true
     });
     if (parsed.execute) {
@@ -303,6 +305,7 @@ function githubCommand(parsed, root, subcommand) {
     }
     return createPullRequestWithGh(root, {
       ...options,
+      env,
       dryRun: !parsed.execute
     });
   }
@@ -312,8 +315,9 @@ function githubCommand(parsed, root, subcommand) {
       bodyFile: parsed["body-file"],
       body: parsed.body
     };
-    const dryRun = commentPullRequestWithGh(root, {
+    const dryRun = await commentPullRequestWithGh(root, {
       ...options,
+      env,
       dryRun: true
     });
     if (parsed.execute) {
@@ -322,6 +326,7 @@ function githubCommand(parsed, root, subcommand) {
     }
     return commentPullRequestWithGh(root, {
       ...options,
+      env,
       dryRun: !parsed.execute
     });
   }
@@ -330,6 +335,7 @@ function githubCommand(parsed, root, subcommand) {
       branch: parsed.branch,
       workflow: parsed.workflow,
       limit: parsed.limit,
+      env,
       dryRun: !parsed.execute
     });
   }

@@ -161,9 +161,9 @@ Detect the repository:
 vibeguard github detect
 ```
 
-Create a draft PR through the GitHub CLI. The command is dry-run by default:
+Create a draft PR through the GitHub CLI or the REST API fallback when `GITHUB_TOKEN` / `GH_TOKEN` is present. The command is dry-run by default:
 
-通过 GitHub CLI 创建 draft PR。默认 dry-run：
+通过 GitHub CLI 创建 draft PR；如果存在 `GITHUB_TOKEN` / `GH_TOKEN`，执行时也可使用 REST API fallback。默认 dry-run：
 
 ```bash
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
@@ -177,9 +177,9 @@ Execute PR creation only when ready:
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm
 ```
 
-Post a PR comment through the GitHub CLI. The command is dry-run by default:
+Post a PR comment through the GitHub CLI or REST API fallback. The command is dry-run by default:
 
-通过 GitHub CLI 发布 PR comment。默认 dry-run：
+通过 GitHub CLI 或 REST API fallback 发布 PR comment。默认 dry-run：
 
 ```bash
 vibeguard github comment --pr 12 --body-file review.md
@@ -195,6 +195,6 @@ vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard github checks --branch codex/fix-bug --limit 5 --execute
 ```
 
-`gh pr create` and `gh pr comment` require policy confirmation and authenticated `gh`.
+`gh pr create` and `gh pr comment` require policy confirmation. Execution uses authenticated `gh` when available, or `GITHUB_TOKEN` / `GH_TOKEN` through the REST API fallback when `gh` is missing.
 
-`gh pr create` 和 `gh pr comment` 需要 policy 确认，并且本机要有已认证的 `gh`。
+`gh pr create` 和 `gh pr comment` 需要 policy 确认。执行时优先使用已认证的 `gh`；如果本机缺少 `gh`，可使用 `GITHUB_TOKEN` / `GH_TOKEN` 通过 REST API fallback 执行。
