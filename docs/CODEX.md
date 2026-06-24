@@ -199,6 +199,10 @@ Generate bilingual onboarding and architecture docs:
 node ./bin/vibeguard.js onboard --write --json
 ```
 
+Codex should inspect `firstTasks` after onboarding. Those tasks are repository-specific low-risk starting points with optional commands and files.
+
+Codex 在 onboarding 后应检查 `firstTasks`。这些任务是按仓库扫描结果生成的低风险新人任务，可包含建议命令和相关文件。
+
 Review changes:
 
 审查变更：

@@ -85,6 +85,10 @@ Available tools:
 
 `eval_history` 会汇总 JSONL 历史记录，方便看趋势。
 
+`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, and structured `firstTasks` with low-risk commands and files for newcomers.
+
+`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown，以及包含低风险命令和文件的新手任务 `firstTasks`。
+
 `write_tests` can analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware tests with simple behavior and exception assertions, optionally run them through command policy, and return `failureAnalysis.repairPlan` for failed runs.
 
 `write_tests` 可以分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的生成测试，并包含简单行为和异常断言；也可以通过 command policy 执行这些测试，并为失败运行返回 `failureAnalysis.repairPlan`。

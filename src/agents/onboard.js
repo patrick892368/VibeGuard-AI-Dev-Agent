@@ -6,7 +6,100 @@ function bulletList(values, fallback = "Not detected / 未检测到") {
   return values.map((value) => `- ${value}`).join("\n");
 }
 
+function isSourceFile(file) {
+  return /\.(js|mjs|cjs|ts|tsx|py|java)$/.test(file) &&
+    !/(^|\/)(test|tests|__tests__)\//.test(file) &&
+    !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+    !file.endsWith("_test.py") &&
+    !file.startsWith("test_");
+}
+
+export function recommendFirstTasks(scan) {
+  const tasks = [];
+  const firstCommand = scan.suggestedCommands[0];
+  const firstEntrypoint = scan.entrypoints[0];
+  const firstSource = scan.files.find(isSourceFile);
+
+  if (firstCommand) {
+    tasks.push({
+      id: "baseline-command",
+      title: "Baseline test command",
+      titleZh: "基线测试命令",
+      reason: "Run the safest known validation command before editing code.",
+      reasonZh: "改代码前先运行最明确的验证命令。",
+      command: firstCommand,
+      files: []
+    });
+  }
+
+  if (scan.frameworks.includes("Django")) {
+    tasks.push({
+      id: "trace-django-entrypoint",
+      title: "Trace Django request flow",
+      titleZh: "追踪 Django 请求链路",
+      reason: "Start from URL routing and follow one view into its template or serializer.",
+      reasonZh: "从 URL 路由开始，追踪一个 view 到 template 或 serializer。",
+      command: scan.suggestedCommands.includes("python manage.py check") ? "python manage.py check" : null,
+      files: scan.entrypoints.includes("manage.py") ? ["manage.py"] : scan.entrypoints.slice(0, 1)
+    });
+  } else if (scan.frameworks.includes("Spring Boot")) {
+    tasks.push({
+      id: "trace-spring-entrypoint",
+      title: "Trace Spring Boot startup",
+      titleZh: "追踪 Spring Boot 启动链路",
+      reason: "Open the application class and follow one controller or service boundary.",
+      reasonZh: "打开应用入口类，追踪一个 controller 或 service 边界。",
+      command: scan.suggestedCommands.find((command) => command.includes("test")) || null,
+      files: scan.entrypoints.slice(0, 2)
+    });
+  } else if (firstEntrypoint) {
+    tasks.push({
+      id: "trace-entrypoint",
+      title: "Trace the first entrypoint",
+      titleZh: "追踪第一个入口",
+      reason: "Map the first execution path before taking a feature or bug task.",
+      reasonZh: "接 feature 或 bug 前，先画清第一条执行路径。",
+      command: null,
+      files: [firstEntrypoint]
+    });
+  }
+
+  if (scan.testFiles.length === 0 && firstSource) {
+    tasks.push({
+      id: "add-first-smoke-test",
+      title: "Add the first smoke test",
+      titleZh: "添加第一个冒烟测试",
+      reason: "This repository has no detected tests, so a small export or startup test is low risk.",
+      reasonZh: "当前未检测到测试文件，添加一个小的导出或启动测试风险较低。",
+      command: firstCommand || null,
+      files: [firstSource]
+    });
+  } else if (firstSource) {
+    tasks.push({
+      id: "add-focused-unit-test",
+      title: "Add a focused unit test",
+      titleZh: "添加聚焦单元测试",
+      reason: "Pick one small source file and add a nearby behavior assertion.",
+      reasonZh: "选择一个小源码文件，补一个邻近的行为断言。",
+      command: firstCommand || null,
+      files: [firstSource]
+    });
+  }
+
+  return tasks.slice(0, 4);
+}
+
+function taskList(tasks) {
+  if (!tasks || tasks.length === 0) return "- No safe first task detected / 未检测到安全新人任务";
+  return tasks.map((task) => {
+    const command = task.command ? ` Command / 命令: \`${task.command}\`.` : "";
+    const files = task.files?.length ? ` Files / 文件: ${task.files.map((file) => `\`${file}\``).join(", ")}.` : "";
+    return `- **${task.title} / ${task.titleZh}**: ${task.reason} / ${task.reasonZh}${command}${files}`;
+  }).join("\n");
+}
+
 export function buildOnboardingMarkdown(scan) {
+  const firstTasks = recommendFirstTasks(scan);
   return `# Repository Onboarding / 仓库上手指南
 
 ## Overview / 概览
@@ -43,9 +136,7 @@ flowchart TD
 
 ## First Tasks / 新人任务
 
-- Run the suggested test command and confirm the baseline. / 运行建议测试命令，确认当前基线。
-- Open the listed entrypoints and trace the first request or execution flow. / 打开入口文件，追踪第一个请求或执行流程。
-- Pick a source file that has no nearby test and add a focused unit test. / 选择一个缺少邻近测试的源码文件，添加聚焦单元测试。
+${taskList(firstTasks)}
 `;
 }
 
@@ -89,8 +180,10 @@ flowchart LR
 export function analyzeRepository(options = {}) {
   const root = options.root || process.cwd();
   const scan = scanRepository(root);
+  const firstTasks = recommendFirstTasks(scan);
   return {
     scan,
+    firstTasks,
     markdown: buildOnboardingMarkdown(scan),
     architecture: buildArchitectureMarkdown(scan)
   };

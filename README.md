@@ -25,7 +25,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard test`: 扫描测试候选，并可使用 coverage.py JSON / LCOV 排序未覆盖文件和函数，也可比较 before/after coverage。Scans source files for test candidates, can use coverage.py JSON / LCOV to prioritize uncovered files and functions, and can compare before/after coverage.
 - `vibeguard test --write`: 经过 policy 后写入基础测试，支持 ESM/CommonJS Node 模块，会为简单纯函数、明确分支、常见边界值和明确异常分支生成行为断言，可用 `--run` 继续通过 command policy 执行生成的测试，并输出失败分类和结构化 `repairPlan`。Writes basic tests after policy checks, supports ESM/CommonJS Node modules, generates behavior assertions for simple pure functions, clear branches, common boundary values, and clear exception branches, can use `--run` to execute generated tests through command policy, and returns failed-run categories plus a structured `repairPlan`.
 - `vibeguard review`: 分析 diff 中的 bug、安全、性能、测试缺口和 policy 风险，并输出文件/行号级 findings。Reviews diffs for bugs, security, performance, missing tests, and policy risk with file/line findings.
-- `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档。Scans a repository and can generate bilingual onboarding / architecture docs.
+- `vibeguard onboard`: 扫描仓库并生成中英双语 onboarding / architecture 文档和结构化 firstTasks 新人任务建议。Scans a repository and can generate bilingual onboarding / architecture docs plus structured firstTasks for newcomer work.
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff。Checks or applies unified diffs through policy.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
 - `vibeguard pr summary`: 从 diff 生成 GitHub-ready PR body。Builds a GitHub-ready PR body from a diff.

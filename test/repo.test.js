@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { scanRepository } from "../src/repo/scan.js";
 import { analyzeTestTargets, compareCoverageReports, parseCoverageReport } from "../src/agents/testWriter.js";
-import { analyzeRepository, buildOnboardingMarkdown } from "../src/agents/onboard.js";
+import { analyzeRepository, buildOnboardingMarkdown, recommendFirstTasks } from "../src/agents/onboard.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-repo-"));
@@ -234,6 +234,8 @@ public class Calculator {
 test("buildOnboardingMarkdown includes command and architecture sections", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node --test" } }), "utf8");
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "index.js"), "export function run() {}\n", "utf8");
   const result = analyzeRepository({ root });
   const markdown = buildOnboardingMarkdown(result.scan);
 
@@ -242,4 +244,25 @@ test("buildOnboardingMarkdown includes command and architecture sections", () =>
   assert.match(markdown, /Suggested Commands/);
   assert.match(markdown, /建议命令/);
   assert.match(markdown, /mermaid/);
+  assert.match(markdown, /Baseline test command/);
+  assert.match(markdown, /npm test/);
+  assert.equal(result.firstTasks[0].id, "baseline-command");
+});
+
+test("recommendFirstTasks returns repo-specific low-risk tasks", () => {
+  const tasks = recommendFirstTasks({
+    files: ["src/index.js"],
+    frameworks: [],
+    entrypoints: ["src/index.js"],
+    testFiles: [],
+    suggestedCommands: ["npm test"]
+  });
+
+  assert.deepEqual(tasks.map((task) => task.id), [
+    "baseline-command",
+    "trace-entrypoint",
+    "add-first-smoke-test"
+  ]);
+  assert.equal(tasks[0].command, "npm test");
+  assert.deepEqual(tasks[1].files, ["src/index.js"]);
 });
