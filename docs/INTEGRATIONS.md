@@ -4,6 +4,10 @@ VibeGuard uses a CLI-first core so every integration shares the same policy chec
 
 VibeGuard 采用 CLI-first 内核，因此所有集成都复用同一套 policy 检查。
 
+Generated onboarding and architecture documents are bilingual Chinese/English by default.
+
+生成的 onboarding 和 architecture 文档默认使用中英双语。
+
 ## CLI / CLI
 
 ```bash

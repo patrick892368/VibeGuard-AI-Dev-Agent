@@ -238,6 +238,8 @@ test("buildOnboardingMarkdown includes command and architecture sections", () =>
   const markdown = buildOnboardingMarkdown(result.scan);
 
   assert.match(markdown, /Repository Onboarding/);
+  assert.match(markdown, /仓库上手指南/);
   assert.match(markdown, /Suggested Commands/);
+  assert.match(markdown, /建议命令/);
   assert.match(markdown, /mermaid/);
 });

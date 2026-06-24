@@ -164,6 +164,14 @@ Codex should inspect `coverage`, `coverageTargets`, `coverage.missingLines`, `un
 
 Codex 在要求 VibeGuard 写测试前，应先检查 `coverage`、`coverageTargets`、`coverage.missingLines`、`uncoveredFunctions` 和 JavaScript `metadata.moduleSystem`。如果有 before/after 报告，还要检查 `coverageDelta.summary.averagePercentDelta`、`coverageDelta.summary.missingLinesReduced` 和文件级 `status`。使用 `--run` 时，提交前还要检查 `testRuns.status`、`testRuns.command`、`stdout` 和 `stderr`。
 
+Generate bilingual onboarding and architecture docs:
+
+生成中英双语 onboarding 和 architecture 文档：
+
+```bash
+node ./bin/vibeguard.js onboard --write --json
+```
+
 Review changes:
 
 审查变更：
