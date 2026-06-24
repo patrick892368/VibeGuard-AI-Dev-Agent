@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { scanRepository } from "../src/repo/scan.js";
 import { analyzeTestTargets, compareCoverageReports, parseCoverageReport } from "../src/agents/testWriter.js";
-import { analyzeRepository, buildOnboardingMarkdown, recommendFirstTasks } from "../src/agents/onboard.js";
+import { analyzeRepository, buildOnboardingMarkdown, recommendFirstTasks, verifySuggestedCommands } from "../src/agents/onboard.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-repo-"));
@@ -243,10 +243,13 @@ test("buildOnboardingMarkdown includes command and architecture sections", () =>
   assert.match(markdown, /仓库上手指南/);
   assert.match(markdown, /Suggested Commands/);
   assert.match(markdown, /建议命令/);
+  assert.match(markdown, /Command Checks/);
+  assert.match(markdown, /命令检查/);
   assert.match(markdown, /mermaid/);
   assert.match(markdown, /Baseline test command/);
   assert.match(markdown, /npm test/);
   assert.equal(result.firstTasks[0].id, "baseline-command");
+  assert.equal(result.commandChecks[0].status, "available");
 });
 
 test("recommendFirstTasks returns repo-specific low-risk tasks", () => {
@@ -265,4 +268,15 @@ test("recommendFirstTasks returns repo-specific low-risk tasks", () => {
   ]);
   assert.equal(tasks[0].command, "npm test");
   assert.deepEqual(tasks[1].files, ["src/index.js"]);
+});
+
+test("verifySuggestedCommands flags missing Gradle wrapper", () => {
+  const checks = verifySuggestedCommands({
+    files: ["build.gradle"],
+    suggestedCommands: ["./gradlew test"]
+  });
+
+  assert.equal(checks[0].command, "./gradlew test");
+  assert.equal(checks[0].status, "missing_wrapper");
+  assert.match(checks[0].reason, /gradlew wrapper was not detected/);
 });

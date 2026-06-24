@@ -6,12 +6,71 @@ function bulletList(values, fallback = "Not detected / 未检测到") {
   return values.map((value) => `- ${value}`).join("\n");
 }
 
+function commandCheckList(checks) {
+  if (!checks || checks.length === 0) return "- No suggested commands to verify / 没有可检查的建议命令";
+  return checks.map((check) =>
+    `- \`${check.command}\`: ${check.status}. ${check.reason} / ${check.reasonZh}`
+  ).join("\n");
+}
+
 function isSourceFile(file) {
   return /\.(js|mjs|cjs|ts|tsx|py|java)$/.test(file) &&
     !/(^|\/)(test|tests|__tests__)\//.test(file) &&
     !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file) &&
     !file.endsWith("_test.py") &&
     !file.startsWith("test_");
+}
+
+export function verifySuggestedCommands(scan) {
+  return (scan.suggestedCommands || []).map((command) => {
+    if (command === "npm test" || command === "npm run lint") {
+      return {
+        command,
+        status: "available",
+        reason: "package.json script was detected.",
+        reasonZh: "已检测到 package.json script。"
+      };
+    }
+    if (command.startsWith("python manage.py ")) {
+      return {
+        command,
+        status: scan.files.includes("manage.py") ? "available" : "missing_entrypoint",
+        reason: scan.files.includes("manage.py") ? "manage.py was detected." : "manage.py was not detected.",
+        reasonZh: scan.files.includes("manage.py") ? "已检测到 manage.py。" : "未检测到 manage.py。"
+      };
+    }
+    if (command === "python -m pytest") {
+      return {
+        command,
+        status: "needs_dependency",
+        reason: "Python tests were detected; verify pytest is installed before running.",
+        reasonZh: "已检测到 Python 测试；运行前需要确认 pytest 已安装。"
+      };
+    }
+    if (command === "mvn test") {
+      return {
+        command,
+        status: scan.files.some((file) => file.endsWith("pom.xml")) ? "available" : "missing_config",
+        reason: scan.files.some((file) => file.endsWith("pom.xml")) ? "pom.xml was detected." : "pom.xml was not detected.",
+        reasonZh: scan.files.some((file) => file.endsWith("pom.xml")) ? "已检测到 pom.xml。" : "未检测到 pom.xml。"
+      };
+    }
+    if (command === "./gradlew test") {
+      const hasWrapper = scan.files.includes("gradlew") || scan.files.includes("gradlew.bat");
+      return {
+        command,
+        status: hasWrapper ? "available" : "missing_wrapper",
+        reason: hasWrapper ? "Gradle wrapper was detected." : "build.gradle was detected, but gradlew wrapper was not detected.",
+        reasonZh: hasWrapper ? "已检测到 Gradle wrapper。" : "已检测到 build.gradle，但未检测到 gradlew wrapper。"
+      };
+    }
+    return {
+      command,
+      status: "unknown",
+      reason: "The command was inferred but VibeGuard does not have a verifier for it yet.",
+      reasonZh: "该命令来自推断，但 VibeGuard 暂未提供对应检查器。"
+    };
+  });
 }
 
 export function recommendFirstTasks(scan) {
@@ -100,6 +159,7 @@ function taskList(tasks) {
 
 export function buildOnboardingMarkdown(scan) {
   const firstTasks = recommendFirstTasks(scan);
+  const commandChecks = verifySuggestedCommands(scan);
   return `# Repository Onboarding / 仓库上手指南
 
 ## Overview / 概览
@@ -120,6 +180,10 @@ ${bulletList(scan.testFiles.slice(0, 20))}
 ## Suggested Commands / 建议命令
 
 ${bulletList(scan.suggestedCommands)}
+
+## Command Checks / 命令检查
+
+${commandCheckList(commandChecks)}
 
 ## Architecture / 架构
 
@@ -181,9 +245,11 @@ export function analyzeRepository(options = {}) {
   const root = options.root || process.cwd();
   const scan = scanRepository(root);
   const firstTasks = recommendFirstTasks(scan);
+  const commandChecks = verifySuggestedCommands(scan);
   return {
     scan,
     firstTasks,
+    commandChecks,
     markdown: buildOnboardingMarkdown(scan),
     architecture: buildArchitectureMarkdown(scan)
   };

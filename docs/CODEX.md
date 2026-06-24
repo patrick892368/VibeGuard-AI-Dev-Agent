@@ -249,6 +249,10 @@ Codex should inspect `firstTasks` after onboarding. Those tasks are repository-s
 
 Codex 在 onboarding 后应检查 `firstTasks`。这些任务是按仓库扫描结果生成的低风险新人任务，可包含建议命令和相关文件。
 
+Codex should also inspect `commandChecks` before telling a user to run onboarding commands. A command can be `available`, `needs_dependency`, `missing_wrapper`, or another explicit status with a bilingual reason.
+
+Codex 在建议用户运行 onboarding 命令前，也应检查 `commandChecks`。命令可能是 `available`、`needs_dependency`、`missing_wrapper` 或其他明确状态，并附带中英双语原因。
+
 Review changes:
 
 审查变更：

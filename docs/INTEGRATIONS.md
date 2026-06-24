@@ -102,9 +102,9 @@ Available tools:
 
 `eval_history` 会汇总 JSONL 历史记录，方便看趋势。
 
-`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, and structured `firstTasks` with low-risk commands and files for newcomers.
+`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
 
-`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown，以及包含低风险命令和文件的新手任务 `firstTasks`。
+`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。
 
 `review_pr` can return structured findings and, when `writeComment` is provided, write the PR comment body through policy.
 
