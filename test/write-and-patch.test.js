@@ -119,6 +119,25 @@ test("writeSuggestedTests can run a generated JavaScript test through policy", (
   assert.equal(result.testRuns[0].command, "node --test src/math.test.js");
 });
 
+test("writeSuggestedTests can run a generated CommonJS test through policy", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), `function add(a, b) {
+  return a + b;
+}
+
+module.exports = { add };
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "math.test.js"), "utf8");
+  assert.deepEqual(result.candidates[0].functions, ["add"]);
+  assert.equal(result.candidates[0].metadata.moduleSystem, "commonjs");
+  assert.match(generated, /require\("node:test"\)/);
+  assert.equal(result.testRuns[0].status, "passed");
+});
+
 test("writeOnboardingDocs writes onboarding and architecture docs through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "README.md"), "# Demo\n", "utf8");

@@ -75,9 +75,9 @@ Available tools:
 
 `eval_history` 会汇总 JSONL 历史记录，方便看趋势。
 
-`write_tests` can analyze coverage, compare before/after coverage, write generated tests, and optionally run them through command policy when called with `write: true` and `run: true`.
+`write_tests` can analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware tests, and optionally run them through command policy when called with `write: true` and `run: true`.
 
-`write_tests` 可以分析 coverage、比较 before/after coverage、写入生成测试，并在传入 `write: true` 和 `run: true` 时通过 command policy 执行这些测试。
+`write_tests` 可以分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的生成测试，并在传入 `write: true` 和 `run: true` 时通过 command policy 执行这些测试。
 
 `doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
 

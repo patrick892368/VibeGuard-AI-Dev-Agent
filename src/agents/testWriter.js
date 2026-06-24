@@ -14,6 +14,11 @@ function extractJavaScriptFunctions(text) {
   for (const match of text.matchAll(/export\s+function\s+([a-zA-Z_$][\w$]*)\s*\(/g)) names.push(match[1]);
   for (const match of text.matchAll(/function\s+([a-zA-Z_$][\w$]*)\s*\(/g)) names.push(match[1]);
   for (const match of text.matchAll(/(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g)) names.push(match[1]);
+  for (const match of text.matchAll(/(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=/g)) names.push(match[1]);
+  const objectExport = text.match(/module\.exports\s*=\s*{([\s\S]*?)}/m);
+  if (objectExport) {
+    for (const match of objectExport[1].matchAll(/([a-zA-Z_$][\w$]*)\s*(?::|,|$)/g)) names.push(match[1]);
+  }
   return [...new Set(names)];
 }
 
@@ -46,7 +51,8 @@ function extractJavaScriptFunctionRanges(text) {
   const patterns = [
     /export\s+function\s+([a-zA-Z_$][\w$]*)\s*\(/g,
     /function\s+([a-zA-Z_$][\w$]*)\s*\(/g,
-    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g
+    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g,
+    /(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?(?:function\b|\()/g
   ];
   for (const pattern of patterns) {
     for (const match of text.matchAll(pattern)) {
@@ -81,11 +87,21 @@ function javaMetadata(text, sourceFile) {
   return { packageName, className };
 }
 
+function detectJavaScriptModuleSystem(text, sourceFile) {
+  if (sourceFile.endsWith(".mjs")) return "esm";
+  if (sourceFile.endsWith(".cjs")) return "commonjs";
+  if (/\bexport\s+|\bimport\s+/.test(text)) return "esm";
+  if (/module\.exports|exports\./.test(text)) return "commonjs";
+  return "unknown";
+}
+
 function candidateTestPath(sourceFile) {
   const extension = path.extname(sourceFile);
   const base = sourceFile.slice(0, -extension.length);
   if (extension === ".py") return `tests/test_${path.basename(base)}.py`;
-  if ([".js", ".mjs", ".cjs", ".ts"].includes(extension)) return `${base}.test${extension === ".ts" ? ".ts" : ".js"}`;
+  if (extension === ".mjs") return `${base}.test.mjs`;
+  if (extension === ".cjs") return `${base}.test.cjs`;
+  if ([".js", ".ts"].includes(extension)) return `${base}.test${extension === ".ts" ? ".ts" : ".js"}`;
   if (extension === ".java") {
     if (sourceFile.startsWith("src/main/java/")) {
       return `src/test/java/${sourceFile.slice("src/main/java/".length, -".java".length)}Test.java`;
@@ -329,6 +345,17 @@ class ${className}Test {
 
   const importPath = relativeImport(testFile, sourceFile);
   const assertions = functions.map((name) => `  assert.equal(typeof mod.${name}, "function");`).join("\n");
+  if (candidate.metadata?.moduleSystem === "commonjs") {
+    return `const test = require("node:test");
+const assert = require("node:assert/strict");
+const mod = require("${importPath}");
+
+test("exports expected functions", () => {
+${assertions}
+});
+`;
+  }
+
   return `import test from "node:test";
 import assert from "node:assert/strict";
 import * as mod from "${importPath}";
@@ -434,6 +461,7 @@ export function analyzeTestTargets(options = {}) {
     if (!text) continue;
     const isPython = file.endsWith(".py");
     const isJava = file.endsWith(".java");
+    const isJavaScript = !isPython && !isJava;
     const functions = isPython ? extractPythonFunctions(text) : isJava ? extractJavaMethods(text) : extractJavaScriptFunctions(text);
     const functionRanges = isPython ? extractPythonFunctionRanges(text) : isJava ? extractJavaMethodRanges(text) : extractJavaScriptFunctionRanges(text);
     if (functions.length === 0) continue;
@@ -448,7 +476,11 @@ export function analyzeTestTargets(options = {}) {
       suggestedTestFile: testPath,
       hasLikelyTest,
       coverage: fileCoverage,
-      metadata: isJava ? javaMetadata(text, file) : undefined
+      metadata: isJava
+        ? javaMetadata(text, file)
+        : isJavaScript
+          ? { moduleSystem: detectJavaScriptModuleSystem(text, file) }
+          : undefined
     });
   }
 
