@@ -80,3 +80,52 @@ export function summarizeAuditEvents(text, options = {}) {
     parseErrors
   };
 }
+
+function formatCountMap(title, counts) {
+  const rows = Object.entries(counts || {}).sort(([left], [right]) => left.localeCompare(right));
+  if (rows.length === 0) return `### ${title}\n\nNo entries.\n`;
+  return `### ${title}
+
+| Key | Count |
+| --- | ---: |
+${rows.map(([key, count]) => `| ${key} | ${count} |`).join("\n")}
+`;
+}
+
+export function buildAuditMarkdown(auditSummary) {
+  const summary = auditSummary.summary || {};
+  const recent = auditSummary.recent || [];
+  const parseErrors = auditSummary.parseErrors || [];
+  const recentRows = recent.length === 0
+    ? "No recent entries."
+    : recent.map((event) => {
+      const target = event.target || event.command || "";
+      return `- ${event.timestamp || "unknown"} ${event.operation || "unknown"} ${event.policyStatus || "unknown"} ${event.outcome || event.status || event.auditStatus || "unknown"} ${target}`;
+    }).join("\n");
+  const parseErrorRows = parseErrors.length === 0
+    ? "No parse errors."
+    : parseErrors.map((item) => `- line ${item.line}: ${item.error}`).join("\n");
+
+  return `# VibeGuard Audit Report
+
+## Summary
+
+- Entries: ${summary.entries || 0}
+- Parse errors: ${summary.parseErrors || 0}
+- Blocked events: ${summary.blockedEvents || 0}
+
+${formatCountMap("Operations", summary.operations)}
+
+${formatCountMap("Policy Statuses", summary.policyStatuses)}
+
+${formatCountMap("Outcomes", summary.outcomes)}
+
+### Recent Entries
+
+${recentRows}
+
+### Parse Errors
+
+${parseErrorRows}
+`;
+}

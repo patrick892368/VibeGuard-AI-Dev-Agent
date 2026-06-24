@@ -122,7 +122,12 @@ Summarize an audit log:
 
 ```bash
 vibeguard audit summary --file reports/audit.jsonl
+vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 ```
+
+The audit log and Markdown report paths are checked by path policy before reading or writing.
+
+审计日志和 Markdown 报告路径在读取或写入前都会经过 path policy 检查。
 
 ## Local Secrets / 本地密钥
 

@@ -32,7 +32,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback。Detects GitHub remotes, creates PRs/comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
-- `vibeguard audit summary`: 汇总 JSONL 审计日志。Summarizes JSONL audit logs.
+- `vibeguard audit summary` / `audit report`: 汇总 JSONL 审计日志，或写出 Markdown 审计报告。Summarizes JSONL audit logs or writes a Markdown audit report.
 - `vibeguard eval fixtures` / `eval history`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider，并按 fixture 汇总历史结果。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures, with per-fixture history summaries.
 - `vibeguard doctor`: 检查 policy、provider、默认模型、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在；provider HTTP 失败会返回短错误摘要，但不会打印密钥。Checks policy, provider, default model, proxy, Git, GitHub remote, `gh`, and GitHub token presence; provider HTTP failures return short error summaries without printing secrets.
 - `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema、structured tool output，以及 GitHub PR dry-run/comment/checks 等 Codex 工作流工具。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, structured tool output, and Codex workflow tools such as GitHub PR dry-runs, comments, and checks.
@@ -96,6 +96,7 @@ vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard run --command "npm test" --dry-run
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard audit summary --file reports/audit.jsonl
+vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 vibeguard eval fixtures --json
 vibeguard eval fixtures --repeat 3 --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json
@@ -300,6 +301,7 @@ The test suite covers:
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
 - Policy-gated JSONL 审计日志。Policy-gated JSONL audit logs.
+- Markdown 审计报告写出。Markdown audit report generation.
 - coverage.py JSON / LCOV 解析、未覆盖文件排序、missing line 到函数映射、before/after coverage delta，以及生成测试后的 policy-gated test run。coverage.py JSON / LCOV parsing, uncovered file prioritization, missing-line-to-function mapping, before/after coverage deltas, and policy-gated test runs after generating tests.
 - Python `unittest` 风格测试生成和运行。Python `unittest`-style test generation and execution.
 - 简单纯函数、明确分支、对象属性/字典字段 fallback、常见边界值和明确异常分支行为断言生成。Simple pure-function, clear-branch, object-property/dictionary-field fallback, common-boundary, and clear-exception-branch behavior assertion generation.

@@ -2,8 +2,8 @@ import readline from "node:readline";
 import { loadConfig } from "../config/loadConfig.js";
 import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
-import { readFileWithPolicy } from "../policy/safeWrite.js";
-import { summarizeAuditEvents } from "../policy/audit.js";
+import { readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
+import { buildAuditMarkdown, summarizeAuditEvents } from "../policy/audit.js";
 import { analyzeDebugLog } from "../agents/debug.js";
 import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
@@ -194,6 +194,17 @@ const tools = [
       confirmed: booleanSchema,
       auditLog: stringSchema
     })
+  },
+  {
+    name: "audit_report",
+    description: "Write a Markdown audit report from a policy-gated JSONL audit log.",
+    inputSchema: objectSchema({
+      file: stringSchema,
+      output: stringSchema,
+      limit: numberSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    }, ["output"])
   }
 ];
 
@@ -446,6 +457,29 @@ async function callTool(name, args, root) {
         policy: auditFile.policy,
         auditLog: auditFile.auditLog
       }
+    };
+  }
+  if (name === "audit_report") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const auditFile = readFileWithPolicy(root, args.file || "reports/audit.jsonl", engine, {
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
+    const summary = {
+      ...summarizeAuditEvents(auditFile.content, { limit: args.limit }),
+      audit: {
+        path: auditFile.path,
+        policy: auditFile.policy,
+        auditLog: auditFile.auditLog
+      }
+    };
+    return {
+      ...summary,
+      report: writeFileWithPolicy(root, args.output, buildAuditMarkdown(summary), engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      })
     };
   }
   throw new Error(`Unknown tool: ${name}`);

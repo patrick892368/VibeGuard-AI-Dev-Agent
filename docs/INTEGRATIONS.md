@@ -27,6 +27,7 @@ vibeguard onboard --write
 vibeguard policy check --path src/index.js
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
 vibeguard audit summary --file reports/audit.jsonl
+vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 ```
 
 `debug` returns a structured `explanation` with a user-facing message, likely cause, and evidence such as error type, stack location, and framework. Source snippets are included only when path policy allows reading that file.
@@ -88,6 +89,7 @@ Available tools:
 - `eval_history`
 - `doctor`
 - `audit_summary`
+- `audit_report`
 
 `eval_fixtures` supports policy-checked `output` reports, compact JSONL `history` appends, and `repeat` runs for Codex/Grok quality tracking.
 
@@ -125,9 +127,9 @@ Available tools:
 
 CLI 或 MCP-style 工作流可以使用 `--audit-log reports/audit.jsonl` 追加经过 policy 检查的 JSONL 审计事件。
 
-`audit_summary` summarizes JSONL audit logs for operation counts, policy statuses, blocked events, recent entries, and parse errors.
+`audit_summary` summarizes JSONL audit logs for operation counts, policy statuses, blocked events, recent entries, and parse errors. `audit_report` writes the same information as Markdown through policy.
 
-`audit_summary` 会汇总 JSONL 审计日志，展示操作次数、policy 状态、blocked 事件、最近记录和解析错误。
+`audit_summary` 会汇总 JSONL 审计日志，展示操作次数、policy 状态、blocked 事件、最近记录和解析错误。`audit_report` 会经过 policy 把同类信息写成 Markdown 报告。
 
 ## Codex / Codex
 

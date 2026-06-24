@@ -77,6 +77,47 @@ test("CLI audit summary reads policy-gated audit logs", () => {
   assert.equal(parsed.audit.policy.status, "allow");
 });
 
+test("CLI audit report writes policy-gated Markdown", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-audit-report-"));
+  execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "policy",
+    "check",
+    "--path",
+    "src/index.js",
+    "--audit-log",
+    "reports/audit.jsonl",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "audit",
+    "report",
+    "--file",
+    "reports/audit.jsonl",
+    "--output",
+    "reports/audit.md",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.report.path, "reports/audit.md");
+  assert.equal(parsed.report.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, "reports", "audit.md"), "utf8"), /VibeGuard Audit Report/);
+  assert.match(fs.readFileSync(path.join(root, "reports", "audit.md"), "utf8"), /policy_check_path/);
+});
+
 test("CLI debug accepts log file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-"));
   fs.mkdirSync(path.join(root, "src"));

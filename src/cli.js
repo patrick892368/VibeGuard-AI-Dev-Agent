@@ -14,14 +14,13 @@ import { runDoctor } from "./agents/doctor.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch.js";
 import { generateDebugPatch } from "./llm/provider.js";
-import { appendAuditEvent } from "./policy/audit.js";
+import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
-import { readFileWithPolicy } from "./policy/safeWrite.js";
-import { summarizeAuditEvents } from "./policy/audit.js";
+import { readFileWithPolicy, writeFileWithPolicy } from "./policy/safeWrite.js";
 
 function printHelp() {
   console.log(`VibeGuard AI Dev Agent
@@ -48,6 +47,7 @@ Usage:
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
   vibeguard audit summary [--file <audit.jsonl>]
+  vibeguard audit report [--file <audit.jsonl>] --output <audit.md>
   vibeguard doctor
   vibeguard mcp
 
@@ -384,7 +384,7 @@ async function evalCommand(parsed, root, subcommand) {
 }
 
 function auditCommand(parsed, root, subcommand) {
-  if (subcommand === "summary") {
+  if (subcommand === "summary" || subcommand === "report") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
     const file = parsed.file || "reports/audit.jsonl";
@@ -392,13 +392,22 @@ function auditCommand(parsed, root, subcommand) {
       confirmed: Boolean(parsed.confirm),
       auditLog: parsed["audit-log"]
     });
-    return {
+    const summary = {
       ...summarizeAuditEvents(auditFile.content, { limit: parsed.limit }),
       audit: {
         path: auditFile.path,
         policy: auditFile.policy,
         auditLog: auditFile.auditLog
       }
+    };
+    if (subcommand === "summary") return summary;
+    if (!parsed.output) throw new Error("audit report requires --output <audit.md>");
+    return {
+      ...summary,
+      report: writeFileWithPolicy(root, parsed.output, buildAuditMarkdown(summary), engine, {
+        confirmed: Boolean(parsed.confirm),
+        auditLog: parsed["audit-log"]
+      })
     };
   }
   throw new Error(`Unknown audit command: ${subcommand || ""}`);
