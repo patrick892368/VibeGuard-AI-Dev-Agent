@@ -81,6 +81,72 @@ function testTargetFunctions(candidate) {
   return candidate.uncoveredFunctions?.length ? candidate.uncoveredFunctions : candidate.functions;
 }
 
+function splitParams(params) {
+  return params.split(",").map((param) => param.trim().replace(/=.*$/, "").trim()).filter(Boolean);
+}
+
+function jsLiteral(value) {
+  return JSON.stringify(value);
+}
+
+function pythonLiteral(value) {
+  if (value === true) return "True";
+  if (value === false) return "False";
+  if (value === null) return "None";
+  return JSON.stringify(value);
+}
+
+function simpleAssertion(name, params, expression) {
+  const normalized = expression.trim().replace(/;$/, "");
+  if (params.length === 0) {
+    if (normalized === "true" || normalized === "True") return { name, args: [], expected: true };
+    if (normalized === "false" || normalized === "False") return { name, args: [], expected: false };
+    const stringLiteral = normalized.match(/^["']([^"']*)["']$/);
+    if (stringLiteral) return { name, args: [], expected: stringLiteral[1] };
+  }
+  if (params.length === 1) {
+    const [value] = params;
+    if (normalized === `${value}.trim()` || normalized === `${value}.strip()`) {
+      return { name, args: [" Ada "], expected: "Ada" };
+    }
+    if (normalized === `${value}.trim().toLowerCase()` || normalized === `${value}.strip().lower()`) {
+      return { name, args: [" Ada "], expected: "ada" };
+    }
+  }
+  if (params.length === 2) {
+    const [left, right] = params;
+    if (normalized === `${left} + ${right}` || normalized === `${right} + ${left}`) {
+      return { name, args: [2, 3], expected: 5 };
+    }
+  }
+  return null;
+}
+
+function inferPythonAssertions(text) {
+  const hints = [];
+  const pattern = /^def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\):\s*\n\s+return\s+(.+)$/gm;
+  for (const match of text.matchAll(pattern)) {
+    const hint = simpleAssertion(match[1], splitParams(match[2]), match[3]);
+    if (hint) hints.push(hint);
+  }
+  return hints;
+}
+
+function inferJavaScriptAssertions(text) {
+  const hints = [];
+  const patterns = [
+    /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g,
+    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      const hint = simpleAssertion(match[1], splitParams(match[2]), match[3]);
+      if (hint) hints.push(hint);
+    }
+  }
+  return hints;
+}
+
 function javaMetadata(text, sourceFile) {
   const packageName = text.match(/^\s*package\s+([\w.]+);/m)?.[1] || "";
   const className = text.match(/\bclass\s+([A-Z]\w*)/)?.[1] || path.basename(sourceFile, ".java");
@@ -303,10 +369,14 @@ export function generateTestContent(candidate) {
   const sourceFile = candidate.sourceFile.replace(/\\/g, "/");
   const testFile = candidate.suggestedTestFile.replace(/\\/g, "/");
   const functions = testTargetFunctions(candidate);
+  const assertionHints = (candidate.metadata?.assertionHints || []).filter((hint) => functions.includes(hint.name));
 
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
     const assertions = functions.map((name) => `    assert hasattr(module, "${name}")`).join("\n");
+    const behaviorAssertions = assertionHints.map((hint) =>
+      `    assert module.${hint.name}(${hint.args.map(pythonLiteral).join(", ")}) == ${pythonLiteral(hint.expected)}`
+    ).join("\n");
     return `import importlib.util
 import pathlib
 
@@ -324,6 +394,7 @@ def load_module():
 def test_exports_expected_functions():
     module = load_module()
 ${assertions}
+${behaviorAssertions ? `\n\ndef test_covers_simple_behavior():\n    module = load_module()\n${behaviorAssertions}\n` : ""}
 `;
   }
 
@@ -345,6 +416,9 @@ class ${className}Test {
 
   const importPath = relativeImport(testFile, sourceFile);
   const assertions = functions.map((name) => `  assert.equal(typeof mod.${name}, "function");`).join("\n");
+  const behaviorAssertions = assertionHints.map((hint) =>
+    `  assert.equal(mod.${hint.name}(${hint.args.map(jsLiteral).join(", ")}), ${jsLiteral(hint.expected)});`
+  ).join("\n");
   if (candidate.metadata?.moduleSystem === "commonjs") {
     return `const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -353,6 +427,7 @@ const mod = require("${importPath}");
 test("exports expected functions", () => {
 ${assertions}
 });
+${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAssertions}\n});\n` : ""}
 `;
   }
 
@@ -363,6 +438,7 @@ import * as mod from "${importPath}";
 test("exports expected functions", () => {
 ${assertions}
 });
+${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAssertions}\n});\n` : ""}
 `;
 }
 
@@ -529,8 +605,8 @@ export function analyzeTestTargets(options = {}) {
       metadata: isJava
         ? javaMetadata(text, file)
         : isJavaScript
-          ? { moduleSystem: detectJavaScriptModuleSystem(text, file) }
-          : undefined
+          ? { moduleSystem: detectJavaScriptModuleSystem(text, file), assertionHints: inferJavaScriptAssertions(text) }
+          : { assertionHints: inferPythonAssertions(text) }
     });
   }
 

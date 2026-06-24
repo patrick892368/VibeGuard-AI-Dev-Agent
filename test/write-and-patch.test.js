@@ -72,7 +72,9 @@ test("writeSuggestedTests writes a real JavaScript smoke test through policy", (
   const result = writeSuggestedTests(root, engine, { limit: 1 });
   assert.equal(result.written.length, 1);
   assert.equal(result.written[0].path, "src/math.test.js");
-  assert.match(fs.readFileSync(path.join(root, "src", "math.test.js"), "utf8"), /exports expected functions/);
+  const generated = fs.readFileSync(path.join(root, "src", "math.test.js"), "utf8");
+  assert.match(generated, /exports expected functions/);
+  assert.match(generated, /assert\.equal\(mod\.add\(2, 3\), 5\)/);
 });
 
 test("writeSuggestedTests focuses generated assertions on uncovered functions", () => {
@@ -102,7 +104,23 @@ export function uncovered() {
   assert.equal(result.coverageTargets[0].sourceFile, "src/math.js");
   assert.deepEqual(result.coverageTargets[0].uncoveredFunctions, ["uncovered"]);
   assert.doesNotMatch(generated, /typeof mod\.covered/);
+  assert.doesNotMatch(generated, /mod\.covered\(\)/);
   assert.match(generated, /typeof mod\.uncovered/);
+  assert.match(generated, /assert\.equal\(mod\.uncovered\(\), false\)/);
+});
+
+test("writeSuggestedTests writes simple Python behavior assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.py"), `def add(a, b):
+    return a + b
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_math.py"), "utf8");
+  assert.equal(result.written.length, 1);
+  assert.match(generated, /assert module\.add\(2, 3\) == 5/);
 });
 
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {
@@ -135,6 +153,7 @@ module.exports = { add };
   assert.deepEqual(result.candidates[0].functions, ["add"]);
   assert.equal(result.candidates[0].metadata.moduleSystem, "commonjs");
   assert.match(generated, /require\("node:test"\)/);
+  assert.match(generated, /assert\.equal\(mod\.add\(2, 3\), 5\)/);
   assert.equal(result.testRuns[0].status, "passed");
 });
 
