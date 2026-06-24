@@ -142,6 +142,10 @@ The CLI loads local `.env` by default, so the same values can live there for loc
 
 CLI 默认加载本地 `.env`，所以本地 Codex 运行可以直接使用其中的 Grok 配置。
 
+If provider proxy environment variables are not set, Codex runs inherit Git `https.proxy` / `http.proxy` for provider requests.
+
+如果 provider 代理环境变量未设置，Codex 运行会继承 Git `https.proxy` / `http.proxy` 作为 provider 请求代理。
+
 Codex should inspect `summary.successRate`, fixture `outcome`, `policyStatus`, `stage`, and `patchSourceReason` before applying generated patches.
 
 Codex 应该先检查 `summary.successRate`、fixture `outcome`、`policyStatus`、`stage` 和 `patchSourceReason`，再决定是否应用生成的 patch。

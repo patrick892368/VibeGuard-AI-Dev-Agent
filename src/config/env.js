@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 function unquote(value) {
   const trimmed = value.trim();
@@ -21,9 +22,32 @@ export function parseDotEnv(text) {
   return values;
 }
 
+function gitConfigValue(root, key) {
+  try {
+    return execFileSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function withGitProxyFallback(root, env) {
+  const next = { ...env };
+  const gitHttps = gitConfigValue(root, "https.proxy");
+  const gitHttp = gitConfigValue(root, "http.proxy");
+  const httpsProxy = gitHttps || gitHttp;
+  const httpProxy = gitHttp || gitHttps;
+  if (httpsProxy && !next.VIBEGUARD_HTTPS_PROXY && !next.HTTPS_PROXY && !next.https_proxy) {
+    next.HTTPS_PROXY = httpsProxy;
+  }
+  if (httpProxy && !next.HTTP_PROXY && !next.http_proxy) {
+    next.HTTP_PROXY = httpProxy;
+  }
+  return next;
+}
+
 export function loadRuntimeEnv(root = process.cwd(), baseEnv = process.env) {
   if (baseEnv.VIBEGUARD_DISABLE_DOTENV === "1") {
-    return { ...baseEnv };
+    return withGitProxyFallback(root, baseEnv);
   }
 
   const envPath = baseEnv.VIBEGUARD_ENV_FILE
@@ -31,12 +55,12 @@ export function loadRuntimeEnv(root = process.cwd(), baseEnv = process.env) {
     : path.join(root, ".env");
 
   if (!fs.existsSync(envPath)) {
-    return { ...baseEnv };
+    return withGitProxyFallback(root, baseEnv);
   }
 
   const fileEnv = parseDotEnv(fs.readFileSync(envPath, "utf8"));
-  return {
+  return withGitProxyFallback(root, {
     ...fileEnv,
     ...baseEnv
-  };
+  });
 }

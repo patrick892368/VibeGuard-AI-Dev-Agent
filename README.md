@@ -135,6 +135,10 @@ AI 生成的 patch 不会自动应用，必须先通过 Policy Engine 检查。
 
 Generated patches are not applied automatically. They must pass the Policy Engine first.
 
+如果没有设置 `HTTPS_PROXY` / `HTTP_PROXY`，VibeGuard 会从当前仓库的 Git `https.proxy` / `http.proxy` 继承代理用于 provider 请求。
+
+If `HTTPS_PROXY` / `HTTP_PROXY` are not set, VibeGuard inherits Git `https.proxy` / `http.proxy` from the current repository for provider requests.
+
 ## Codex 修复工作流 / Codex Fix Workflow
 
 当前主线是 Codex 驱动：
