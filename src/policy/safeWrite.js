@@ -21,3 +21,15 @@ export function writeFileWithPolicy(root, relativePath, content, engine, options
     policy: result
   };
 }
+
+export function appendFileWithPolicy(root, relativePath, content, engine, options = {}) {
+  const result = engine.checkPath(relativePath, "append");
+  assertPolicyAllowed(result, options);
+  const absolute = path.join(root, relativePath);
+  fs.mkdirSync(path.dirname(absolute), { recursive: true });
+  fs.appendFileSync(absolute, content, "utf8");
+  return {
+    path: relativePath,
+    policy: result
+  };
+}

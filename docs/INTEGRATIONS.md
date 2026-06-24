@@ -44,6 +44,8 @@ Available tools:
 - `detect_github`
 - `eval_fixtures`
 
+`eval_fixtures` supports policy-checked `output` reports and compact JSONL `history` appends for Codex/Grok quality tracking.
+
 ## Codex
 
 Codex is the current priority integration target.

@@ -74,6 +74,7 @@ Evaluate the configured LLM provider against both fixtures:
 ```bash
 node ./bin/vibeguard.js eval fixtures --json
 node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
+node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --json
 ```
 
 With a real provider:
@@ -89,6 +90,7 @@ The CLI also loads a local `.env` file by default, so the same values can live t
 
 Codex should inspect `summary.successRate`, each fixture `outcome`, and any `policyStatus`, `stage`, or `patchSourceReason` before deciding whether to apply a generated patch.
 When `--output` is used, VibeGuard writes the report through `.vibeguard.yaml` path policy.
+When `--history` is used, VibeGuard appends a compact JSONL record through the same policy and omits temporary fixture paths.
 
 Run tests through policy:
 

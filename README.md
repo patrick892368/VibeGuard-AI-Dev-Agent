@@ -63,6 +63,7 @@ vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 vibeguard run --command "npm test" --dry-run
 vibeguard eval fixtures --json
 vibeguard eval fixtures --output reports/eval-fixtures.json --json
+vibeguard eval fixtures --history reports/eval-history.jsonl --json
 vibeguard mcp
 ```
 
@@ -115,10 +116,12 @@ export XAI_API_KEY=...
 export VIBEGUARD_MODEL=...
 node ./bin/vibeguard.js eval fixtures --json
 node ./bin/vibeguard.js eval fixtures --output reports/eval-fixtures.json --json
+node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --json
 ```
 
 The evaluation reports success rate, patch validation failures, policy denials, patch check failures, and blocked provider calls.
 Report output is written through Policy-as-Code, so denied paths such as `.env` are blocked.
+History output is appended as compact JSONL without temporary fixture paths. Local `reports/*.json` and `reports/*.jsonl` files are ignored by Git.
 
 Optional Codex orchestration:
 
@@ -187,6 +190,7 @@ The test suite covers:
 - Review diff analysis.
 - Repository scanning.
 - Confirmed Codex Git plan execution for local branch and commit flows.
+- Compact fixture evaluation history output.
 
 ## Integration Targets
 

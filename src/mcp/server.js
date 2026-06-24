@@ -110,6 +110,7 @@ function callTool(name, args, root) {
       fixture: args.fixture,
       apply: Boolean(args.apply),
       output: args.output,
+      history: args.history,
       confirmed: Boolean(args.confirmed),
       env: loadRuntimeEnv(root)
     });

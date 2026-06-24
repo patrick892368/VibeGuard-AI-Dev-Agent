@@ -38,7 +38,7 @@ Usage:
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
-  vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>]
+  vibeguard eval fixtures [--fixture <id>] [--apply] [--output <file>] [--history <file>]
   vibeguard mcp
 
 Options:
@@ -228,6 +228,7 @@ async function evalCommand(parsed, root, subcommand) {
       fixture: parsed.fixture,
       apply: Boolean(parsed.apply),
       output: parsed.output,
+      history: parsed.history,
       confirmed: Boolean(parsed.confirm),
       env: loadRuntimeEnv(root)
     });

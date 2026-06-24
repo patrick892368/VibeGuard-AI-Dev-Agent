@@ -3,6 +3,8 @@ coverage/
 .vibeguard-cache/
 .env
 .env.*
+reports/*.json
+reports/*.jsonl
 .DS_Store
 Thumbs.db
 

@@ -6,7 +6,7 @@ import { loadConfig } from "../config/loadConfig.js";
 import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
 import { runFixWorkflow } from "../agents/fix.js";
-import { writeFileWithPolicy } from "../policy/safeWrite.js";
+import { appendFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 
 export const defaultEvalFixtures = [
   {
@@ -111,26 +111,90 @@ function aggregateResults(results) {
   };
 }
 
+function resolveProviderName(env) {
+  return env.VIBEGUARD_LLM_PROVIDER || ((env.XAI_API_KEY || env.GROK_API_KEY) ? "grok" : "unset");
+}
+
+function resolveProviderModel(env, provider) {
+  if (provider === "grok" || provider === "xai") {
+    return env.VIBEGUARD_MODEL || env.XAI_MODEL || env.GROK_MODEL || "grok-4.3";
+  }
+  return env.VIBEGUARD_MODEL || null;
+}
+
+function emptyReport(status, stage, apply, runtimeEnv) {
+  const provider = resolveProviderName(runtimeEnv);
+  return {
+    status,
+    stage,
+    mode: apply ? "apply" : "dry_run",
+    provider,
+    model: resolveProviderModel(runtimeEnv, provider),
+    summary: aggregateResults([]),
+    results: []
+  };
+}
+
+function buildHistoryEntry(report) {
+  return {
+    timestamp: new Date().toISOString(),
+    mode: report.mode,
+    provider: report.provider,
+    model: report.model,
+    summary: report.summary,
+    results: report.results.map((result) => ({
+      id: result.id,
+      language: result.language,
+      outcome: result.outcome,
+      status: result.status,
+      stage: result.stage,
+      patchSourceStatus: result.patchSourceStatus,
+      patchSourceReason: result.patchSourceReason,
+      policyStatus: result.policyStatus,
+      applyCheckStatus: result.applyCheckStatus,
+      testStatus: result.testStatus,
+      pr: result.pr
+    }))
+  };
+}
+
 export async function evaluateFixFixtures(options = {}) {
   const repoRoot = options.root || process.cwd();
   const runtimeEnv = options.env || loadRuntimeEnv(repoRoot);
   let outputPolicy = null;
+  let historyPolicy = null;
+  let repoEngine = null;
+
+  if (options.output || options.history) {
+    const { config } = loadConfig(repoRoot);
+    repoEngine = new PolicyEngine(config, { root: repoRoot });
+  }
 
   if (options.output) {
-    const { config } = loadConfig(repoRoot);
-    const engine = new PolicyEngine(config, { root: repoRoot });
-    outputPolicy = engine.checkPath(options.output, "write_eval_report");
+    outputPolicy = repoEngine.checkPath(options.output, "write_eval_report");
     if (outputPolicy.status !== "allow" && !(outputPolicy.status === "require_confirmation" && options.confirmed)) {
       return {
-        status: outputPolicy.status,
-        stage: "output_report",
-        mode: options.apply ? "apply" : "dry_run",
-        provider: runtimeEnv.VIBEGUARD_LLM_PROVIDER || ((runtimeEnv.XAI_API_KEY || runtimeEnv.GROK_API_KEY) ? "grok" : "unset"),
-        summary: aggregateResults([]),
-        results: [],
+        ...emptyReport(outputPolicy.status, "output_report", Boolean(options.apply), runtimeEnv),
         output: {
           path: options.output,
           policy: outputPolicy
+        }
+      };
+    }
+  }
+
+  if (options.history) {
+    historyPolicy = repoEngine.checkPath(options.history, "append_eval_history");
+    if (historyPolicy.status !== "allow" && !(historyPolicy.status === "require_confirmation" && options.confirmed)) {
+      return {
+        ...emptyReport(historyPolicy.status, "history_report", Boolean(options.apply), runtimeEnv),
+        output: outputPolicy ? {
+          path: options.output,
+          policy: outputPolicy
+        } : null,
+        history: {
+          path: options.history,
+          policy: historyPolicy
         }
       };
     }
@@ -162,26 +226,37 @@ export async function evaluateFixFixtures(options = {}) {
     results.push(summarizeFixture(fixture, tempRoot, result, Boolean(options.apply)));
   }
 
+  const provider = resolveProviderName(runtimeEnv);
   const report = {
     status: "completed",
     mode: options.apply ? "apply" : "dry_run",
-    provider: runtimeEnv.VIBEGUARD_LLM_PROVIDER || ((runtimeEnv.XAI_API_KEY || runtimeEnv.GROK_API_KEY) ? "grok" : "unset"),
+    provider,
+    model: resolveProviderModel(runtimeEnv, provider),
     summary: aggregateResults(results),
     results
   };
 
-  if (!options.output) {
+  if (!options.output && !options.history) {
     return report;
   }
 
-  const { config } = loadConfig(repoRoot);
-  const engine = new PolicyEngine(config, { root: repoRoot });
-  const output = writeFileWithPolicy(repoRoot, options.output, `${JSON.stringify(report, null, 2)}\n`, engine, {
-    confirmed: Boolean(options.confirmed)
-  });
+  let output = null;
+  if (options.output) {
+    output = writeFileWithPolicy(repoRoot, options.output, `${JSON.stringify(report, null, 2)}\n`, repoEngine, {
+      confirmed: Boolean(options.confirmed)
+    });
+  }
+
+  let history = null;
+  if (options.history) {
+    history = appendFileWithPolicy(repoRoot, options.history, `${JSON.stringify(buildHistoryEntry(report))}\n`, repoEngine, {
+      confirmed: Boolean(options.confirmed)
+    });
+  }
 
   return {
     ...report,
-    output
+    output,
+    history
   };
 }

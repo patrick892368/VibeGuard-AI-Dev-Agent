@@ -96,6 +96,31 @@ test("CLI eval fixtures writes report output through policy", () => {
   assert.equal(report.summary.successRate, 0);
 });
 
+test("CLI eval fixtures appends compact history through policy", () => {
+  const root = copyRepoWithoutSecrets();
+  const historyPath = "reports/eval-history.jsonl";
+
+  const output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "fixtures", "--history", historyPath, "--json"], {
+    cwd: root,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VIBEGUARD_LLM_PROVIDER: "fixture",
+      VIBEGUARD_FIXTURE_PATCH_MAP: fixturePatchMap(),
+      VIBEGUARD_DISABLE_DOTENV: "1"
+    }
+  });
+  const result = JSON.parse(output);
+  const lines = fs.readFileSync(path.join(root, historyPath), "utf8").trim().split("\n");
+  const history = JSON.parse(lines[0]);
+
+  assert.equal(result.history.path, historyPath);
+  assert.equal(result.history.policy.status, "allow");
+  assert.equal(history.summary.successRate, 1);
+  assert.equal(history.results.length, 2);
+  assert.equal(JSON.stringify(history).includes("tempRoot"), false);
+});
+
 test("CLI eval fixtures blocks report output on denied path", () => {
   const root = copyRepoWithoutSecrets();
   let output;
@@ -116,6 +141,32 @@ test("CLI eval fixtures blocks report output on denied path", () => {
   assert.equal(result.status, "deny");
   assert.equal(result.stage, "output_report");
   assert.equal(result.output.policy.status, "deny");
+  assert.equal(result.summary.total, 0);
+  assert.equal(fs.existsSync(path.join(root, ".env")), false);
+});
+
+test("CLI eval fixtures blocks history output on denied path before provider calls", () => {
+  const root = copyRepoWithoutSecrets();
+  let output;
+  try {
+    output = execFileSync(process.execPath, [path.join(root, "bin", "vibeguard.js"), "--root", root, "eval", "fixtures", "--history", ".env", "--json"], {
+      cwd: root,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        VIBEGUARD_LLM_PROVIDER: "fixture",
+        VIBEGUARD_FIXTURE_PATCH_MAP: fixturePatchMap(),
+        VIBEGUARD_DISABLE_DOTENV: "1"
+      }
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const result = JSON.parse(output);
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "history_report");
+  assert.equal(result.history.policy.status, "deny");
   assert.equal(result.summary.total, 0);
   assert.equal(fs.existsSync(path.join(root, ".env")), false);
 });
