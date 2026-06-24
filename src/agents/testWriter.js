@@ -118,6 +118,7 @@ function expectedFromExpression(param, expression, sample) {
     return sample.trim().toLowerCase();
   }
   if (typeof sample === "number" && normalized === `-${param}`) return -sample;
+  if (Array.isArray(sample) && normalized === `${param}[0]`) return sample[0];
   return undefined;
 }
 
@@ -126,6 +127,7 @@ function trueBranchArgs(param, condition) {
   if ([`${param} == null`, `${param} === null`, `${param} is None`].includes(normalized)) return [null];
   if ([`${param} < 0`, `${param} <= 0`].includes(normalized)) return [-2];
   if ([`${param} == ""`, `${param} === ""`].includes(normalized)) return [""];
+  if ([`${param}.length == 0`, `${param}.length === 0`, `len(${param}) == 0`].includes(normalized)) return [[]];
   return null;
 }
 
@@ -138,12 +140,19 @@ function branchAssertions(name, params, condition, trueExpression, falseExpressi
   if ([`${param} == null`, `${param} === null`, `${param} is None`].includes(normalized)) {
     cases.push({ args: [null], expression: trueExpression });
     cases.push({ args: [" Ada "], expression: falseExpression });
-  } else if ([`${param} < 0`, `${param} <= 0`].includes(normalized)) {
+  } else if (normalized === `${param} < 0`) {
     cases.push({ args: [-2], expression: trueExpression });
+    cases.push({ args: [3], expression: falseExpression });
+  } else if (normalized === `${param} <= 0`) {
+    cases.push({ args: [-2], expression: trueExpression });
+    cases.push({ args: [0], expression: trueExpression });
     cases.push({ args: [3], expression: falseExpression });
   } else if ([`${param} == ""`, `${param} === ""`].includes(normalized)) {
     cases.push({ args: [""], expression: trueExpression });
     cases.push({ args: ["Ada"], expression: falseExpression });
+  } else if ([`${param}.length == 0`, `${param}.length === 0`, `len(${param}) == 0`].includes(normalized)) {
+    cases.push({ args: [[]], expression: trueExpression });
+    cases.push({ args: [["Ada"]], expression: falseExpression });
   }
 
   return cases

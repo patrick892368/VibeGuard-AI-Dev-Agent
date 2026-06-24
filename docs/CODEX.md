@@ -187,9 +187,9 @@ When generated tests fail, `failureAnalysis.repairPlan` tells Codex whether a te
 
 生成测试失败时，`failureAnalysis.repairPlan` 会告诉 Codex 是否适合只重试测试文件、下一步动作是什么，以及哪些 guardrail 不能违反。
 
-Generated tests may include behavior assertions for simple pure functions, clear branches such as null/None checks or numeric lower-bound branches, and clear exception branches such as `throw new RangeError(...)` or `raise ValueError(...)`. More complex IO, database, dependency injection, and mock-heavy cases still require review.
+Generated tests may include behavior assertions for simple pure functions, clear branches such as null/None checks, numeric lower-bound branches including `<= 0`, empty collection checks, and clear exception branches such as `throw new RangeError(...)` or `raise ValueError(...)`. More complex IO, database, dependency injection, and mock-heavy cases still require review.
 
-生成的测试可能包含简单纯函数、明确分支和明确异常分支的行为断言，例如 null/None 检查、数值下界分支、`throw new RangeError(...)` 或 `raise ValueError(...)`。更复杂的 IO、数据库、依赖注入和重 mock 场景仍需要人工 review。
+生成的测试可能包含简单纯函数、明确分支、常见边界值和明确异常分支的行为断言，例如 null/None 检查、包含 `<= 0` 的数值下界分支、空集合检查、`throw new RangeError(...)` 或 `raise ValueError(...)`。更复杂的 IO、数据库、依赖注入和重 mock 场景仍需要人工 review。
 
 Generate bilingual onboarding and architecture docs:
 

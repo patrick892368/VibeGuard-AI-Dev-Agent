@@ -160,6 +160,44 @@ test("writeSuggestedTests writes simple Python branch assertions", () => {
   assert.match(generated, /assert module\.display_name\(" Ada "\) == "Ada"/);
 });
 
+test("writeSuggestedTests writes JavaScript numeric boundary assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "score.js"), `export function normalizeScore(value) {
+  if (value <= 0) {
+    return 0;
+  }
+  return value;
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "score.test.js"), "utf8");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /assert\.equal\(mod\.normalizeScore\(-2\), 0\)/);
+  assert.match(generated, /assert\.equal\(mod\.normalizeScore\(0\), 0\)/);
+  assert.match(generated, /assert\.equal\(mod\.normalizeScore\(3\), 3\)/);
+});
+
+test("writeSuggestedTests writes Python empty collection branch assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "items.py"), `def first_item(items):
+    if len(items) == 0:
+        return None
+    return items[0]
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_items.py"), "utf8");
+  assert.equal(result.written.length, 1);
+  assert.match(generated, /assert module\.first_item\(\[\]\) == None/);
+  assert.match(generated, /assert module\.first_item\(\["Ada"\]\) == "Ada"/);
+});
+
 test("writeSuggestedTests writes simple JavaScript exception assertions", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
