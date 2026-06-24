@@ -16,6 +16,7 @@ function extractJavaScriptFunctions(text) {
   for (const match of text.matchAll(/function\s+([a-zA-Z_$][\w$]*)\s*\(/g)) names.push(match[1]);
   for (const match of text.matchAll(/(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g)) names.push(match[1]);
   for (const match of text.matchAll(/(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=/g)) names.push(match[1]);
+  for (const match of text.matchAll(/(?:exports|module\.exports)\[['"]([^'"]+)['"]\]\s*=/g)) names.push(match[1]);
   const objectExport = text.match(/module\.exports\s*=\s*{([\s\S]*?)}/m);
   if (objectExport) {
     for (const match of objectExport[1].matchAll(/([a-zA-Z_$][\w$]*)\s*(?::|,|$)/g)) names.push(match[1]);
@@ -286,7 +287,7 @@ function detectJavaScriptModuleSystem(text, sourceFile) {
   if (sourceFile.endsWith(".mjs")) return "esm";
   if (sourceFile.endsWith(".cjs")) return "commonjs";
   if (/\bexport\s+|\bimport\s+/.test(text)) return "esm";
-  if (/module\.exports|exports\./.test(text)) return "commonjs";
+  if (/module\.exports|exports\.|(?:exports|module\.exports)\[['"][^'"]+['"]\]/.test(text)) return "commonjs";
   return "unknown";
 }
 

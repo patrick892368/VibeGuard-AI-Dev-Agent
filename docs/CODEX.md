@@ -233,9 +233,9 @@ With `--repair`, VibeGuard can rewrite only the generated test file through Poli
 
 使用 `--repair` 时，VibeGuard 可以只通过 Policy-as-Code 重写生成的测试文件，并对安全分类重新运行同一个聚焦命令。首个已支持的成功修复策略是 `python_source_dir_sys_path`，用于修复 Python 生成测试因源码目录本地 import 未进入 `sys.path` 而失败的场景。
 
-Generated tests may include behavior assertions for simple pure functions, clear branches such as null/None checks, object-property and dictionary-field fallbacks, numeric lower-bound branches including `<= 0`, empty collection checks, and clear exception branches such as `throw new RangeError(...)` or `raise ValueError(...)`. Python tests are generated as stdlib `unittest` cases so they can run without requiring pytest. More complex IO, database, dependency injection, and mock-heavy cases still require review.
+Generated tests may include behavior assertions for simple pure functions, clear branches such as null/None checks, object-property and dictionary-field fallbacks, numeric lower-bound branches including `<= 0`, empty collection checks, and clear exception branches such as `throw new RangeError(...)` or `raise ValueError(...)`. JavaScript module detection supports ESM, CommonJS, and CommonJS bracket exports such as `exports["name"] = value`. Python tests are generated as stdlib `unittest` cases so they can run without requiring pytest. More complex IO, database, dependency injection, and mock-heavy cases still require review.
 
-生成的测试可能包含简单纯函数、明确分支、对象属性/字典字段 fallback、常见边界值和明确异常分支的行为断言，例如 null/None 检查、包含 `<= 0` 的数值下界分支、空集合检查、`throw new RangeError(...)` 或 `raise ValueError(...)`。Python 测试会生成为 stdlib `unittest` 用例，因此不强制依赖 pytest。更复杂的 IO、数据库、依赖注入和重 mock 场景仍需要人工 review。
+生成的测试可能包含简单纯函数、明确分支、对象属性/字典字段 fallback、常见边界值和明确异常分支的行为断言，例如 null/None 检查、包含 `<= 0` 的数值下界分支、空集合检查、`throw new RangeError(...)` 或 `raise ValueError(...)`。JavaScript 模块识别支持 ESM、CommonJS，以及 `exports["name"] = value` 这类 CommonJS bracket export。Python 测试会生成为 stdlib `unittest` 用例，因此不强制依赖 pytest。更复杂的 IO、数据库、依赖注入和重 mock 场景仍需要人工 review。
 
 Generate bilingual onboarding and architecture docs:
 

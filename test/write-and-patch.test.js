@@ -327,6 +327,33 @@ def greeting():
   assert.match(generated, /sys\.path\.insert\(0, source_dir\)/);
 });
 
+test("writeSuggestedTests detects JavaScript bracket CommonJS exports", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "commonjs" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), `function add(a, b) {
+  return a + b;
+}
+
+exports["add"] = add;
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    runTests: true,
+    repairFailures: true
+  });
+  const generated = fs.readFileSync(path.join(root, "src", "math.test.js"), "utf8");
+
+  assert.equal(result.candidates[0].metadata.moduleSystem, "commonjs");
+  assert.equal(result.initialTestRuns, undefined);
+  assert.equal(result.repairRuns, undefined);
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /const mod = require\("\.\/math\.js"\)/);
+  assert.match(generated, /assert\.equal\(mod\.add\(2, 3\), 5\)/);
+});
+
 test("writeSuggestedTests can prepare a Git and PR dry-run plan", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
