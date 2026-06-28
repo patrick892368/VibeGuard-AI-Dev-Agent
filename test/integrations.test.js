@@ -20,6 +20,13 @@ function tempGitHubRepo() {
   return root;
 }
 
+function permissivePolicyEngine(root) {
+  return new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+}
+
 test("hook templates include pre-commit policy check", () => {
   assert.ok(listHooks().includes("pre-commit"));
   assert.match(hookTemplate("pre-commit"), /policy check/);
@@ -260,6 +267,7 @@ test("GitHub PR creation can use REST API fallback", async () => {
     draft: true,
     dryRun: false,
     useApi: true,
+    engine: permissivePolicyEngine(root),
     env: { GITHUB_TOKEN: "token" },
     async fetch(url, options) {
       request = { url, options, body: JSON.parse(options.body) };
@@ -338,6 +346,7 @@ test("GitHub REST API body files cannot escape the repository root", async () =>
     bodyFile: outside,
     dryRun: false,
     useApi: true,
+    engine: permissivePolicyEngine(root),
     env: { GITHUB_TOKEN: "token" },
     async fetch() {
       throw new Error("fetch should not be called");
@@ -387,6 +396,7 @@ test("GitHub PR comments can use REST API fallback", async () => {
     body: "review",
     dryRun: false,
     useApi: true,
+    engine: permissivePolicyEngine(root),
     env: { GITHUB_TOKEN: "token" },
     async fetch(url, options) {
       request = { url, options, body: JSON.parse(options.body) };
@@ -404,6 +414,21 @@ test("GitHub PR comments can use REST API fallback", async () => {
   assert.equal(result.method, "api");
   assert.equal(request.url, "https://api.github.com/repos/owner/repo/issues/12/comments");
   assert.deepEqual(request.body, { body: "review" });
+});
+
+test("GitHub execution helpers require a policy engine", async () => {
+  const root = tempGitHubRepo();
+
+  await assert.rejects(() => commentPullRequestWithGh(root, {
+    pr: 12,
+    body: "review",
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  }), /GitHub PR comment requires a PolicyEngine/);
 });
 
 test("CLI GitHub PR comment execute requires command confirmation", () => {
@@ -493,6 +518,7 @@ test("GitHub PR review comments can use REST API fallback", async () => {
     line: 10,
     dryRun: false,
     useApi: true,
+    engine: permissivePolicyEngine(root),
     env: { GITHUB_TOKEN: "token" },
     async fetch(url, options) {
       request = { url, options, body: JSON.parse(options.body) };
@@ -573,6 +599,7 @@ test("GitHub PR review comment batches can use REST API fallback", async () => {
     ],
     dryRun: false,
     useApi: true,
+    engine: permissivePolicyEngine(root),
     env: { GITHUB_TOKEN: "token" },
     async fetch(url, options) {
       requests.push({ url, options, body: JSON.parse(options.body) });
@@ -650,6 +677,7 @@ test("GitHub checks can use REST API fallback", async () => {
     limit: 5,
     dryRun: false,
     useApi: true,
+    engine: permissivePolicyEngine(root),
     env: { GITHUB_TOKEN: "token" },
     async fetch(url) {
       requestUrl = url;

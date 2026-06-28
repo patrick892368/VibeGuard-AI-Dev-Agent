@@ -127,6 +127,12 @@ function checkOptionalCommandPolicy(root, command, options = {}, operation = "gi
   return policy;
 }
 
+function requireExecutionPolicy(options = {}, operation = "GitHub execution") {
+  if (!options.engine) {
+    throw new Error(`${operation} requires a PolicyEngine`);
+  }
+}
+
 function currentBranch(root, options = {}) {
   checkOptionalCommandPolicy(root, GITHUB_CURRENT_BRANCH_COMMAND, options, "github_current_branch");
   return execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
@@ -310,6 +316,7 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
       command
     };
   }
+  requireExecutionPolicy(options, "GitHub PR creation");
   checkOptionalCommandPolicy(root, command, options, "github_pr");
   if (options.useApi) return createPullRequestWithApi(root, options);
   try {
@@ -334,6 +341,7 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
       command
     };
   }
+  requireExecutionPolicy(options, "GitHub PR comment");
   checkOptionalCommandPolicy(root, command, options, "github_comment");
   if (options.useApi) return commentPullRequestWithApi(root, options);
   try {
@@ -358,6 +366,7 @@ export async function createReviewCommentWithGh(root = process.cwd(), options = 
       command
     };
   }
+  requireExecutionPolicy(options, "GitHub PR review comment");
   checkOptionalCommandPolicy(root, command, options, "github_review_comment");
   if (options.useApi) return createReviewCommentWithApi(root, options);
   try {
@@ -468,6 +477,7 @@ export async function listWorkflowRunsWithGh(root = process.cwd(), options = {})
       command
     };
   }
+  requireExecutionPolicy(options, "GitHub checks");
   checkOptionalCommandPolicy(root, command, options, "github_checks");
   if (options.useApi) return listWorkflowRunsWithApi(root, options);
 

@@ -419,6 +419,13 @@ function githubPrerequisitePolicy(root, commands, stage, confirmed) {
 
 async function githubCommand(parsed, root, subcommand) {
   const env = loadRuntimeEnv(root);
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const executionPolicyOptions = {
+    engine,
+    confirmed: Boolean(parsed.confirm),
+    auditLog: parsed["audit-log"]
+  };
   if (subcommand === "detect") {
     const blocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_detect_policy", Boolean(parsed.confirm));
     if (blocked) return blocked;
@@ -451,7 +458,8 @@ async function githubCommand(parsed, root, subcommand) {
     return createPullRequestWithGh(root, {
       ...options,
       env,
-      dryRun: !parsed.execute
+      dryRun: !parsed.execute,
+      ...(parsed.execute ? executionPolicyOptions : {})
     });
   }
   if (subcommand === "comment") {
@@ -476,7 +484,8 @@ async function githubCommand(parsed, root, subcommand) {
     return commentPullRequestWithGh(root, {
       ...options,
       env,
-      dryRun: !parsed.execute
+      dryRun: !parsed.execute,
+      ...(parsed.execute ? executionPolicyOptions : {})
     });
   }
   if (subcommand === "review-comment") {
@@ -508,7 +517,8 @@ async function githubCommand(parsed, root, subcommand) {
     return createReviewCommentWithGh(root, {
       ...options,
       env,
-      dryRun: !parsed.execute
+      dryRun: !parsed.execute,
+      ...(parsed.execute ? executionPolicyOptions : {})
     });
   }
   if (subcommand === "review-comments") {
@@ -553,7 +563,8 @@ async function githubCommand(parsed, root, subcommand) {
         comments: review.reviewComments,
         limit: parsed.limit,
         env,
-        dryRun: false
+        dryRun: false,
+        ...executionPolicyOptions
       })
       : dryRun;
     return {
@@ -594,7 +605,8 @@ async function githubCommand(parsed, root, subcommand) {
       }
       const result = await listWorkflowRunsWithGh(root, {
         ...options,
-        dryRun: false
+        dryRun: false,
+        ...executionPolicyOptions
       });
       return {
         ...result,

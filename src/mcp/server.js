@@ -572,9 +572,13 @@ async function callTool(name, args, root) {
       env,
       dryRun: true
     });
+    const executionPolicyOptions = {};
     if (args.execute === true) {
       const { config } = loadConfig(root);
       const engine = new PolicyEngine(config, { root });
+      executionPolicyOptions.engine = engine;
+      executionPolicyOptions.confirmed = Boolean(args.confirmed);
+      executionPolicyOptions.auditLog = args.auditLog;
       const policy = engine.checkCommand(dryRun.command);
       if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
         return {
@@ -597,7 +601,8 @@ async function callTool(name, args, root) {
       head: args.head,
       draft: Boolean(args.draft),
       env,
-      dryRun: args.execute !== true
+      dryRun: args.execute !== true,
+      ...executionPolicyOptions
     });
   }
   if (name === "github_comment") {
@@ -611,9 +616,13 @@ async function callTool(name, args, root) {
       env,
       dryRun: true
     });
+    const executionPolicyOptions = {};
     if (args.execute === true) {
       const { config } = loadConfig(root);
       const engine = new PolicyEngine(config, { root });
+      executionPolicyOptions.engine = engine;
+      executionPolicyOptions.confirmed = Boolean(args.confirmed);
+      executionPolicyOptions.auditLog = args.auditLog;
       const policy = engine.checkCommand(dryRun.command);
       if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
         return {
@@ -631,7 +640,8 @@ async function callTool(name, args, root) {
       bodyFile: args.bodyFile,
       body: args.body,
       env,
-      dryRun: args.execute !== true
+      dryRun: args.execute !== true,
+      ...executionPolicyOptions
     });
   }
   if (name === "github_review_comment") {
@@ -655,9 +665,13 @@ async function callTool(name, args, root) {
       ...options,
       dryRun: true
     });
+    const executionPolicyOptions = {};
     if (args.execute === true) {
       const { config } = loadConfig(root);
       const engine = new PolicyEngine(config, { root });
+      executionPolicyOptions.engine = engine;
+      executionPolicyOptions.confirmed = Boolean(args.confirmed);
+      executionPolicyOptions.auditLog = args.auditLog;
       const policy = engine.checkCommand(dryRun.command);
       if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
         return {
@@ -672,7 +686,8 @@ async function callTool(name, args, root) {
     }
     return createReviewCommentWithGh(root, {
       ...options,
-      dryRun: args.execute !== true
+      dryRun: args.execute !== true,
+      ...executionPolicyOptions
     });
   }
   if (name === "github_review_comments") {
@@ -722,7 +737,10 @@ async function callTool(name, args, root) {
         comments: review.reviewComments,
         limit: args.limit,
         env,
-        dryRun: false
+        dryRun: false,
+        engine,
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
       })
       : dryRun;
     return {
@@ -763,7 +781,10 @@ async function callTool(name, args, root) {
       }
       const result = await listWorkflowRunsWithGh(root, {
         ...options,
-        dryRun: false
+        dryRun: false,
+        engine,
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
       });
       return {
         ...result,

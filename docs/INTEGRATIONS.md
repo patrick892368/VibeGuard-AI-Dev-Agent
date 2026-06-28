@@ -281,9 +281,9 @@ vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.d
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff --execute --confirm
 ```
 
-PR and comment body files are checked through path policy before dry-run or execution; batch review-comment diff files are also checked before analysis. REST fallback body-file reads are contained inside the repository root, and direct helper calls can pass a `PolicyEngine` so real GitHub operations, prerequisite commands, and body-file reads use policy gates. Do not pass denied files such as `.env`.
+PR and comment body files are checked through path policy before dry-run or execution; batch review-comment diff files are also checked before analysis. REST fallback body-file reads are contained inside the repository root. CLI and MCP execute paths pass a `PolicyEngine` into the GitHub helpers, and direct public helper calls with `dryRun:false` must also pass a `PolicyEngine` so real GitHub operations, prerequisite commands, and body-file reads use policy gates. Do not pass denied files such as `.env`.
 
-PR 和 comment 的正文文件会先经过 path policy 检查，然后才进入 dry-run 或执行；批量 review comment 的 diff 文件也会在分析前经过检查。REST fallback 读取 bodyFile 时会限制在仓库 root 内；直接调用 helper 时可传入 `PolicyEngine`，让真实 GitHub 操作、prerequisite 命令和正文文件读取使用 policy gate。不要传入 `.env` 等 denied 文件。
+PR 和 comment 的正文文件会先经过 path policy 检查，然后才进入 dry-run 或执行；批量 review comment 的 diff 文件也会在分析前经过检查。REST fallback 读取 bodyFile 时会限制在仓库 root 内。CLI 和 MCP execute 路径会把 `PolicyEngine` 传给 GitHub helper；直接调用公开 helper 时，`dryRun:false` 也必须传入 `PolicyEngine`，让真实 GitHub 操作、prerequisite 命令和正文文件读取使用 policy gate。不要传入 `.env` 等 denied 文件。
 
 Read recent workflow run status:
 
