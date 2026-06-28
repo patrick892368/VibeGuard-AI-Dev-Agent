@@ -147,6 +147,29 @@ test("generateDebugPatch fixture provider returns local patch text", async () =>
   assert.match(result.repairPlan.steps[0], /src\/app\.js:10/);
 });
 
+test("generateDebugPatch fixture patch files are path-policy gated", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-provider-policy-"));
+  fs.writeFileSync(path.join(root, ".env"), "diff --git a/src/app.js b/src/app.js\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const result = await generateDebugPatch({ summary: { type: "Error" } }, {
+    VIBEGUARD_LLM_PROVIDER: "fixture",
+    VIBEGUARD_FIXTURE_PATCH_FILE: ".env"
+  }, {
+    root,
+    engine
+  });
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "fixture_patch_file_policy");
+  assert.equal(result.patchFileRead.path, ".env");
+  assert.equal(result.patchFileRead.policy.status, "deny");
+  assert.equal(result.patch, undefined);
+});
+
 test("buildDebugRepairPlan returns a structured repair strategy", () => {
   const plan = buildDebugRepairPlan({
     summary: { type: "TemplateDoesNotExist", message: "accounts/detail.html" },

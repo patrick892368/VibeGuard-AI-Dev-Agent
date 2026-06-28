@@ -303,16 +303,23 @@ export async function runFixWorkflow(options = {}) {
     auditLog: options.auditLog
   }) : null);
   const providedPatch = patchFromOptions(options, engine);
-  let patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
+  let patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env, {
+    root,
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
 
   if (!patchSource.patch) {
-    const status = "blocked";
+    const status = patchSource.status === "deny" || patchSource.status === "require_confirmation"
+      ? patchSource.status
+      : "blocked";
     return {
       status,
-      stage: "patch_generation",
+      stage: patchSource.stage || "patch_generation",
       debug,
       patchSource,
-      decision: buildDecisionSummary({ status, stage: "patch_generation", selectedTestCommand })
+      decision: buildDecisionSummary({ status, stage: patchSource.stage || "patch_generation", selectedTestCommand })
     };
   }
 

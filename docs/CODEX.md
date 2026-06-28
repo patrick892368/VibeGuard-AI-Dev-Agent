@@ -68,6 +68,10 @@ For AI/provider patch generation, Codex should inspect `aiPatch.repairPlan` or `
 
 AI/provider 生成 patch 时，Codex 在应用任何内容前应检查 `aiPatch.repairPlan` 或 `patchSource.repairPlan`。它会给出可能目标文件、具体修复策略、policy/apply check 要求，以及应运行的最小验证命令。
 
+If fixture provider output is configured with `VIBEGUARD_FIXTURE_PATCH_FILE`, Codex should inspect `patchFileRead.policy` and stop on `fixture_patch_file_policy` unless the path is allowed or explicitly confirmed.
+
+如果 fixture provider 通过 `VIBEGUARD_FIXTURE_PATCH_FILE` 配置输出，Codex 应检查 `patchFileRead.policy`；遇到 `fixture_patch_file_policy` 时必须停止，除非该路径已被允许或已显式确认。
+
 When `--output-patch` is used with `debug --ai-patch`, the patch is normalized, validated, checked by patch policy, and then written as an artifact; it is not applied. When a patch is checked or applied, the underlying `git apply --check` / `git apply` command is also command-policy gated.
 
 `debug --ai-patch` 搭配 `--output-patch` 时，patch 会先规范化、校验、经过 patch policy 检查，然后作为 artifact 写出；它不会被应用。当 patch 被检查或应用时，底层 `git apply --check` / `git apply` 命令也会经过 command policy。

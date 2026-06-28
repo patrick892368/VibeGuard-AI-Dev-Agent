@@ -183,7 +183,12 @@ async function debugCommand(parsed, root) {
     auditLog: parsed["audit-log"]
   });
   if (parsed["ai-patch"]) {
-    const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
+    const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root), {
+      root,
+      engine,
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
     result.aiPatch = ai;
     if (ai.patch) {
       const normalizedPatch = normalizeUnifiedDiff(ai.patch);

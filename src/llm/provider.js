@@ -2,6 +2,8 @@ import fs from "node:fs";
 import http from "node:http";
 import https from "node:https";
 import tls from "node:tls";
+import { appendAuditEvent } from "../policy/audit.js";
+import { readFileWithPolicy } from "../policy/safeWrite.js";
 
 const PATCH_SYSTEM_PROMPT = "You generate minimal unified diff patches for software bugs. Output only a git-style unified diff. Do not modify sensitive files.";
 
@@ -44,6 +46,10 @@ function resolveProvider(env) {
   if (env.VIBEGUARD_LLM_PROVIDER) return env.VIBEGUARD_LLM_PROVIDER;
   if (env.XAI_API_KEY || env.GROK_API_KEY) return "grok";
   return null;
+}
+
+function policyAllows(result, options = {}) {
+  return result.status === "allow" || (result.status === "require_confirmation" && options.confirmed);
 }
 
 function uniqueValues(values) {
@@ -266,7 +272,61 @@ async function callResponsesApi({ endpoint, apiKey, model, context, proxyUrl }) 
   };
 }
 
-export async function generateDebugPatch(context, env = process.env) {
+function readFixturePatchFile(filePath, options = {}) {
+  if (!options.engine) {
+    return {
+      status: "ok",
+      content: fs.readFileSync(filePath, "utf8"),
+      patchFileRead: {
+        path: filePath,
+        policy: {
+          status: "unchecked",
+          operation: "read_fixture_patch",
+          path: filePath,
+          reason: "No PolicyEngine was supplied for fixture patch file reads."
+        }
+      }
+    };
+  }
+
+  const root = options.root || process.cwd();
+  const policy = options.engine.checkPath(filePath, "read_fixture_patch");
+  if (!policyAllows(policy, options)) {
+    const auditLog = appendAuditEvent(root, options.engine, options.auditLog, {
+      operation: "read_fixture_patch",
+      target: filePath,
+      policyStatus: policy.status,
+      outcome: "blocked",
+      reason: policy.reason
+    }, options);
+    return {
+      status: policy.status,
+      stage: "fixture_patch_file_policy",
+      reason: policy.reason,
+      patchFileRead: {
+        path: filePath,
+        policy,
+        auditLog
+      }
+    };
+  }
+
+  const read = readFileWithPolicy(root, filePath, options.engine, {
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
+  return {
+    status: "ok",
+    content: read.content,
+    patchFileRead: {
+      path: read.path,
+      policy: read.policy,
+      auditLog: read.auditLog
+    }
+  };
+}
+
+export async function generateDebugPatch(context, env = process.env, options = {}) {
   const repairPlan = buildDebugRepairPlan(context);
   const provider = resolveProvider(env);
   if (!provider) {
@@ -289,9 +349,26 @@ export async function generateDebugPatch(context, env = process.env) {
       };
     }
 
-    const patch = env.VIBEGUARD_FIXTURE_PATCH_FILE
-      ? fs.readFileSync(env.VIBEGUARD_FIXTURE_PATCH_FILE, "utf8")
-      : env.VIBEGUARD_FIXTURE_PATCH || "";
+    if (env.VIBEGUARD_FIXTURE_PATCH_FILE) {
+      const fixtureFile = readFixturePatchFile(env.VIBEGUARD_FIXTURE_PATCH_FILE, options);
+      if (fixtureFile.status !== "ok") {
+        return {
+          status: fixtureFile.status,
+          stage: fixtureFile.stage,
+          reason: fixtureFile.reason,
+          patchFileRead: fixtureFile.patchFileRead,
+          repairPlan
+        };
+      }
+      return {
+        status: fixtureFile.content ? "ok" : "empty",
+        patch: fixtureFile.content,
+        patchFileRead: fixtureFile.patchFileRead,
+        repairPlan
+      };
+    }
+
+    const patch = env.VIBEGUARD_FIXTURE_PATCH || "";
     return {
       status: patch ? "ok" : "empty",
       patch,

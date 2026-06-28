@@ -43,6 +43,10 @@ When `debug --ai-patch` or `fix` calls a provider, the patch source includes `re
 
 当 `debug --ai-patch` 或 `fix` 调用 provider 时，patch source 会包含 `repairPlan`，列出 primary file、target files、修复策略、policy/apply check 要求和建议验证命令。只要已有 debug context，即使 provider unavailable/error 也会返回这份方案。
 
+Fixture-provider patch files configured with `VIBEGUARD_FIXTURE_PATCH_FILE` are read through path policy on CLI/MCP/Fix paths. Denied or confirmation-required inputs return a structured `fixture_patch_file_policy` result before any patch text is loaded.
+
+通过 `VIBEGUARD_FIXTURE_PATCH_FILE` 配置的 fixture provider patch 文件，在 CLI/MCP/Fix 路径下会先经过 path policy 读取。被拒绝或需要确认的输入会在读取任何 patch 文本前返回结构化 `fixture_patch_file_policy` 结果。
+
 `debug --log <file>` and `fix --log <file>` read log input files through path policy before parsing.
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。

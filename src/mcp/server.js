@@ -494,7 +494,12 @@ async function callTool(name, args, root) {
       };
     }
     if (args.aiPatch) {
-      const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
+      const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root), {
+        root,
+        engine,
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      });
       result.aiPatch = ai;
       if (ai.patch) {
         const normalizedPatch = normalizeUnifiedDiff(ai.patch);

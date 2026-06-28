@@ -20,7 +20,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
 - `vibeguard debug`: 通过 read policy 读取报错日志，解析 Python、Django、Node.js、Java/Spring Boot 报错，定位可能文件，并输出结构化 `explanation` 解释为什么失败。Reads error logs through read policy, parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and returns a structured `explanation` for why the failure happened.
-- `debug --ai-patch` 和 `fix` 的 provider patch source 会返回结构化 `repairPlan`，包含 primary file、target files、策略步骤和建议测试命令，即使 provider 暂时不可用也能给出下一步修复方案。`debug --ai-patch` and `fix` provider patch sources return a structured `repairPlan` with the primary file, target files, strategy steps, and suggested test commands, so callers still get a repair plan even when the provider is temporarily unavailable.
+- `debug --ai-patch` 和 `fix` 的 provider patch source 会返回结构化 `repairPlan`，包含 primary file、target files、策略步骤和建议测试命令，即使 provider 暂时不可用也能给出下一步修复方案；fixture provider 的 patch file 读取也会经过 path policy，避免测试/评测入口读取 `.env` 等 denied 文件。`debug --ai-patch` and `fix` provider patch sources return a structured `repairPlan` with the primary file, target files, strategy steps, and suggested test commands, so callers still get a repair plan even when the provider is temporarily unavailable; fixture-provider patch-file reads also pass path policy to prevent test/eval entry points from reading denied files such as `.env`.
 - Debug snippets 会先经过 path policy，再包含 stack frame 和 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件但不读取 denied 路径。Debug snippets pass through path policy before including stack frames and short previews of framework-related likely files, so AI patch generation can see likely targets without reading denied paths.
 - `vibeguard fix`: 通过 read policy 读取日志和 patch 文件，编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Reads log and patch files through read policy, orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
 - `vibeguard test`: 扫描测试候选，候选源码读取会先经过 path policy，并可通过 read policy 读取 coverage.py JSON / LCOV；coverage 文件读取会限制在仓库 root 内，排序未覆盖文件、函数、类和接口，也可比较 before/after coverage，并用 `coverageDeltaStatus` 标明是否已比较。Scans source files for test candidates, checks candidate source reads through path policy, reads coverage.py JSON / LCOV through read policy; coverage-file reads are contained inside the repository root, can prioritize uncovered files, functions, classes, and interfaces, can compare before/after coverage, and reports `coverageDeltaStatus`.
@@ -148,6 +148,10 @@ export VIBEGUARD_MODEL=...
 AI 生成的 patch 不会自动应用，必须先通过 Policy Engine 检查。`debug --ai-patch --output-patch <file>` 可以经过 policy 写出规范化 patch artifact。
 
 Generated patches are not applied automatically. They must pass the Policy Engine first. `debug --ai-patch --output-patch <file>` can write the normalized patch artifact through policy.
+
+用于测试和评测的 fixture provider 如果通过 `VIBEGUARD_FIXTURE_PATCH_FILE` 读取本地 patch 文件，CLI/MCP/Fix 会先执行 path policy；被拒绝或需要确认的路径会返回结构化 `fixture_patch_file_policy` 状态。
+
+When the fixture provider used for tests and evaluations reads a local patch through `VIBEGUARD_FIXTURE_PATCH_FILE`, CLI/MCP/Fix paths check path policy first; denied or confirmation-required paths return a structured `fixture_patch_file_policy` status.
 
 如果没有设置 `HTTPS_PROXY` / `HTTP_PROXY`，VibeGuard 会从当前仓库的 Git `https.proxy` / `http.proxy` 继承代理用于 provider 请求；该继承通过解析 `.git/config` 完成，不执行 `git config --get`。
 
