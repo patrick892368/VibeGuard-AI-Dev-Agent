@@ -145,9 +145,9 @@ AI 生成的 patch 不会自动应用，必须先通过 Policy Engine 检查。`
 
 Generated patches are not applied automatically. They must pass the Policy Engine first. `debug --ai-patch --output-patch <file>` can write the normalized patch artifact through policy.
 
-如果没有设置 `HTTPS_PROXY` / `HTTP_PROXY`，VibeGuard 会从当前仓库的 Git `https.proxy` / `http.proxy` 继承代理用于 provider 请求。
+如果没有设置 `HTTPS_PROXY` / `HTTP_PROXY`，VibeGuard 会从当前仓库的 Git `https.proxy` / `http.proxy` 继承代理用于 provider 请求；该继承通过解析 `.git/config` 完成，不执行 `git config --get`。
 
-If `HTTPS_PROXY` / `HTTP_PROXY` are not set, VibeGuard inherits Git `https.proxy` / `http.proxy` from the current repository for provider requests.
+If `HTTPS_PROXY` / `HTTP_PROXY` are not set, VibeGuard inherits Git `https.proxy` / `http.proxy` from the current repository for provider requests; this is done by parsing `.git/config`, not by running `git config --get`.
 
 ## Codex 修复工作流 / Codex Fix Workflow
 

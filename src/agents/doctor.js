@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { gitConfigValue } from "../config/env.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { detectGitHubRepository } from "../integrations/github.js";
 import { PolicyEngine } from "../policy/engine.js";
@@ -48,14 +49,6 @@ function providerStatus(env) {
     ready,
     reason
   };
-}
-
-function gitConfigValue(root, key) {
-  try {
-    return execFileSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" }).trim() || null;
-  } catch {
-    return null;
-  }
 }
 
 function buildNextActions({ policy, github, githubAuth, provider, tools }) {

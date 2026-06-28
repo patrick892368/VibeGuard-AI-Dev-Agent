@@ -169,6 +169,10 @@ MCP `write_tests` tool 暴露与 CLI 相同的 `repair` 布尔参数。
 
 `doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥；如果缺少 provider 或 GitHub 执行前置条件，会返回 `nextActions`。
 
+Provider proxy fallback reads Git `http.proxy` / `https.proxy` by parsing `.git/config`; it does not shell out to `git config --get`.
+
+Provider 代理 fallback 会通过解析 `.git/config` 读取 Git `http.proxy` / `https.proxy`，不会 shell out 执行 `git config --get`。
+
 `--audit-log reports/audit.jsonl` can be used from CLI or MCP-style workflows to append policy-gated JSONL audit events.
 
 CLI 或 MCP-style 工作流可以使用 `--audit-log reports/audit.jsonl` 追加经过 policy 检查的 JSONL 审计事件。

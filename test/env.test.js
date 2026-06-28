@@ -3,8 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { loadRuntimeEnv, parseDotEnv } from "../src/config/env.js";
+import { loadRuntimeEnv, parseDotEnv, parseGitConfig } from "../src/config/env.js";
 
 test("parseDotEnv parses basic dotenv syntax", () => {
   const parsed = parseDotEnv(`
@@ -17,6 +16,18 @@ QUOTED="hello world"
   assert.equal(parsed.XAI_API_KEY, "xai-secret");
   assert.equal(parsed.VIBEGUARD_LLM_PROVIDER, "grok");
   assert.equal(parsed.QUOTED, "hello world");
+});
+
+test("parseGitConfig parses proxy values without running git", () => {
+  const parsed = parseGitConfig(`
+[http]
+  proxy = http://127.0.0.1:10809
+[https]
+  proxy = "http://127.0.0.1:10809"
+`);
+
+  assert.equal(parsed["http.proxy"], "http://127.0.0.1:10809");
+  assert.equal(parsed["https.proxy"], "http://127.0.0.1:10809");
 });
 
 test("loadRuntimeEnv loads .env unless disabled and keeps process env precedence", () => {
@@ -33,9 +44,12 @@ test("loadRuntimeEnv loads .env unless disabled and keeps process env precedence
 
 test("loadRuntimeEnv falls back to git proxy config for provider requests", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-env-proxy-"));
-  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
-  execFileSync("git", ["config", "http.proxy", "http://127.0.0.1:10809"], { cwd: root, encoding: "utf8" });
-  execFileSync("git", ["config", "https.proxy", "http://127.0.0.1:10809"], { cwd: root, encoding: "utf8" });
+  fs.mkdirSync(path.join(root, ".git"));
+  fs.writeFileSync(path.join(root, ".git", "config"), `[http]
+  proxy = http://127.0.0.1:10809
+[https]
+  proxy = http://127.0.0.1:10809
+`, "utf8");
 
   const loaded = loadRuntimeEnv(root, {});
   assert.equal(loaded.HTTP_PROXY, "http://127.0.0.1:10809");
