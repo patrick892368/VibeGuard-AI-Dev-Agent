@@ -7,6 +7,25 @@ import { execFileSync } from "node:child_process";
 
 const bin = path.resolve("bin/vibeguard.js");
 
+function writeCommandPolicy(root, { deny = [], requireConfirmation = [] } = {}) {
+  const denyBlock = deny.length
+    ? `\n${deny.map((command) => `    - "${command}"`).join("\n")}`
+    : " []";
+  const confirmBlock = requireConfirmation.length
+    ? `\n${requireConfirmation.map((command) => `    - "${command}"`).join("\n")}`
+    : " []";
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny:${denyBlock}
+  require_confirmation:${confirmBlock}
+`, "utf8");
+}
+
 test("CLI policy check prints JSON result", () => {
   const output = execFileSync(process.execPath, [bin, "policy", "check", "--path", "src/index.js", "--json"], {
     cwd: process.cwd(),
@@ -435,6 +454,33 @@ test("CLI review blocks denied diff input paths", () => {
   }), /Path matches deny policy/);
 });
 
+test("CLI review checks git diff command policy before default diff reads", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-git-diff-policy-"));
+  writeCommandPolicy(root, { deny: ["git diff"] });
+
+  let output;
+  try {
+    output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "review",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "deny");
+  assert.equal(parsed.stage, "review_git_diff_policy");
+  assert.equal(parsed.command, "git diff --cached");
+  assert.match(parsed.policy.reason, /Command matches deny policy: git diff/);
+});
+
 test("CLI GitHub review-comments builds a policy-gated batch dry-run from a diff", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-comments-"));
   fs.mkdirSync(path.join(root, "reports"), { recursive: true });
@@ -635,6 +681,34 @@ test("CLI pr summary can write a policy-gated body file", () => {
   assert.equal(parsed.writtenBody.path, "reports/pr-body.md");
   assert.equal(parsed.writtenBody.policy.status, "allow");
   assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
+});
+
+test("CLI pr summary checks git diff command policy before default diff reads", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-git-diff-policy-"));
+  writeCommandPolicy(root, { deny: ["git diff"] });
+
+  let output;
+  try {
+    output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "pr",
+      "summary",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "deny");
+  assert.equal(parsed.stage, "pr_summary_git_diff_policy");
+  assert.equal(parsed.command, "git diff");
+  assert.match(parsed.policy.reason, /Command matches deny policy: git diff/);
 });
 
 test("CLI patch check blocks denied patch input files", () => {

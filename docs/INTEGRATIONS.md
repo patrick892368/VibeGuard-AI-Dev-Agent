@@ -49,13 +49,13 @@ When `debug --ai-patch` or `fix` calls a provider, the patch source includes `re
 
 `test` 会先通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。它会返回 `coverageDeltaStatus`，让调用方知道 before/after coverage 是否已比较。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
 
-`review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`, and `github review-comments` can publish the generated file-line comments in a policy-gated batch.
+`review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. Without `--diff`, default `git diff` reads are command-policy gated; `--diff` input files are read through path policy, `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`, and `github review-comments` can publish the generated file-line comments in a policy-gated batch.
 
-`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`，`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
+`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。未传 `--diff` 时，默认 `git diff` 读取会先经过 command policy；`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`，`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
 
-`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes. `writeBody` writes that body through policy for GitHub PR creation.
+`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes. Without an explicit diff file or stdin diff, the default `git diff` read is command-policy gated. `writeBody` writes that body through policy for GitHub PR creation.
 
-`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems 和验证 checklist。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
+`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems 和验证 checklist。未传显式 diff 文件或 stdin diff 时，默认 `git diff` 读取会先经过 command policy。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
 
 ## Git Hooks / Git Hooks
 

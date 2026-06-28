@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { loadConfig } from "./config/loadConfig.js";
 import { loadRuntimeEnv } from "./config/env.js";
 import { PolicyEngine } from "./policy/engine.js";
@@ -17,7 +16,7 @@ import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
-import { runCommandWithPolicy } from "./runner/safeCommand.js";
+import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
 import { readFileWithPolicy, writeFileWithPolicy } from "./policy/safeWrite.js";
@@ -235,17 +234,69 @@ async function fixCommand(parsed, root) {
   });
 }
 
+function blockedCommandPolicyResult(root, engine, parsed, argv, stage) {
+  const command = commandDisplay(argv);
+  const policy = engine.checkCommand(command);
+  if (policy.status === "allow" || (policy.status === "require_confirmation" && parsed.confirm)) {
+    return null;
+  }
+  const auditLog = appendAuditEvent(root, engine, parsed["audit-log"], {
+    operation: "run_command",
+    command,
+    argv,
+    policyStatus: policy.status,
+    outcome: "blocked",
+    dryRun: false,
+    reason: policy.reason
+  }, { confirmed: Boolean(parsed.confirm) });
+  return {
+    status: policy.status,
+    stage,
+    command,
+    argv,
+    policy,
+    auditLog
+  };
+}
+
+function runGitDiffCommand(root, parsed, argv, stage) {
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const blocked = blockedCommandPolicyResult(root, engine, parsed, argv, stage);
+  if (blocked) return { blocked };
+
+  return {
+    result: runArgvWithPolicy(root, argv, engine, {
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    })
+  };
+}
+
+function readGitDiffWithPolicy(parsed, root, options = {}) {
+  const commands = options.preferCached
+    ? [["git", "diff", "--cached"], ["git", "diff"]]
+    : [["git", "diff"]];
+  for (const argv of commands) {
+    const run = runGitDiffCommand(root, parsed, argv, options.stage || "git_diff_policy");
+    if (run.blocked) return run.blocked;
+    if (run.result.status !== "passed") return readStdinIfAvailable();
+    if (run.result.stdout.trim()) return run.result.stdout;
+  }
+  return readStdinIfAvailable();
+}
+
 function reviewCommand(parsed, root) {
   let diffText = "";
   if (parsed.diff) {
     diffText = readInputFileWithPolicy(root, parsed.diff, parsed);
   } else {
-    try {
-      diffText = execFileSync("git", ["diff", "--cached"], { cwd: root, encoding: "utf8" });
-      if (!diffText.trim()) diffText = execFileSync("git", ["diff"], { cwd: root, encoding: "utf8" });
-    } catch {
-      diffText = readStdinIfAvailable();
-    }
+    const diffResult = readGitDiffWithPolicy(parsed, root, {
+      preferCached: true,
+      stage: "review_git_diff_policy"
+    });
+    if (typeof diffResult !== "string") return diffResult;
+    diffText = diffResult;
   }
   if (!diffText.trim()) throw new Error("review requires a git diff, --diff <file>, or diff text on stdin");
   if (parsed["write-comment"]) {
@@ -263,7 +314,9 @@ function diffInput(parsed, root) {
   if (parsed.diff) return readInputFileWithPolicy(root, parsed.diff, parsed);
   const stdin = readStdinIfAvailable();
   if (stdin.trim()) return stdin;
-  return execFileSync("git", ["diff"], { cwd: root, encoding: "utf8" });
+  return readGitDiffWithPolicy(parsed, root, {
+    stage: "pr_summary_git_diff_policy"
+  });
 }
 
 function patchCommand(parsed, root, subcommand) {
@@ -660,6 +713,7 @@ async function dispatch(parsed) {
   if (command === "hooks") return hooksCommand(parsed, root, subcommand);
   if (command === "pr" && subcommand === "summary") {
     const diffText = diffInput(parsed, root);
+    if (typeof diffText !== "string") return diffText;
     if (parsed["write-body"]) {
       const { config } = loadConfig(root);
       const engine = new PolicyEngine(config, { root });
