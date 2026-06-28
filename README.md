@@ -20,6 +20,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
 - `vibeguard debug`: 通过 read policy 读取报错日志，解析 Python、Django、Node.js、Java/Spring Boot 报错，定位可能文件，并输出结构化 `explanation` 解释为什么失败。Reads error logs through read policy, parses Python, Django, Node.js, and Java/Spring Boot errors, finds likely files, and returns a structured `explanation` for why the failure happened.
+- `debug --ai-patch` 和 `fix` 的 provider patch source 会返回结构化 `repairPlan`，包含 primary file、target files、策略步骤和建议测试命令，即使 provider 暂时不可用也能给出下一步修复方案。`debug --ai-patch` and `fix` provider patch sources return a structured `repairPlan` with the primary file, target files, strategy steps, and suggested test commands, so callers still get a repair plan even when the provider is temporarily unavailable.
 - Debug snippets 会先经过 path policy，再包含 stack frame 和 framework 相关 likely files 的短预览，帮助 AI patch 看到真正需要修改的文件但不读取 denied 路径。Debug snippets pass through path policy before including stack frames and short previews of framework-related likely files, so AI patch generation can see likely targets without reading denied paths.
 - `vibeguard fix`: 通过 read policy 读取日志和 patch 文件，编排 debug、patch 校验、policy 检查、安全 apply、测试、PR summary 和 Git plan；会规范化 fenced diff、plain unified diff、非标准 diff header 和 hunk count，并在生成的 Django TemplateDoesNotExist patch 无法应用时尝试受策略保护的本地恢复。Reads log and patch files through read policy, orchestrates debug, patch validation, policy checks, safe apply, tests, PR summaries, and Git plans; normalizes fenced diffs, plain unified diffs, non-standard diff headers, and hunk counts, and can try a policy-protected local recovery when a generated Django TemplateDoesNotExist patch cannot apply.
 - `vibeguard test`: 扫描测试候选，并可通过 read policy 读取 coverage.py JSON / LCOV；coverage 文件读取会限制在仓库 root 内，排序未覆盖文件、函数、类和接口，也可比较 before/after coverage，并用 `coverageDeltaStatus` 标明是否已比较。Scans source files for test candidates, reads coverage.py JSON / LCOV through read policy; coverage-file reads are contained inside the repository root, can prioritize uncovered files, functions, classes, and interfaces, can compare before/after coverage, and reports `coverageDeltaStatus`.
@@ -312,6 +313,7 @@ The test suite covers:
 - Patch 安全检查。Patch file safety checks.
 - Debug/fix 日志输入和 patch 输入文件读取的 Policy-as-Code 边界。Policy-as-Code boundaries for reading debug/fix log inputs and patch input files.
 - Patch 输出规范化和生成补丁失败后的 Django fallback 恢复。Patch output normalization and Django fallback recovery after generated patch-check failures.
+- AI patch provider 的结构化 `repairPlan`，覆盖 provider unavailable、fixture 和 Grok-compatible 返回路径。Structured AI patch provider `repairPlan` coverage for provider-unavailable, fixture, and Grok-compatible return paths.
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
 - Python / Django / Node / Java / Spring Boot 报错解析。Python / Django / Node / Java / Spring Boot error parsing.

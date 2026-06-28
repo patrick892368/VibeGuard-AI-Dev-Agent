@@ -37,6 +37,10 @@ vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 
 `debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。源码片段只有在 path policy 允许读取该文件时才会返回。
 
+When `debug --ai-patch` or `fix` calls a provider, the patch source includes `repairPlan` with the primary file, target files, strategy, policy/apply-check requirements, and suggested validation commands. This is returned even for provider unavailable/error states when debug context is available.
+
+当 `debug --ai-patch` 或 `fix` 调用 provider 时，patch source 会包含 `repairPlan`，列出 primary file、target files、修复策略、policy/apply check 要求和建议验证命令。只要已有 debug context，即使 provider unavailable/error 也会返回这份方案。
+
 `debug --log <file>` and `fix --log <file>` read log input files through path policy before parsing.
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。

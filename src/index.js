@@ -12,7 +12,7 @@ export { buildPrSummary, writePrSummaryBody } from "./agents/pr.js";
 export { runDoctor } from "./agents/doctor.js";
 export { applyPatchWithPolicy } from "./patch/safeApply.js";
 export { validateUnifiedDiff } from "./patch/validatePatch.js";
-export { generateDebugPatch } from "./llm/provider.js";
+export { buildDebugRepairPlan, generateDebugPatch } from "./llm/provider.js";
 export { runCommandWithPolicy } from "./runner/safeCommand.js";
 export {
   GITHUB_CURRENT_BRANCH_COMMAND,

@@ -8,7 +8,7 @@ import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
-import { generateDebugPatch } from "../src/llm/provider.js";
+import { buildDebugRepairPlan, generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
 
 const bin = path.resolve("bin/vibeguard.js");
@@ -28,6 +28,7 @@ test("hook templates include pre-commit policy check", () => {
 test("public API exports GitHub batch review helpers", async () => {
   const api = await import("../src/index.js");
 
+  assert.equal(typeof api.buildDebugRepairPlan, "function");
   assert.equal(typeof api.createReviewCommentsWithGh, "function");
   assert.equal(typeof api.checkGitHubCommandsPolicy, "function");
   assert.equal(typeof api.checkGitPlanPolicy, "function");
@@ -79,15 +80,40 @@ test("writePrSummaryBody writes a GitHub-ready body through policy", () => {
 test("generateDebugPatch is unavailable without provider env", async () => {
   const result = await generateDebugPatch({ summary: { type: "Error" } }, {});
   assert.equal(result.status, "unavailable");
+  assert.equal(result.repairPlan.status, "suggested");
 });
 
 test("generateDebugPatch fixture provider returns local patch text", async () => {
-  const result = await generateDebugPatch({ summary: { type: "Error" } }, {
+  const result = await generateDebugPatch({
+    summary: { type: "Error" },
+    frames: [{ file: "src/app.js", line: 10, symbol: "main" }]
+  }, {
     VIBEGUARD_LLM_PROVIDER: "fixture",
     VIBEGUARD_FIXTURE_PATCH: "not a diff"
   });
   assert.equal(result.status, "ok");
   assert.equal(result.patch, "not a diff");
+  assert.equal(result.repairPlan.primaryFile, "src/app.js");
+  assert.match(result.repairPlan.steps[0], /src\/app\.js:10/);
+});
+
+test("buildDebugRepairPlan returns a structured repair strategy", () => {
+  const plan = buildDebugRepairPlan({
+    summary: { type: "TemplateDoesNotExist", message: "accounts/detail.html" },
+    explanation: { likelyCause: "The view points at a template path that does not exist." },
+    frames: [{ file: "accounts/views.py", line: 7, symbol: "detail" }],
+    likelyFiles: ["accounts/views.py", "templates/accounts/detail.html"],
+    frameworkContext: { framework: "Django", likelyFiles: ["project/settings.py"] },
+    suggestedTestCommands: ["python manage.py test accounts"]
+  });
+
+  assert.equal(plan.status, "suggested");
+  assert.equal(plan.errorType, "TemplateDoesNotExist");
+  assert.equal(plan.framework, "Django");
+  assert.equal(plan.primaryFile, "accounts/views.py");
+  assert.deepEqual(plan.targetFiles.slice(0, 3), ["accounts/views.py", "templates/accounts/detail.html", "project/settings.py"]);
+  assert.match(plan.strategy, /Django render\/template reference/);
+  assert.deepEqual(plan.validation.testCommands, ["python manage.py test accounts"]);
 });
 
 test("generateDebugPatch uses Grok-compatible Responses API", async () => {
@@ -118,6 +144,7 @@ test("generateDebugPatch uses Grok-compatible Responses API", async () => {
     assert.equal(request.headers.authorization, "Bearer xai-secret");
     assert.equal(request.body.model, "grok-test");
     assert.match(request.body.input[0].content, /unified diff/);
+    assert.equal(result.repairPlan.errorType, "ReferenceError");
   } finally {
     globalThis.fetch = originalFetch;
   }

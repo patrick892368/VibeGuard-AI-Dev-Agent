@@ -46,6 +46,98 @@ function resolveProvider(env) {
   return null;
 }
 
+function uniqueValues(values) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function targetFilesFromContext(context = {}) {
+  return uniqueValues([
+    ...(context.frames || []).map((frame) => frame.file),
+    ...(context.likelyFiles || []),
+    ...(context.snippets || []).map((snippet) => snippet.file),
+    ...(context.frameworkContexts || []).flatMap((framework) => framework.likelyFiles || []),
+    ...(context.frameworkContext?.likelyFiles || [])
+  ]).slice(0, 8);
+}
+
+function frameworkName(context = {}) {
+  return context.frameworkContext?.framework ||
+    context.frameworkContexts?.[0]?.framework ||
+    null;
+}
+
+function repairStrategyForContext(context = {}) {
+  const summary = context.summary || {};
+  const text = `${summary.type || ""}: ${summary.message || ""}`;
+  const framework = frameworkName(context);
+
+  if (/TemplateDoesNotExist/.test(summary.type || "")) {
+    return "Fix the Django render/template reference so it points at an existing template path, or add the missing template if that is the intended contract.";
+  }
+  if (/NoSuchBeanDefinitionException|UnsatisfiedDependencyException/.test(summary.type || "")) {
+    return "Register the missing Spring dependency with the right component annotation or configuration, then verify the application context can construct the dependency graph.";
+  }
+  if (/NameError|ReferenceError/.test(text)) {
+    return "Correct the missing symbol by using the intended variable name, import, or scope-local value at the failing line.";
+  }
+  if (/TypeError/.test(text)) {
+    return "Guard or normalize the value shape before the failing operation, keeping the fix as close as possible to the reported stack frame.";
+  }
+  if (/NullPointerException/.test(summary.type || "")) {
+    return "Initialize, inject, or validate the nullable Java value before dereferencing it.";
+  }
+  if (/ModuleNotFoundError|Cannot find module/.test(text)) {
+    return "Correct the import path or dependency declaration without changing lockfiles unless policy and human review allow it.";
+  }
+  if (/SyntaxError/.test(text)) {
+    return "Fix the malformed syntax at the reported line with the smallest source edit that restores parsing.";
+  }
+  if (framework) {
+    return `Inspect the ${framework} context and patch the smallest source or configuration mismatch that explains the stack trace.`;
+  }
+  return "Patch the first in-repository stack frame with the smallest behavior-preserving change that addresses the reported runtime error.";
+}
+
+function repairStepsForContext(context = {}, targetFiles = []) {
+  const firstFrame = context.frames?.[0];
+  const location = firstFrame
+    ? `${firstFrame.file}:${firstFrame.line}${firstFrame.symbol ? ` in ${firstFrame.symbol}` : ""}`
+    : targetFiles[0] || "the first likely source file";
+  const commands = (context.suggestedTestCommands || []).slice(0, 3);
+  return [
+    `Inspect ${location} and compare it with the error message and source snippet.`,
+    `Modify ${targetFiles[0] || "the likely source file"} only as needed to remove the root cause.`,
+    "Generate a minimal unified diff and check every changed file through Policy-as-Code.",
+    commands.length > 0
+      ? `Run the smallest relevant test command: ${commands[0]}.`
+      : "Run the smallest relevant test command discovered from the repository."
+  ];
+}
+
+export function buildDebugRepairPlan(context = {}) {
+  const summary = context.summary || {};
+  const explanation = context.explanation || {};
+  const targetFiles = targetFilesFromContext(context);
+  const testCommands = (context.suggestedTestCommands || []).slice(0, 5);
+
+  return {
+    status: "suggested",
+    errorType: summary.type || null,
+    message: summary.message || null,
+    framework: frameworkName(context),
+    likelyCause: explanation.likelyCause || null,
+    primaryFile: targetFiles[0] || null,
+    targetFiles,
+    strategy: repairStrategyForContext(context),
+    steps: repairStepsForContext(context, targetFiles),
+    validation: {
+      policyCheckRequired: true,
+      applyCheckRequired: true,
+      testCommands
+    }
+  };
+}
+
 class HttpsProxyAgent extends https.Agent {
   constructor(proxyUrl) {
     super();
@@ -121,6 +213,7 @@ function postJsonViaProxy(endpoint, headers, body, proxyUrl) {
 }
 
 async function callResponsesApi({ endpoint, apiKey, model, context, proxyUrl }) {
+  const repairPlan = buildDebugRepairPlan(context);
   const body = JSON.stringify({
     model,
     input: [
@@ -151,14 +244,16 @@ async function callResponsesApi({ endpoint, apiKey, model, context, proxyUrl }) 
   } catch (error) {
     return {
       status: "error",
-      reason: `LLM request failed: ${error.message}`
+      reason: `LLM request failed: ${error.message}`,
+      repairPlan
     };
   }
 
   if (!response.ok) {
     return {
       status: "error",
-      reason: await responseErrorReason(response)
+      reason: await responseErrorReason(response),
+      repairPlan
     };
   }
 
@@ -166,16 +261,19 @@ async function callResponsesApi({ endpoint, apiKey, model, context, proxyUrl }) 
   const patch = extractResponsesText(data).trim();
   return {
     status: patch ? "ok" : "empty",
-    patch
+    patch,
+    repairPlan
   };
 }
 
 export async function generateDebugPatch(context, env = process.env) {
+  const repairPlan = buildDebugRepairPlan(context);
   const provider = resolveProvider(env);
   if (!provider) {
     return {
       status: "unavailable",
-      reason: "Set VIBEGUARD_LLM_PROVIDER=openai-compatible with OPENAI_API_KEY, or set XAI_API_KEY/GROK_API_KEY for Grok patch generation."
+      reason: "Set VIBEGUARD_LLM_PROVIDER=openai-compatible with OPENAI_API_KEY, or set XAI_API_KEY/GROK_API_KEY for Grok patch generation.",
+      repairPlan
     };
   }
 
@@ -186,7 +284,8 @@ export async function generateDebugPatch(context, env = process.env) {
       const mapped = patchMap[key] || patchMap.default || "";
       return {
         status: mapped ? "ok" : "empty",
-        patch: mapped
+        patch: mapped,
+        repairPlan
       };
     }
 
@@ -195,7 +294,8 @@ export async function generateDebugPatch(context, env = process.env) {
       : env.VIBEGUARD_FIXTURE_PATCH || "";
     return {
       status: patch ? "ok" : "empty",
-      patch
+      patch,
+      repairPlan
     };
   }
 
@@ -206,7 +306,8 @@ export async function generateDebugPatch(context, env = process.env) {
     if (!apiKey) {
       return {
         status: "unavailable",
-        reason: "XAI_API_KEY or GROK_API_KEY is required for Grok patch generation."
+        reason: "XAI_API_KEY or GROK_API_KEY is required for Grok patch generation.",
+        repairPlan
       };
     }
     return callResponsesApi({
@@ -221,14 +322,16 @@ export async function generateDebugPatch(context, env = process.env) {
   if (provider !== "openai-compatible") {
     return {
       status: "unavailable",
-      reason: `Unsupported LLM provider: ${provider}`
+      reason: `Unsupported LLM provider: ${provider}`,
+      repairPlan
     };
   }
 
   if (!env.OPENAI_API_KEY || !env.VIBEGUARD_MODEL) {
     return {
       status: "unavailable",
-      reason: "OPENAI_API_KEY and VIBEGUARD_MODEL are required for openai-compatible patch generation."
+      reason: "OPENAI_API_KEY and VIBEGUARD_MODEL are required for openai-compatible patch generation.",
+      repairPlan
     };
   }
 

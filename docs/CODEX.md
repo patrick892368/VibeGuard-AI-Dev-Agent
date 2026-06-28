@@ -64,6 +64,10 @@ For any debug result, Codex should show or reuse `explanation.message`, `explana
 
 对任何 debug 结果，Codex 在请求或应用 patch 前，都应该展示或复用 `explanation.message`、`explanation.likelyCause` 和 `explanation.evidence`。
 
+For AI/provider patch generation, Codex should inspect `aiPatch.repairPlan` or `patchSource.repairPlan` before applying anything. It gives the likely target files, concrete repair strategy, policy/apply-check requirements, and the smallest validation commands to run.
+
+AI/provider 生成 patch 时，Codex 在应用任何内容前应检查 `aiPatch.repairPlan` 或 `patchSource.repairPlan`。它会给出可能目标文件、具体修复策略、policy/apply check 要求，以及应运行的最小验证命令。
+
 When `--output-patch` is used with `debug --ai-patch`, the patch is normalized, validated, checked by patch policy, and then written as an artifact; it is not applied.
 
 `debug --ai-patch` 搭配 `--output-patch` 时，patch 会先规范化、校验、经过 patch policy 检查，然后作为 artifact 写出；它不会被应用。
