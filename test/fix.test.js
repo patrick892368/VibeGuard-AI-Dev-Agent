@@ -465,7 +465,7 @@ test("fix workflow can create PRs through the GitHub REST fallback", async () =>
       require_confirmation: ["git switch -c", "git commit", "gh pr create"]
     }
   }, { root });
-  let request;
+  const requests = [];
 
   const result = await runFixWorkflow({
     root,
@@ -481,8 +481,31 @@ test("fix workflow can create PRs through the GitHub REST fallback", async () =>
     confirmed: true,
     env: { GITHUB_TOKEN: "token" },
     githubUseApi: true,
+    checkCi: true,
+    ciLimit: 4,
     async githubFetch(url, options) {
-      request = { url, options, body: JSON.parse(options.body) };
+      const request = { url, options, body: options.body ? JSON.parse(options.body) : null };
+      requests.push(request);
+      if (url.includes("/actions/runs?")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              workflow_runs: [{
+                id: 222,
+                status: "completed",
+                conclusion: "success",
+                name: "CI",
+                head_branch: "codex/fix-referenceerror",
+                event: "pull_request",
+                workflow_name: "CI",
+                html_url: "https://github.com/owner/repo/actions/runs/222"
+              }]
+            };
+          }
+        };
+      }
       return {
         ok: true,
         status: 201,
@@ -498,8 +521,12 @@ test("fix workflow can create PRs through the GitHub REST fallback", async () =>
   assert.equal(result.gitExecution.results.at(-1).step, "create_pr");
   assert.equal(result.gitExecution.results.at(-1).method, "api");
   assert.equal(result.gitExecution.results.at(-1).url, "https://github.com/owner/repo/pull/1");
-  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
-  assert.equal(request.body.head, "codex/fix-referenceerror");
+  assert.equal(requests[0].url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(requests[0].body.head, "codex/fix-referenceerror");
+  assert.match(requests[1].url, /\/actions\/runs\?per_page=4&branch=codex%2Ffix-referenceerror$/);
+  assert.equal(result.gitExecution.ciStatus.status, "completed");
+  assert.equal(result.gitExecution.ciStatus.summary.gate, "pass");
+  assert.equal(result.ciStatus.summary.gate, "pass");
 });
 
 test("fix CLI applies Node fixture patch and runs tests", () => {

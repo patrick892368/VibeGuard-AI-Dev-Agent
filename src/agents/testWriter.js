@@ -1519,7 +1519,10 @@ async function buildTestWriterGitExecutionAsync(root, gitPlan, gitPolicy, testRu
     auditLog: options.auditLog,
     env: options.env,
     fetch: options.githubFetch,
-    useApi: Boolean(options.githubUseApi)
+    useApi: Boolean(options.githubUseApi),
+    checkCi: Boolean(options.checkCi),
+    workflow: options.workflow,
+    ciLimit: options.ciLimit
   });
 }
 
@@ -1713,7 +1716,8 @@ function buildSuggestedTestsResult(state, gitExecution) {
     coverageRuns: state.coverageRuns,
     gitPlan: state.gitPlan,
     gitPolicy: state.gitPolicy,
-    gitExecution
+    gitExecution,
+    ciStatus: gitExecution?.ciStatus || null
   };
   if (state.hasRepairRuns) {
     result.initialTestRuns = state.initialTestRuns;

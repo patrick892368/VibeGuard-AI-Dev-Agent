@@ -558,7 +558,10 @@ export async function runFixWorkflow(options = {}) {
       auditLog: options.auditLog,
       env: options.env,
       fetch: options.githubFetch,
-      useApi: Boolean(options.githubUseApi)
+      useApi: Boolean(options.githubUseApi),
+      checkCi: Boolean(options.checkCi),
+      workflow: options.workflow,
+      ciLimit: options.ciLimit
     });
     if (gitExecution.status !== "executed") {
       status = gitExecution.status === "deny" || gitExecution.status === "require_confirmation"
@@ -573,6 +576,7 @@ export async function runFixWorkflow(options = {}) {
     applyResult,
     tests,
     gitExecution,
+    ciStatus: gitExecution?.ciStatus || null,
     selectedTestCommand,
     decision: buildDecisionSummary({
       status,

@@ -255,6 +255,8 @@ test("buildPrPlanWorkflow can execute branch commit and REST PR creation after c
   ]);
   assert.equal(result.gitExecution.results[3].method, "api");
   assert.equal(result.gitExecution.results[3].url, "https://github.com/owner/repo/pull/9");
+  assert.equal(result.gitExecution.ciStatus.status, "completed");
+  assert.equal(result.gitExecution.ciStatus.summary.gate, "pass");
   assert.equal(requests[0].url, "https://api.github.com/repos/owner/repo/pulls");
   assert.equal(requests[0].body.title, result.title);
   assert.equal(requests[0].body.head, result.branch);
@@ -1188,14 +1190,37 @@ test("executeGitPlanAsync can create PRs through the REST fallback", async () =>
     body: "body",
     prDryRun: true
   });
-  let request;
+  const requests = [];
 
   const result = await executeGitPlanAsync(root, plan, engine, {
     confirmed: true,
     useApi: true,
+    checkCi: true,
+    ciLimit: 2,
     env: { GITHUB_TOKEN: "token" },
     async fetch(url, options) {
-      request = { url, options, body: JSON.parse(options.body) };
+      const request = { url, options, body: options.body ? JSON.parse(options.body) : null };
+      requests.push(request);
+      if (url.includes("/actions/runs?")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              workflow_runs: [{
+                id: 333,
+                status: "completed",
+                conclusion: "success",
+                name: "CI",
+                head_branch: "codex/fix-error",
+                event: "pull_request",
+                workflow_name: "CI",
+                html_url: "https://github.com/owner/repo/actions/runs/333"
+              }]
+            };
+          }
+        };
+      }
       return {
         ok: true,
         status: 201,
@@ -1210,8 +1235,11 @@ test("executeGitPlanAsync can create PRs through the REST fallback", async () =>
   assert.equal(result.results[0].step, "create_pr");
   assert.equal(result.results[0].method, "api");
   assert.equal(result.results[0].url, "https://github.com/owner/repo/pull/1");
-  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
-  assert.equal(request.body.head, "codex/fix-error");
+  assert.equal(requests[0].url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(requests[0].body.head, "codex/fix-error");
+  assert.match(requests[1].url, /\/actions\/runs\?per_page=2&branch=codex%2Ffix-error$/);
+  assert.equal(result.ciStatus.status, "completed");
+  assert.equal(result.ciStatus.summary.gate, "pass");
 });
 
 test("executeGitPlan blocks denied PR body files before running commands", () => {

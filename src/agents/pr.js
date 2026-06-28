@@ -130,6 +130,7 @@ export function writePrSummaryBody(root, diffText, outputPath, engine, options =
 
 async function buildPrPlanCiStatus(root, branch, gitExecution, engine, options = {}) {
   if (!options.checkCi) return null;
+  if (options.executeGitPlan && gitExecution?.ciStatus) return gitExecution.ciStatus;
   if (options.executeGitPlan && gitExecution?.status !== "executed") {
     return {
       status: "skipped",
@@ -187,7 +188,10 @@ export async function buildPrPlanWorkflow(root, diffText, engine, options = {}) 
       env: options.env,
       fetch: options.fetch,
       useApi: Boolean(options.githubUseApi),
-      dryRun: Boolean(options.dryRun)
+      dryRun: Boolean(options.dryRun),
+      checkCi: Boolean(options.checkCi),
+      workflow: options.workflow,
+      ciLimit: options.ciLimit
     })
     : null;
   const ciStatus = await buildPrPlanCiStatus(root, branch, gitExecution, engine, options);

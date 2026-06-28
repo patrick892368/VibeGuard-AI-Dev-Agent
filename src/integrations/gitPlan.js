@@ -1,6 +1,6 @@
 import { parsePatchFiles } from "../patch/parsePatch.js";
 import { commandDisplay, runArgvWithPolicy } from "../runner/safeCommand.js";
-import { createPullRequestWithGh } from "./github.js";
+import { createPullRequestWithGh, listWorkflowRunsWithGh } from "./github.js";
 
 function summarizeCommandStatus(results) {
   if (results.some((result) => result.policy.status === "deny")) return "deny";
@@ -143,6 +143,31 @@ export function executeGitPlan(root, gitPlan, engine, options = {}) {
   };
 }
 
+async function readCiStatusAfterGitPlan(root, gitPlan, engine, options = {}) {
+  if (!options.checkCi) return null;
+  try {
+    return await listWorkflowRunsWithGh(root, {
+      branch: options.ciBranch || gitPlan.branch,
+      workflow: options.workflow,
+      limit: options.ciLimit || 10,
+      env: options.env,
+      fetch: options.fetch,
+      useApi: Boolean(options.useApi),
+      dryRun: Boolean(options.dryRun),
+      engine,
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
+    });
+  } catch (error) {
+    return {
+      status: "failed",
+      stage: "github_checks",
+      branch: options.ciBranch || gitPlan.branch,
+      error: error.message
+    };
+  }
+}
+
 export async function executeGitPlanAsync(root, gitPlan, engine, options = {}) {
   const policy = checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) });
   if (policy.status !== "allow") {
@@ -204,11 +229,14 @@ export async function executeGitPlanAsync(root, gitPlan, engine, options = {}) {
     }
   }
 
+  const ciStatus = await readCiStatusAfterGitPlan(root, gitPlan, engine, options);
+
   return {
     status: options.dryRun ? "dry_run" : "executed",
     stage: "git_plan_execute",
     branch: gitPlan.branch,
     policy,
-    results
+    results,
+    ciStatus
   };
 }

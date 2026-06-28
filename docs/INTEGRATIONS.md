@@ -19,7 +19,7 @@ vibeguard test --write
 vibeguard test --write --run --limit 1
 vibeguard test --write --run --repair --limit 1
 vibeguard test --write --create-branch --commit --pr-dry-run --json
-vibeguard test --write --run --create-branch --commit --execute-git-plan --confirm --json
+vibeguard test --write --run --create-branch --commit --execute-git-plan --confirm --check-ci --json
 vibeguard test --coverage coverage.json
 vibeguard test --coverage coverage/lcov.info
 vibeguard test --coverage coverage-before.json --coverage-after coverage-after.json
@@ -140,9 +140,9 @@ Available tools:
 
 `debug_error` 可以解析粘贴的日志，也可以通过 path policy 读取 `logFile`；当 `aiPatch` 为 true 时，会调用配置的 provider，规范化并校验生成的 diff，执行 patch policy 检查，并可通过 `outputPatch` 写出 patch artifact。
 
-`fix_error` accepts pasted `log` / `patch` text or `logFile` / `patchFile` inputs; file inputs are read through path policy before debug analysis or patch parsing. If generated-patch recovery tries the Django TemplateDoesNotExist fallback, source reads are also path-policy gated and skipped files are surfaced as `recovery.skippedSourceFiles`.
+`fix_error` accepts pasted `log` / `patch` text or `logFile` / `patchFile` inputs; file inputs are read through path policy before debug analysis or patch parsing. If generated-patch recovery tries the Django TemplateDoesNotExist fallback, source reads are also path-policy gated and skipped files are surfaced as `recovery.skippedSourceFiles`. With `executeGitPlan` plus `checkCi`, the shared Git plan executor reads the generated branch CI status after branch/commit/push/PR commands finish and returns both top-level `ciStatus` and `gitExecution.ciStatus`.
 
-`fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。如果生成 patch 的恢复流程尝试 Django TemplateDoesNotExist fallback，源码读取也会经过 path policy，被跳过的文件会暴露为 `recovery.skippedSourceFiles`。
+`fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。如果生成 patch 的恢复流程尝试 Django TemplateDoesNotExist fallback，源码读取也会经过 path policy，被跳过的文件会暴露为 `recovery.skippedSourceFiles`。同时传入 `executeGitPlan` 和 `checkCi` 时，共享 Git plan 执行器会在 branch/commit/push/PR 命令完成后读取生成分支 CI 状态，并返回顶层 `ciStatus` 和 `gitExecution.ciStatus`。
 
 `onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured dependency lists, structured `coreModules`, repository-specific Mermaid diagrams, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness plus command-policy status.
 
@@ -176,9 +176,9 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 
 `github_review_comments` 支持粘贴 `diff`、通过 path policy 读取 `diffFile`，或读取远端 `githubPr`，先分析 review findings，再生成一批文件行级 review comment 命令。当提供 `githubPr` 且省略 `commitId` / `--commit` 时，会通过 policy 检查后的 `gh pr view` 或 REST fallback 读取 PR head SHA。默认 dry-run；execute 模式会要求每条生成的 `gh api` 命令都通过 command policy 确认。
 
-`write_tests` can read coverage files through path policy, analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests including CommonJS bracket exports, write stdlib `unittest` Python tests including simple dependency `Mock` assertions, write JUnit 5 Java tests with class-load smoke checks plus simple public static / no-arg instance behavior assertions, optionally run them through command policy, run `coverageCommand` before and after generation to return policy-gated `coverageRuns` and `coverageDelta`, include coverage status in the generated test PR body, return `failureAnalysis.repairPlan` for failed runs, run one safe test-only repair retry with `repair`, prepare a target-derived Git/PR dry-run plan with branch name, commit message, and PR title, and execute a confirmed branch/commit/PR plan only after final generated tests pass. CLI `test --write` accepts `--github-api`; MCP `write_tests` accepts `githubUseApi` for token REST fallback PR creation.
+`write_tests` can read coverage files through path policy, analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests including CommonJS bracket exports, write stdlib `unittest` Python tests including simple dependency `Mock` assertions, write JUnit 5 Java tests with class-load smoke checks plus simple public static / no-arg instance behavior assertions, optionally run them through command policy, run `coverageCommand` before and after generation to return policy-gated `coverageRuns` and `coverageDelta`, include coverage status in the generated test PR body, return `failureAnalysis.repairPlan` for failed runs, run one safe test-only repair retry with `repair`, prepare a target-derived Git/PR dry-run plan with branch name, commit message, and PR title, and execute a confirmed branch/commit/PR plan only after final generated tests pass. With `checkCi`, executed test PR plans return `ciStatus` / `gitExecution.ciStatus` for the generated test branch. CLI `test --write` accepts `--github-api`; MCP `write_tests` accepts `githubUseApi` for token REST fallback PR creation and CI reads.
 
-`write_tests` 可以先通过 path policy 读取 coverage 文件，再分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的 JavaScript 生成测试（包含 CommonJS bracket export）、包含简单 dependency `Mock` 断言的 stdlib `unittest` Python 测试，以及 JUnit 5 Java 测试；Java 会生成 class-load smoke check，并对简单 public static / 可无参构造实例方法生成行为断言。也可以通过 command policy 执行这些测试、在生成前后运行 `coverageCommand` 并返回受策略保护的 `coverageRuns` 与 `coverageDelta`、把 coverage 状态写入生成的测试 PR body、为失败运行返回 `failureAnalysis.repairPlan`、通过 `repair` 做一轮安全的 test-only 修复重试、按生成测试目标准备包含 branch name、commit message 和 PR title 的 Git/PR dry-run plan，并且只会在最终生成测试通过后执行已确认的 branch/commit/PR plan。CLI `test --write` 支持 `--github-api`；MCP `write_tests` 支持 `githubUseApi`，用于 token REST fallback 创建测试 PR。
+`write_tests` 可以先通过 path policy 读取 coverage 文件，再分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的 JavaScript 生成测试（包含 CommonJS bracket export）、包含简单 dependency `Mock` 断言的 stdlib `unittest` Python 测试，以及 JUnit 5 Java 测试；Java 会生成 class-load smoke check，并对简单 public static / 可无参构造实例方法生成行为断言。也可以通过 command policy 执行这些测试、在生成前后运行 `coverageCommand` 并返回受策略保护的 `coverageRuns` 与 `coverageDelta`、把 coverage 状态写入生成的测试 PR body、为失败运行返回 `failureAnalysis.repairPlan`、通过 `repair` 做一轮安全的 test-only 修复重试、按生成测试目标准备包含 branch name、commit message 和 PR title 的 Git/PR dry-run plan，并且只会在最终生成测试通过后执行已确认的 branch/commit/PR plan。传入 `checkCi` 时，执行后的测试 PR plan 会为生成测试分支返回 `ciStatus` / `gitExecution.ciStatus`。CLI `test --write` 支持 `--github-api`；MCP `write_tests` 支持 `githubUseApi`，用于 token REST fallback 创建测试 PR 和读取 CI。
 
 The MCP `write_tests` tool exposes the same `repair` boolean as the CLI.
 
@@ -287,7 +287,7 @@ Execute PR creation only when ready:
 确认就绪后才执行 PR 创建：
 
 ```bash
-vibeguard pr plan --diff reports/change.diff --write-body reports/pr-body.md --push --execute-git-plan --confirm --github-api
+vibeguard pr plan --diff reports/change.diff --write-body reports/pr-body.md --push --execute-git-plan --confirm --check-ci --github-api
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm --github-api
 ```

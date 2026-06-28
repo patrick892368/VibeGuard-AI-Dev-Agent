@@ -763,7 +763,7 @@ test("writeSuggestedTestsAsync can create test PRs through the GitHub REST fallb
       require_confirmation: ["git switch -c", "git commit", "gh pr create"]
     }
   }, { root });
-  let request;
+  const requests = [];
 
   const result = await writeSuggestedTestsAsync(root, engine, {
     limit: 1,
@@ -774,9 +774,32 @@ test("writeSuggestedTestsAsync can create test PRs through the GitHub REST fallb
     executeGitPlan: true,
     confirmed: true,
     githubUseApi: true,
+    checkCi: true,
+    ciLimit: 6,
     env: { GITHUB_TOKEN: "token" },
     async githubFetch(url, options) {
-      request = { url, options, body: JSON.parse(options.body) };
+      const request = { url, options, body: options.body ? JSON.parse(options.body) : null };
+      requests.push(request);
+      if (url.includes("/actions/runs?")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              workflow_runs: [{
+                id: 808,
+                status: "completed",
+                conclusion: "success",
+                name: "CI",
+                head_branch: "codex/add-tests-math",
+                event: "pull_request",
+                workflow_name: "CI",
+                html_url: "https://github.com/owner/repo/actions/runs/808"
+              }]
+            };
+          }
+        };
+      }
       return {
         ok: true,
         status: 201,
@@ -797,9 +820,13 @@ test("writeSuggestedTestsAsync can create test PRs through the GitHub REST fallb
   ]);
   assert.equal(result.gitExecution.results.at(-1).method, "api");
   assert.equal(result.gitExecution.results.at(-1).url, "https://github.com/owner/repo/pull/8");
-  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
-  assert.equal(request.body.head, "codex/add-tests-math");
-  assert.equal(request.body.title, "Add generated tests for math");
+  assert.equal(requests[0].url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(requests[0].body.head, "codex/add-tests-math");
+  assert.equal(requests[0].body.title, "Add generated tests for math");
+  assert.match(requests[1].url, /\/actions\/runs\?per_page=6&branch=codex%2Fadd-tests-math$/);
+  assert.equal(result.gitExecution.ciStatus.status, "completed");
+  assert.equal(result.gitExecution.ciStatus.summary.gate, "pass");
+  assert.equal(result.ciStatus.summary.gate, "pass");
 });
 
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {

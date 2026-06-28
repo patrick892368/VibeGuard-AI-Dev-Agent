@@ -90,7 +90,11 @@ test("MCP tools expose input schemas", () => {
   assert.ok(mcpInternals.tools.some((tool) => tool.name === "apply_patch_safely"));
   const byName = new Map(mcpInternals.tools.map((tool) => [tool.name, tool]));
   assert.equal(byName.get("fix_error").inputSchema.properties.githubUseApi.type, "boolean");
+  assert.equal(byName.get("fix_error").inputSchema.properties.checkCi.type, "boolean");
+  assert.equal(byName.get("fix_error").inputSchema.properties.ciLimit.type, "number");
   assert.equal(byName.get("write_tests").inputSchema.properties.githubUseApi.type, "boolean");
+  assert.equal(byName.get("write_tests").inputSchema.properties.checkCi.type, "boolean");
+  assert.equal(byName.get("write_tests").inputSchema.properties.ciLimit.type, "number");
   assert.equal(byName.get("write_tests").inputSchema.properties.coverageCommand.type, "string");
   assert.equal(byName.get("review_pr").inputSchema.properties.githubPr.type, "string");
   assert.equal(byName.get("review_pr").inputSchema.properties.publishComment.type, "boolean");
