@@ -188,6 +188,8 @@ test("analyzeTestTargets prioritizes uncovered coverage files", () => {
 
   const result = analyzeTestTargets({ root, coverageFile: coveragePath });
   assert.equal(result.coverage.summary.filesWithMissingLines, 1);
+  assert.equal(result.coverageDeltaStatus.status, "not_compared");
+  assert.equal(result.coverageDeltaStatus.reason, "coverage_after_missing");
   assert.equal(result.candidates[0].sourceFile, "src/uncovered.js");
   assert.equal(result.candidates[0].coverage.missingLineCount, 1);
 });
@@ -228,6 +230,8 @@ test("analyzeTestTargets includes coverage delta when before and after reports a
   const result = analyzeTestTargets({ root, coverageFile: beforePath, coverageAfterFile: afterPath });
   assert.equal(result.coverageDelta.summary.averagePercentDelta, 100);
   assert.equal(result.coverageDelta.summary.missingLinesReduced, 1);
+  assert.equal(result.coverageDeltaStatus.status, "compared");
+  assert.equal(result.coverageDeltaStatus.summary.missingLinesReduced, 1);
 });
 
 test("analyzeTestTargets maps missing coverage lines to functions", () => {

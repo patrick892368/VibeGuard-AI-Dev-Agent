@@ -609,6 +609,32 @@ export function compareCoverageReports(before, after) {
   };
 }
 
+function describeCoverageDelta(coverage, coverageAfter, coverageDelta) {
+  if (coverageDelta) {
+    return {
+      status: "compared",
+      reason: null,
+      summary: coverageDelta.summary
+    };
+  }
+  if (coverage && !coverageAfter) {
+    return {
+      status: "not_compared",
+      reason: "coverage_after_missing"
+    };
+  }
+  if (!coverage && coverageAfter) {
+    return {
+      status: "not_compared",
+      reason: "coverage_before_missing"
+    };
+  }
+  return {
+    status: "not_requested",
+    reason: "coverage_reports_missing"
+  };
+}
+
 export function parseCoverageReport(text, options = {}) {
   const root = options.root || process.cwd();
   const trimmed = text.trim();
@@ -1162,6 +1188,7 @@ export function analyzeTestTargets(options = {}) {
   const repo = scanRepository(root);
   const coverage = loadCoverage(options, root);
   const coverageAfter = loadCoverageAfter(options, root);
+  const coverageDelta = compareCoverageReports(coverage, coverageAfter);
   const coverageByFile = new Map((coverage?.files || []).map((item) => [item.file, item]));
   const sourceFiles = files.filter((file) =>
     !/(^|\/)(test|tests|__tests__)\//.test(file) &&
@@ -1219,7 +1246,8 @@ export function analyzeTestTargets(options = {}) {
     frameworkHints: repo.suggestedCommands,
     coverage,
     coverageAfter,
-    coverageDelta: compareCoverageReports(coverage, coverageAfter),
+    coverageDelta,
+    coverageDeltaStatus: describeCoverageDelta(coverage, coverageAfter, coverageDelta),
     coverageTargets: coverageTargets(sortedCandidates),
     candidates: sortedCandidates
   };

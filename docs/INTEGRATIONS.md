@@ -41,9 +41,9 @@ vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。
 
-`test` reads coverage.py JSON or LCOV input files through path policy, then reports uncovered functions, classes, and interfaces. `test --write` can generate runtime tests for functions and classes, while TypeScript interface-only files stay as prioritization candidates instead of producing empty runtime tests.
+`test` reads coverage.py JSON or LCOV input files through path policy, then reports uncovered functions, classes, and interfaces. It returns `coverageDeltaStatus` so callers can tell whether before/after coverage was compared. `test --write` can generate runtime tests for functions and classes, while TypeScript interface-only files stay as prioritization candidates instead of producing empty runtime tests.
 
-`test` 会先通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
+`test` 会先通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。它会返回 `coverageDeltaStatus`，让调用方知道 before/after coverage 是否已比较。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
 
 `review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`, and `github review-comments` can publish the generated file-line comments in a policy-gated batch.
 
