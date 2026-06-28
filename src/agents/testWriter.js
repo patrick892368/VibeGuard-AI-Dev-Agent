@@ -409,6 +409,36 @@ function simpleAssertion(name, params, expression, options = {}) {
   return null;
 }
 
+function pythonDependencyCallAssertion(name, params, assignedName, dependency, method, callArgsText, returnExpression) {
+  if (!params.includes(dependency)) return null;
+  const callArgs = splitParams(callArgsText);
+  if (callArgs.some((arg) => !params.includes(arg) || arg === dependency)) return null;
+
+  const escapedAssigned = assignedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const normalizedReturn = returnExpression.trim().replace(/;$/, "");
+  const dictMatch = normalizedReturn.match(new RegExp(`^${escapedAssigned}\\[['"]([^'"]+)['"]\\]$`))
+    || normalizedReturn.match(new RegExp(`^${escapedAssigned}\\.get\\(['"]([^'"]+)['"]\\)$`));
+  const attrMatch = normalizedReturn.match(new RegExp(`^${escapedAssigned}\\.([a-zA-Z_]\\w*)$`));
+  const property = dictMatch?.[1] || attrMatch?.[1];
+  if (!property) return null;
+
+  const samples = Object.fromEntries(callArgs.map((arg) => [arg, sampleValueForProperty(arg)]));
+  const expected = sampleValueForProperty(property);
+  return {
+    kind: "python_mock_call",
+    name,
+    params,
+    dependency,
+    method,
+    callArgs,
+    samples,
+    returnProperty: property,
+    returnObjectKind: attrMatch ? "object" : "dict",
+    returnValue: { [property]: expected },
+    expected
+  };
+}
+
 function inferPythonAssertions(text) {
   const hints = [];
   const pattern = /^def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\):\s*\n\s+return\s+(.+)$/gm;
@@ -423,6 +453,11 @@ function inferPythonAssertions(text) {
   const exceptionPattern = /^def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\):\s*\n\s+if\s+(.+):\s*\n\s+raise\s+([a-zA-Z_][\w.]*)\s*\([^)]*\)\s*\n\s+return\s+(.+)$/gm;
   for (const match of text.matchAll(exceptionPattern)) {
     hints.push(...exceptionAssertions(match[1], splitParams(match[2]), match[3], match[4]));
+  }
+  const dependencyPattern = /^def\s+([a-zA-Z_]\w*)\s*\(([^)]*)\):\s*\n\s+([a-zA-Z_]\w*)\s*=\s*([a-zA-Z_]\w*)\.([a-zA-Z_]\w*)\(([^)]*)\)\s*\n\s+return\s+(.+)$/gm;
+  for (const match of text.matchAll(dependencyPattern)) {
+    const hint = pythonDependencyCallAssertion(match[1], splitParams(match[2]), match[3], match[4], match[5], match[6], match[7]);
+    if (hint) hints.push(hint);
   }
   return hints;
 }
@@ -493,7 +528,7 @@ function inferJavaAssertions(text) {
 function uniqueBehaviorHints(hints) {
   const seen = new Set();
   return hints.filter((hint) => {
-    const key = `${hint.name}:${JSON.stringify(hint.args)}:${JSON.stringify(hint.expected)}:${hint.throws || ""}:${hint.static ? "static" : "instance"}`;
+    const key = `${hint.name}:${hint.kind || "value"}:${JSON.stringify(hint.args || hint.callArgs)}:${JSON.stringify(hint.expected)}:${hint.throws || ""}:${hint.static ? "static" : "instance"}:${hint.dependency || ""}:${hint.method || ""}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -798,6 +833,17 @@ function loadCoverageAfter(options, root) {
 }
 
 function pythonBehaviorAssertion(hint) {
+  if (hint.kind === "python_mock_call") {
+    const args = hint.params.map((param) => (param === hint.dependency ? param : pythonLiteral(hint.samples[param]))).join(", ");
+    const callArgs = hint.callArgs.map((param) => pythonLiteral(hint.samples[param])).join(", ");
+    const returnValue = hint.returnObjectKind === "object"
+      ? `types.SimpleNamespace(${hint.returnProperty}=${pythonLiteral(hint.expected)})`
+      : pythonLiteral(hint.returnValue);
+    return `        ${hint.dependency} = Mock()
+        ${hint.dependency}.${hint.method}.return_value = ${returnValue}
+        self.assertEqual(module.${hint.name}(${args}), ${pythonLiteral(hint.expected)})
+        ${hint.dependency}.${hint.method}.assert_called_once_with(${callArgs})`;
+  }
   const call = `module.${hint.name}(${hint.args.map(pythonLiteral).join(", ")})`;
   if (hint.throws) {
     return `        with self.assertRaises(${hint.throws}):
@@ -872,6 +918,8 @@ export function generateTestContent(candidate, options = {}) {
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
     const sourcePathSetup = Boolean(options.pythonSourcePathSetup);
+    const needsPythonMock = assertionHints.some((hint) => hint.kind === "python_mock_call");
+    const needsTypes = assertionHints.some((hint) => hint.kind === "python_mock_call" && hint.returnObjectKind === "object");
     const assertions = [
       ...functions.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`),
       ...classes.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`)
@@ -879,7 +927,8 @@ export function generateTestContent(candidate, options = {}) {
     const behaviorAssertions = assertionHints.map(pythonBehaviorAssertion).join("\n");
     return `import importlib.util
 import pathlib
-${sourcePathSetup ? "import sys\n" : ""}import unittest
+${sourcePathSetup ? "import sys\n" : ""}${needsTypes ? "import types\n" : ""}import unittest
+${needsPythonMock ? "from unittest.mock import Mock\n" : ""}
 
 
 def load_module():

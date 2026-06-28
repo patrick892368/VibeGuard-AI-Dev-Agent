@@ -507,6 +507,26 @@ test("writeSuggestedTests writes simple Python exception assertions", () => {
   assert.match(generated, /with self\.assertRaises\(ValueError\)/);
 });
 
+test("writeSuggestedTests writes Python dependency mock assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "users.py"), `def display_name(repository, user_id):
+    user = repository.get_user(user_id)
+    return user["name"]
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_users.py"), "utf8");
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /from unittest\.mock import Mock/);
+  assert.match(generated, /repository = Mock\(\)/);
+  assert.match(generated, /repository\.get_user\.return_value = \{"name":"Ada"\}/);
+  assert.match(generated, /self\.assertEqual\(module\.display_name\(repository, 123\), "Ada"\)/);
+  assert.match(generated, /repository\.get_user\.assert_called_once_with\(123\)/);
+});
+
 test("writeSuggestedTests can run a generated Python unittest through policy", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));
