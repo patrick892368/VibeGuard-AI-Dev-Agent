@@ -223,6 +223,10 @@ function resolveToken(env = process.env) {
   return env.GITHUB_TOKEN || env.GH_TOKEN || null;
 }
 
+function isReadOnlyApiMethod(method) {
+  return ["GET", "HEAD"].includes(String(method || "GET").toUpperCase());
+}
+
 function policyAllowedOutcome(policy, options = {}) {
   return policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed);
 }
@@ -287,21 +291,25 @@ function readBody(root, options = {}) {
 async function githubApiRequest(root, apiOptions = {}) {
   const env = apiOptions.env || process.env;
   const token = resolveToken(env);
-  if (!token) throw new Error("GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API fallback");
+  const method = String(apiOptions.method || "GET").toUpperCase();
+  if (!token && !isReadOnlyApiMethod(method)) {
+    throw new Error("GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback");
+  }
 
   const repository = apiOptions.repository || detectGitHubRepository(root, apiOptions);
   const baseUrl = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
   const fetchImpl = apiOptions.fetch || globalThis.fetch;
   if (!fetchImpl) throw new Error("fetch is required for GitHub REST API fallback");
+  const headers = {
+    accept: apiOptions.accept || "application/vnd.github+json",
+    "x-github-api-version": "2022-11-28"
+  };
+  if (token) headers.authorization = `Bearer ${token}`;
+  if (apiOptions.body) headers["content-type"] = "application/json";
 
   const response = await fetchImpl(`${baseUrl}/repos/${repository.owner}/${repository.repo}${apiOptions.path}`, {
-    method: apiOptions.method || "GET",
-    headers: {
-      accept: apiOptions.accept || "application/vnd.github+json",
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-      "x-github-api-version": "2022-11-28"
-    },
+    method,
+    headers,
     body: apiOptions.body ? JSON.stringify(apiOptions.body) : undefined
   });
   if (!response.ok) {

@@ -340,6 +340,24 @@ test("GitHub PR creation can use REST API fallback", async () => {
   });
 });
 
+test("GitHub REST API write fallback still requires a token", async () => {
+  const root = tempGitHubRepo();
+
+  await assert.rejects(() => createPullRequestWithGh(root, {
+    title: "Fix bug",
+    body: "body",
+    base: "main",
+    head: "codex/fix-bug",
+    dryRun: false,
+    useApi: true,
+    engine: permissivePolicyEngine(root),
+    env: {},
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  }), /GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback/);
+});
+
 test("GitHub PR diff can use REST API fallback", async () => {
   const root = tempGitHubRepo();
   let request;
@@ -866,6 +884,45 @@ test("GitHub checks can use REST API fallback", async () => {
     createdAt: "2026-06-24T00:00:00Z",
     updatedAt: "2026-06-24T00:01:00Z"
   });
+});
+
+test("GitHub checks can use unauthenticated REST API fallback for public repositories", async () => {
+  const root = tempGitHubRepo();
+  let request;
+  const result = await listWorkflowRunsWithGh(root, {
+    limit: 1,
+    dryRun: false,
+    useApi: true,
+    engine: permissivePolicyEngine(root),
+    env: {},
+    async fetch(url, options) {
+      request = { url, options };
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            workflow_runs: [{
+              id: 456,
+              status: "completed",
+              conclusion: "success",
+              name: "CI",
+              head_branch: "main",
+              event: "push",
+              workflow_name: "CI",
+              html_url: "https://github.com/owner/repo/actions/runs/456"
+            }]
+          };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "completed");
+  assert.equal(result.method, "api");
+  assert.equal(result.summary.gate, "pass");
+  assert.equal(request.options.headers.authorization, undefined);
+  assert.match(request.url, /\/repos\/owner\/repo\/actions\/runs\?per_page=1$/);
 });
 
 test("buildFixGitPlan includes push and PR commands for Codex review", () => {
