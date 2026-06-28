@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
@@ -345,6 +345,87 @@ test("GitHub PR review comments can use REST API fallback", async () => {
   assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls/12/comments");
   assert.deepEqual(request.body, {
     body: "review",
+    commit_id: "abc123",
+    path: "src/app.js",
+    line: 10,
+    side: "RIGHT"
+  });
+});
+
+test("GitHub PR review comments can be published as a policy-checkable batch dry-run", async () => {
+  const result = await createReviewCommentsWithGh(process.cwd(), {
+    pr: 12,
+    commitId: "abc123",
+    comments: [
+      {
+        path: "src/app.js",
+        line: 10,
+        side: "RIGHT",
+        severity: "high",
+        category: "security",
+        body: "Fix this issue"
+      },
+      {
+        path: "src/db.js",
+        line: 4,
+        severity: "medium",
+        category: "testing",
+        body: "Add a focused test"
+      }
+    ],
+    limit: 1
+  });
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.count, 1);
+  assert.equal(result.totalReviewComments, 2);
+  assert.equal(result.skipped, 1);
+  assert.match(result.comments[0].command, /gh api repos\/\{owner\}\/\{repo\}\/pulls\/12\/comments/);
+
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["gh api"] }
+  });
+  assert.equal(checkGitHubCommandsPolicy(result.comments, engine, {
+    stage: "github_review_comments_policy"
+  }).status, "require_confirmation");
+  assert.equal(checkGitHubCommandsPolicy(result.comments, engine, {
+    stage: "github_review_comments_policy",
+    confirmed: true
+  }).status, "allow");
+});
+
+test("GitHub PR review comment batches can use REST API fallback", async () => {
+  const root = tempGitHubRepo();
+  const requests = [];
+  const result = await createReviewCommentsWithGh(root, {
+    pr: 12,
+    commitId: "abc123",
+    comments: [
+      { path: "src/app.js", line: 10, body: "First review" },
+      { path: "src/db.js", line: 4, body: "Second review" }
+    ],
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      requests.push({ url, options, body: JSON.parse(options.body) });
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: `https://github.com/owner/repo/pull/1#discussion_r${requests.length}`, id: requests.length };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "review_comments_published");
+  assert.equal(result.count, 2);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].url, "https://api.github.com/repos/owner/repo/pulls/12/comments");
+  assert.deepEqual(requests[0].body, {
+    body: "First review",
     commit_id: "abc123",
     path: "src/app.js",
     line: 10,

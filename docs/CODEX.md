@@ -281,11 +281,12 @@ Review changes:
 node ./bin/vibeguard.js review --json
 node ./bin/vibeguard.js review --diff reports/change.diff --write-comment reports/review.md --json
 node ./bin/vibeguard.js pr summary --diff reports/change.diff --write-body reports/pr-body.md --json
+node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff reports/change.diff --json
 ```
 
-Review findings include `file`, `line`, `severity`, `category`, `message`, and `recommendation` when line information is available. Codex can use `actionItems` for planning, `reviewComments` for file-line GitHub review comments, `markdown` as a general PR comment body, or `--write-comment` to write that body through Policy-as-Code before calling `github comment --body-file`. CLI `--diff` input files and MCP `review_pr.diffFile` / `summarize_pr.diffFile` inputs are also read through path policy.
+Review findings include `file`, `line`, `severity`, `category`, `message`, and `recommendation` when line information is available. Codex can use `actionItems` for planning, `reviewComments` for file-line GitHub review comments, `markdown` as a general PR comment body, or `--write-comment` to write that body through Policy-as-Code before calling `github comment --body-file`. `github review-comments` can turn the generated `reviewComments` into a batched dry-run or confirmed execution plan. CLI `--diff` input files and MCP `review_pr.diffFile` / `summarize_pr.diffFile` / `github_review_comments.diffFile` inputs are also read through path policy.
 
-Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category`、`message` 和 `recommendation`。Codex 可以使用 `actionItems` 做执行计划，使用 `reviewComments` 发布文件行级 GitHub review comment，直接用 `markdown` 作为普通 PR 评论正文，或用 `--write-comment` 先经过 Policy-as-Code 写出正文文件，再调用 `github comment --body-file`。CLI `--diff` 输入文件和 MCP `review_pr.diffFile` / `summarize_pr.diffFile` 输入也会经过路径 policy 读取。
+Review findings 在有行号信息时会包含 `file`、`line`、`severity`、`category`、`message` 和 `recommendation`。Codex 可以使用 `actionItems` 做执行计划，使用 `reviewComments` 发布文件行级 GitHub review comment，直接用 `markdown` 作为普通 PR 评论正文，或用 `--write-comment` 先经过 Policy-as-Code 写出正文文件，再调用 `github comment --body-file`。`github review-comments` 可以把生成的 `reviewComments` 转成批量 dry-run 或确认后的执行计划。CLI `--diff` 输入文件和 MCP `review_pr.diffFile` / `summarize_pr.diffFile` / `github_review_comments.diffFile` 输入也会经过路径 policy 读取。
 
 `pr summary` includes review findings, severity counts, and action items in the generated PR body. `--write-body` writes that body through policy so it can be reused by `github pr --body-file`.
 
@@ -309,15 +310,17 @@ node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --json
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --json
 node ./bin/vibeguard.js github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --json
 node ./bin/vibeguard.js github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --execute --confirm --json
+node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff reports/change.diff --json
+node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff reports/change.diff --execute --confirm --json
 ```
 
 The MCP-style server exposes the same GitHub PR path as `github_pr`, which returns a dry-run `gh pr create` command unless `execute` is true and policy confirmation is present.
 
 MCP-style server 也通过 `github_pr` 暴露同一条 GitHub PR 路径；默认返回 dry-run 的 `gh pr create` 命令，只有 `execute` 为 true 且通过 policy 确认时才执行。
 
-For file-line PR review comments, use `github review-comment` or MCP `github_review_comment` with the PR head commit SHA, file path, and diff line.
+For one file-line PR review comment, use `github review-comment` or MCP `github_review_comment` with the PR head commit SHA, file path, and diff line. For all generated diff findings, use `github review-comments` or MCP `github_review_comments`; each generated `gh api` command is checked by command policy before execution.
 
-对于文件行级 PR review comment，使用 `github review-comment` 或 MCP `github_review_comment`，并传入 PR head commit SHA、文件路径和 diff line。
+对于单条文件行级 PR review comment，使用 `github review-comment` 或 MCP `github_review_comment`，并传入 PR head commit SHA、文件路径和 diff line。对于 diff 中生成的全部 findings，使用 `github review-comments` 或 MCP `github_review_comments`；每条生成的 `gh api` 命令都会在执行前经过 command policy。
 
 When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` through the GitHub REST API fallback. Policy confirmation is still required for PR creation and PR comments.
 

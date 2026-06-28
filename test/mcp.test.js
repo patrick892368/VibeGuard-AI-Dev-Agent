@@ -291,6 +291,61 @@ test("MCP github_review_comment blocks denied body files before dry-run", async 
   assert.equal(result.policy.path, ".env");
 });
 
+test("MCP github_review_comments builds a batch dry-run from a policy-gated diff file", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 16,
+    method: "tools/call",
+    params: {
+      name: "github_review_comments",
+      arguments: {
+        pr: "12",
+        commitId: "abc123",
+        diffFile: "reports/change.diff"
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.review.reviewComments.length, 1);
+  assert.equal(result.publish.count, 1);
+  assert.equal(result.commandPolicy.status, "require_confirmation");
+  assert.match(result.publish.comments[0].command, /gh api repos\/\{owner\}\/\{repo\}\/pulls\/12\/comments/);
+});
+
+test("MCP github_review_comments blocks denied diff files before analysis", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".env"), "diff --git a/src/app.js b/src/app.js\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 17,
+    method: "tools/call",
+    params: {
+      name: "github_review_comments",
+      arguments: {
+        pr: "12",
+        commitId: "abc123",
+        diffFile: ".env"
+      }
+    }
+  }, root);
+
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
+});
+
 test("MCP debug_error reads log files through path policy", async () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined\n", "utf8");

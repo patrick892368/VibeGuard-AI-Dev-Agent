@@ -435,6 +435,67 @@ test("CLI review blocks denied diff input paths", () => {
   }), /Path matches deny policy/);
 });
 
+test("CLI GitHub review-comments builds a policy-gated batch dry-run from a diff", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-comments-"));
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`, "utf8");
+
+  const dryRunOutput = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "review-comments",
+    "--pr",
+    "12",
+    "--commit",
+    "abc123",
+    "--diff",
+    "reports/change.diff",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const dryRun = JSON.parse(dryRunOutput);
+
+  assert.equal(dryRun.status, "dry_run");
+  assert.equal(dryRun.review.reviewComments.length, 1);
+  assert.equal(dryRun.publish.count, 1);
+  assert.equal(dryRun.commandPolicy.status, "require_confirmation");
+  assert.match(dryRun.publish.comments[0].command, /gh api repos\/\{owner\}\/\{repo\}\/pulls\/12\/comments/);
+
+  const executeOutput = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "review-comments",
+    "--pr",
+    "12",
+    "--commit",
+    "abc123",
+    "--diff",
+    "reports/change.diff",
+    "--execute",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const execute = JSON.parse(executeOutput);
+
+  assert.equal(execute.status, "require_confirmation");
+  assert.equal(execute.stage, "github_review_comments_policy");
+  assert.equal(execute.publish.count, 1);
+});
+
 test("CLI pr summary can write a policy-gated body file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-body-"));
   fs.mkdirSync(path.join(root, "reports"), { recursive: true });

@@ -25,6 +25,7 @@ vibeguard test --coverage coverage/lcov.info
 vibeguard test --coverage coverage-before.json --coverage-after coverage-after.json
 vibeguard review
 vibeguard review --diff reports/change.diff --write-comment reports/review.md
+vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
 vibeguard onboard --write
 vibeguard policy check --path src/index.js
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
@@ -44,9 +45,9 @@ vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 
 `test` 会先通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
 
-`review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, and `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`.
+`review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`, and `github review-comments` can publish the generated file-line comments in a policy-gated batch.
 
-`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`。
+`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`，`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
 
 `summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes. `writeBody` writes that body through policy for GitHub PR creation.
 
@@ -97,6 +98,7 @@ Available tools:
 - `github_checks`
 - `github_comment`
 - `github_review_comment`
+- `github_review_comments`
 - `eval_fixtures`
 - `eval_history`
 - `doctor`
@@ -142,6 +144,10 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 
 `github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。`bodyFile` / `--body-file` 输入会先经过 path policy 检查，然后才进入 dry-run 或执行。
+
+`github_review_comments` accepts pasted `diff` or a `diffFile` read through path policy, analyzes review findings, and builds a batch of file-line review comment commands. Dry-run is the default; execute mode requires command policy confirmation for every generated `gh api` command.
+
+`github_review_comments` 支持粘贴 `diff` 或通过 path policy 读取 `diffFile`，先分析 review findings，再生成一批文件行级 review comment 命令。默认 dry-run；execute 模式会要求每条生成的 `gh api` 命令都通过 command policy 确认。
 
 `write_tests` can read coverage files through path policy, analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests including CommonJS bracket exports, write stdlib `unittest` Python tests with simple behavior, object-property/dictionary-field fallback, and exception assertions, optionally run them through command policy, return `failureAnalysis.repairPlan` for failed runs, run one safe test-only repair retry with `repair`, prepare a Git/PR dry-run plan, and execute a confirmed local branch/commit plan only after final generated tests pass.
 
@@ -255,11 +261,13 @@ Post a file-line PR review comment when a finding has a concrete diff line. It r
 ```bash
 vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md
 vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --execute --confirm
+vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
+vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff --execute --confirm
 ```
 
-PR and comment body files are checked through path policy before dry-run or execution; do not pass denied files such as `.env`.
+PR and comment body files are checked through path policy before dry-run or execution; batch review-comment diff files are also checked before analysis. Do not pass denied files such as `.env`.
 
-PR 和 comment 的正文文件会先经过 path policy 检查，然后才进入 dry-run 或执行；不要传入 `.env` 等 denied 文件。
+PR 和 comment 的正文文件会先经过 path policy 检查，然后才进入 dry-run 或执行；批量 review comment 的 diff 文件也会在分析前经过检查。不要传入 `.env` 等 denied 文件。
 
 Read recent workflow run status:
 

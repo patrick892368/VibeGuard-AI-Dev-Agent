@@ -11,7 +11,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
-import { commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
@@ -198,6 +198,20 @@ const tools = [
       subjectType: stringSchema,
       execute: booleanSchema,
       confirmed: booleanSchema
+    })
+  },
+  {
+    name: "github_review_comments",
+    description: "Analyze a diff and publish generated file-line GitHub PR review comments. Dry-run by default.",
+    inputSchema: objectSchema({
+      pr: stringSchema,
+      commitId: stringSchema,
+      diff: stringSchema,
+      diffFile: stringSchema,
+      limit: numberSchema,
+      execute: booleanSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
@@ -636,6 +650,53 @@ async function callTool(name, args, root) {
       ...options,
       dryRun: args.execute !== true
     });
+  }
+  if (name === "github_review_comments") {
+    const env = loadRuntimeEnv(root);
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const diffText = args.diffFile
+      ? readFileWithPolicy(root, args.diffFile, engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      }).content
+      : args.diff || "";
+    const review = analyzeReviewDiff(diffText);
+    const dryRun = await createReviewCommentsWithGh(root, {
+      pr: args.pr,
+      commitId: args.commitId,
+      comments: review.reviewComments,
+      limit: args.limit,
+      env,
+      dryRun: true
+    });
+    const commandPolicy = checkGitHubCommandsPolicy(dryRun.comments, engine, {
+      confirmed: Boolean(args.confirmed),
+      stage: "github_review_comments_policy"
+    });
+    if (args.execute === true && commandPolicy.status !== "allow") {
+      return {
+        ...commandPolicy,
+        review,
+        publish: dryRun
+      };
+    }
+    const publish = args.execute === true
+      ? await createReviewCommentsWithGh(root, {
+        pr: args.pr,
+        commitId: args.commitId,
+        comments: review.reviewComments,
+        limit: args.limit,
+        env,
+        dryRun: false
+      })
+      : dryRun;
+    return {
+      status: publish.status,
+      review,
+      commandPolicy,
+      publish
+    };
   }
   if (name === "github_checks") {
     return listWorkflowRunsWithGh(root, {

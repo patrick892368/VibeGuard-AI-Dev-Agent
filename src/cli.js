@@ -16,7 +16,7 @@ import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch
 import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -43,6 +43,7 @@ Usage:
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm]
   vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm]
+  vibeguard github review-comments --pr <number> --commit <sha> [--diff <file>] [--limit <n>] [--execute] [--confirm]
   vibeguard github checks [--branch <branch>] [--limit <n>] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
@@ -427,6 +428,48 @@ async function githubCommand(parsed, root, subcommand) {
       env,
       dryRun: !parsed.execute
     });
+  }
+  if (subcommand === "review-comments") {
+    const commitId = parsed.commit || parsed["commit-id"];
+    const diffText = diffInput(parsed, root);
+    const review = analyzeReviewDiff(diffText);
+    const dryRun = await createReviewCommentsWithGh(root, {
+      pr: parsed.pr,
+      commitId,
+      comments: review.reviewComments,
+      limit: parsed.limit,
+      env,
+      dryRun: true
+    });
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const commandPolicy = checkGitHubCommandsPolicy(dryRun.comments, engine, {
+      confirmed: Boolean(parsed.confirm),
+      stage: "github_review_comments_policy"
+    });
+    if (parsed.execute && commandPolicy.status !== "allow") {
+      return {
+        ...commandPolicy,
+        review,
+        publish: dryRun
+      };
+    }
+    const publish = parsed.execute
+      ? await createReviewCommentsWithGh(root, {
+        pr: parsed.pr,
+        commitId,
+        comments: review.reviewComments,
+        limit: parsed.limit,
+        env,
+        dryRun: false
+      })
+      : dryRun;
+    return {
+      status: publish.status,
+      review,
+      commandPolicy,
+      publish
+    };
   }
   if (subcommand === "checks") {
     return listWorkflowRunsWithGh(root, {

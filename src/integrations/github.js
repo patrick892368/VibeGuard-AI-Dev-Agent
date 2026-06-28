@@ -88,6 +88,13 @@ export function buildGhRunListArgs(options = {}) {
   return args;
 }
 
+function normalizeLimit(limit, total) {
+  if (limit === undefined || limit === null || limit === true) return total;
+  const value = Number(limit);
+  if (!Number.isInteger(value) || value < 0) throw new Error("GitHub PR review comments limit must be a non-negative integer");
+  return Math.min(value, total);
+}
+
 function isMissingGh(error) {
   return error?.code === "ENOENT" || /ENOENT|not recognized|not found/i.test(error?.message || "");
 }
@@ -308,6 +315,89 @@ export async function createReviewCommentWithGh(root = process.cwd(), options = 
     if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
     return createReviewCommentWithApi(root, options);
   }
+}
+
+export async function createReviewCommentsWithGh(root = process.cwd(), options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  if (!options.commitId) throw new Error("GitHub PR review comment commitId is required");
+  if (!Array.isArray(options.comments)) throw new Error("GitHub PR review comments must be an array");
+
+  const limit = normalizeLimit(options.limit, options.comments.length);
+  const selected = options.comments.slice(0, limit);
+  if (selected.length === 0) {
+    return {
+      status: "no_comments",
+      count: 0,
+      totalReviewComments: options.comments.length,
+      skipped: options.comments.length,
+      comments: []
+    };
+  }
+
+  const results = [];
+  for (const [index, comment] of selected.entries()) {
+    const result = await createReviewCommentWithGh(root, {
+      pr: options.pr,
+      commitId: options.commitId,
+      path: comment.path,
+      line: comment.line,
+      side: comment.side,
+      startLine: comment.startLine,
+      startSide: comment.startSide,
+      subjectType: comment.subjectType,
+      body: comment.body,
+      env: options.env,
+      dryRun: options.dryRun,
+      useApi: options.useApi,
+      fetch: options.fetch
+    });
+    results.push({
+      index: index + 1,
+      path: comment.path,
+      line: comment.line,
+      side: comment.side || "RIGHT",
+      severity: comment.severity,
+      category: comment.category,
+      ...result
+    });
+  }
+
+  return {
+    status: options.dryRun === false ? "review_comments_published" : "dry_run",
+    count: results.length,
+    totalReviewComments: options.comments.length,
+    skipped: options.comments.length - results.length,
+    comments: results
+  };
+}
+
+export function checkGitHubCommandsPolicy(items = [], engine, options = {}) {
+  const confirmed = Boolean(options.confirmed);
+  const commandPolicies = items
+    .filter((item) => item.command)
+    .map((item) => ({
+      index: item.index,
+      command: item.command,
+      policy: engine.checkCommand(item.command)
+    }));
+  const blocked = commandPolicies.find(({ policy }) =>
+    policy.status !== "allow" && !(policy.status === "require_confirmation" && confirmed)
+  );
+  if (blocked) {
+    return {
+      status: blocked.policy.status,
+      stage: options.stage || "github_command_policy",
+      index: blocked.index,
+      command: blocked.command,
+      policy: blocked.policy,
+      commandPolicies
+    };
+  }
+  return {
+    status: "allow",
+    stage: options.stage || "github_command_policy",
+    commandPolicies
+  };
 }
 
 export async function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {

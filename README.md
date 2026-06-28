@@ -29,13 +29,13 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff；`--file` 输入路径本身也会先经过 read policy。Checks or applies unified diffs through policy; `--file` input paths also pass read policy first.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
 - `vibeguard pr summary`: 从 diff 生成包含 review findings 和 actionItems 的 GitHub-ready PR body；可用 `--write-body` 经过 policy 写出 PR body 文件。Builds a GitHub-ready PR body with review findings and actionItems from a diff; `--write-body` can write the PR body file through policy.
-- `vibeguard github`: 检测 GitHub remote、创建 PR、发布普通评论/文件行级 review comment、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，`--body-file` 会先经过 path policy。Detects GitHub remotes, creates PRs, posts general comments/file-line review comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, and `--body-file` is checked by path policy first.
+- `vibeguard github`: 检测 GitHub remote、创建 PR、发布普通评论/单条或批量文件行级 review comment、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，`--body-file` 和批量 diff 输入会先经过 path policy。Detects GitHub remotes, creates PRs, posts general comments and single or batched file-line review comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, and `--body-file` plus batched diff inputs are checked by path policy first.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary` / `audit report`: 汇总 JSONL 审计日志，或写出 Markdown 审计报告。Summarizes JSONL audit logs or writes a Markdown audit report.
 - `vibeguard eval fixtures` / `eval history`: 用 Python / Node / Django-style / Spring Boot-style fixture 评测当前 LLM provider，并按 fixture 汇总历史结果。Evaluates the configured LLM provider against Python, Node, Django-style, and Spring Boot-style fixtures, with per-fixture history summaries.
 - `vibeguard doctor`: 检查 policy、provider、默认模型、proxy、Git、GitHub remote、`gh` 和 GitHub token 是否存在，并返回机器可读 `nextActions`；provider HTTP 失败会返回短错误摘要，但不会打印密钥。Checks policy, provider, default model, proxy, Git, GitHub remote, `gh`, and GitHub token presence, and returns machine-readable `nextActions`; provider HTTP failures return short error summaries without printing secrets.
-- `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema、structured tool output、受 read policy 保护的 log/patch/diff/coverage 文件输入、`debug_error` AI patch artifact、`apply_patch_safely`，以及 GitHub PR dry-run/comment/checks 等 Codex 工作流工具。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, structured tool output, read-policy-protected log/patch/diff/coverage file inputs, `debug_error` AI patch artifacts, `apply_patch_safely`, and Codex workflow tools such as GitHub PR dry-runs, comments, and checks.
+- `vibeguard mcp`: 启动 MCP-style stdio server，支持 `initialize`、`tools/list` schema、structured tool output、受 read policy 保护的 log/patch/diff/coverage 文件输入、`debug_error` AI patch artifact、`apply_patch_safely`，以及 GitHub PR dry-run、普通/批量 review comments、checks 等 Codex 工作流工具。Starts an MCP-style stdio server with `initialize`, `tools/list` schemas, structured tool output, read-policy-protected log/patch/diff/coverage file inputs, `debug_error` AI patch artifacts, `apply_patch_safely`, and Codex workflow tools such as GitHub PR dry-runs, general/batched review comments, and checks.
 
 项目当前保持 dependency-light，CLI 基于 Node.js built-ins，clone 后即可测试。
 
@@ -95,6 +95,7 @@ vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 vibeguard github comment --pr 12 --body-file review.md
 vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md
+vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
 vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard run --command "npm test" --dry-run
 vibeguard run --command "npm test" --audit-log reports/audit.jsonl
@@ -231,9 +232,9 @@ Remote push / PR actions sit behind the same explicit execution gate:
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --json
 ```
 
-默认策略要求 `git switch -c`、`git commit`、`git push`、`gh pr create`、`gh pr comment` 人工确认。远端 PR / comment 还要求 GitHub remote 和已认证的 `gh`。
+默认策略要求 `git switch -c`、`git commit`、`git push`、`gh pr create`、`gh pr comment`、`gh api` 人工确认。远端 PR / comment 还要求 GitHub remote 和已认证的 `gh`，或可用的 GitHub token fallback。
 
-Default policy requires confirmation for `git switch -c`, `git commit`, `git push`, `gh pr create`, and `gh pr comment`. Remote PR/comment actions also require a GitHub remote and authenticated `gh`.
+Default policy requires confirmation for `git switch -c`, `git commit`, `git push`, `gh pr create`, `gh pr comment`, and `gh api`. Remote PR/comment actions also require a GitHub remote and authenticated `gh`, or an available GitHub token fallback.
 
 ## Policy-as-Code / Policy-as-Code
 
@@ -270,6 +271,7 @@ commands:
     - "git push"
     - "gh pr create"
     - "gh pr comment"
+    - "gh api"
 ```
 
 策略结果：
@@ -308,7 +310,7 @@ The test suite covers:
 - Onboarding command checks，用于标注建议命令的依据、缺失 wrapper 或需要确认的依赖。Onboarding command checks for suggested command evidence, missing wrappers, or dependencies that need confirmation.
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
 - 本地 branch / commit / push 的受保护执行。Confirmed protected local branch / commit / push flows.
-- PR 创建调度和 PR comment dry-run。PR creation dispatch and PR comment dry-run.
+- PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, policy confirmation, and REST fallback.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
