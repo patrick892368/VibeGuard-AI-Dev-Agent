@@ -148,6 +148,59 @@ test("writeSuggestedTests writes Python class smoke assertions", () => {
   assert.match(generated, /self\.assertTrue\(hasattr\(module, "User"\)\)/);
 });
 
+test("writeSuggestedTests writes Java JUnit behavior assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "Calculator.java"), `package com.example;
+
+public class Calculator {
+    public int add(int a, int b) {
+        return a+b;
+    }
+
+    public static String normalize(String name) {
+        return name.trim().toLowerCase();
+    }
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "src", "test", "java", "com", "example", "CalculatorTest.java"), "utf8");
+
+  assert.equal(result.written.length, 1);
+  assert.equal(result.written[0].path, "src/test/java/com/example/CalculatorTest.java");
+  assert.deepEqual(result.candidates[0].functions, ["add", "normalize"]);
+  assert.equal(result.candidates[0].metadata.canInstantiateNoArg, true);
+  assert.match(generated, /package com\.example;/);
+  assert.match(generated, /import static org\.junit\.jupiter\.api\.Assertions\.assertEquals;/);
+  assert.match(generated, /Calculator target = new Calculator\(\)/);
+  assert.match(generated, /assertEquals\(5, target\.add\(2, 3\)\)/);
+  assert.match(generated, /assertEquals\("ada", Calculator\.normalize\(" Ada "\)\)/);
+});
+
+test("writeSuggestedTests can dry-run a generated Java test command through policy", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "pom.xml"), "<project></project>\n", "utf8");
+  fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "Calculator.java"), `package com.example;
+
+public class Calculator {
+    public int add(int a, int b) {
+        return a + b;
+    }
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true, dryRun: true });
+
+  assert.equal(result.written.length, 1);
+  assert.equal(result.testRuns[0].status, "checked");
+  assert.equal(result.testRuns[0].command, "mvn test");
+  assert.deepEqual(result.testRuns[0].argv, ["mvn", "test"]);
+});
+
 test("writeSuggestedTests skips runtime writes for TypeScript interface-only files", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));

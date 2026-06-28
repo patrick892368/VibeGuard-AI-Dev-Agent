@@ -401,7 +401,8 @@ function simpleAssertion(name, params, expression, options = {}) {
   }
   if (params.length === 2) {
     const [left, right] = params;
-    if (normalized === `${left} + ${right}` || normalized === `${right} + ${left}`) {
+    const compact = normalized.replace(/\s+/g, "");
+    if (normalized === `${left} + ${right}` || normalized === `${right} + ${left}` || compact === `${left}+${right}` || compact === `${right}+${left}`) {
       return { name, args: [2, 3], expected: 5, async: asyncHint };
     }
   }
@@ -455,10 +456,64 @@ function inferJavaScriptAssertions(text) {
   return hints;
 }
 
+function javaParamNames(params) {
+  return splitParams(params).map((param) => {
+    const cleaned = param
+      .replace(/@\w+(?:\([^)]*\))?\s*/g, "")
+      .replace(/\bfinal\s+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned.match(/([a-zA-Z_]\w*)\s*(?:\[\])?$/)?.[1] || "";
+  }).filter(Boolean);
+}
+
+function inferJavaAssertions(text) {
+  const hints = [];
+  const simpleMethodPattern = /public\s+(static\s+)?[\w.<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{\s*return\s+([^;{}]+);?\s*\}/g;
+  for (const match of text.matchAll(simpleMethodPattern)) {
+    const hint = simpleAssertion(match[2], javaParamNames(match[3]), match[4]);
+    if (hint) hints.push({ ...hint, static: Boolean(match[1]) });
+  }
+
+  const branchPattern = /public\s+(static\s+)?[\w.<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{\s*if\s*\(([^)]*)\)\s*\{\s*return\s+([^;{}]+);?\s*}\s*return\s+([^;{}]+);?\s*}/g;
+  for (const match of text.matchAll(branchPattern)) {
+    hints.push(...branchAssertions(match[2], javaParamNames(match[3]), match[4], match[5], match[6])
+      .map((hint) => ({ ...hint, static: Boolean(match[1]) })));
+  }
+
+  return uniqueBehaviorHints(hints);
+}
+
+function uniqueBehaviorHints(hints) {
+  const seen = new Set();
+  return hints.filter((hint) => {
+    const key = `${hint.name}:${JSON.stringify(hint.args)}:${JSON.stringify(hint.expected)}:${hint.static ? "static" : "instance"}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function javaCanInstantiateNoArg(text, className, kind) {
+  if (kind !== "class" || !className) return false;
+  const constructorPattern = new RegExp(`(?:public|protected|private)?\\s*${className}\\s*\\(([^)]*)\\)`, "g");
+  const constructors = [...text.matchAll(constructorPattern)];
+  if (constructors.length === 0) return true;
+  return constructors.some((match) => match[1].trim() === "" && !match[0].trim().startsWith("private"));
+}
+
 function javaMetadata(text, sourceFile) {
   const packageName = text.match(/^\s*package\s+([\w.]+);/m)?.[1] || "";
-  const className = text.match(/\b(?:class|interface|record|enum)\s+([A-Z]\w*)/)?.[1] || path.basename(sourceFile, ".java");
-  return { packageName, className };
+  const type = text.match(/\b(class|interface|record|enum)\s+([A-Z]\w*)/);
+  const kind = type?.[1] || "class";
+  const className = type?.[2] || path.basename(sourceFile, ".java");
+  return {
+    packageName,
+    className,
+    kind,
+    canInstantiateNoArg: javaCanInstantiateNoArg(text, className, kind),
+    assertionHints: inferJavaAssertions(text)
+  };
 }
 
 function detectJavaScriptModuleSystem(text, sourceFile) {
@@ -771,6 +826,29 @@ function jsClassAssertion(name, candidate) {
   return `  assert.equal(typeof mod.${name}, "function");`;
 }
 
+function javaLiteral(value) {
+  if (value === true) return "true";
+  if (value === false) return "false";
+  if (value === null) return "null";
+  if (typeof value === "number") return String(value);
+  return JSON.stringify(String(value));
+}
+
+function javaBehaviorAssertions(candidate, assertionHints) {
+  const { className, canInstantiateNoArg } = candidate.metadata || {};
+  if (!className) return "";
+  const usable = assertionHints.filter((hint) => hint.static || canInstantiateNoArg);
+  if (usable.length === 0) return "";
+  const needsTarget = usable.some((hint) => !hint.static);
+  const setup = needsTarget ? `        ${className} target = new ${className}();\n` : "";
+  const assertions = usable.map((hint) => {
+    const receiver = hint.static ? className : "target";
+    const args = hint.args.map(javaLiteral).join(", ");
+    return `        assertEquals(${javaLiteral(hint.expected)}, ${receiver}.${hint.name}(${args}));`;
+  }).join("\n");
+  return `${setup}${assertions}`;
+}
+
 export function generateTestContent(candidate, options = {}) {
   const sourceFile = candidate.sourceFile.replace(/\\/g, "/");
   const testFile = candidate.suggestedTestFile.replace(/\\/g, "/");
@@ -820,8 +898,10 @@ if __name__ == "__main__":
   if (sourceFile.endsWith(".java")) {
     const { packageName, className } = candidate.metadata || {};
     const packageLine = packageName ? `package ${packageName};\n\n` : "";
+    const behaviorAssertions = javaBehaviorAssertions(candidate, assertionHints);
     return `${packageLine}import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class ${className}Test {
@@ -829,6 +909,7 @@ class ${className}Test {
     void symbolCanBeLoaded() {
         assertNotNull(${className}.class);
     }
+${behaviorAssertions ? `\n    @Test\n    void coversSimpleBehavior() {\n${behaviorAssertions}\n    }\n` : ""}
 }
 `;
   }
