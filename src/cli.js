@@ -29,7 +29,7 @@ Usage:
   vibeguard debug --log <file> [--ai-patch] [--output-patch <file>]
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--github-api]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--github-api]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--coverage-command <cmd>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--github-api]
   vibeguard review [--diff <file>] [--github-pr <number>] [--write-comment <file>] [--publish-comment|--comment-pr <number>] [--execute] [--confirm] [--github-api]
   vibeguard onboard [--write] [--confirm]
   vibeguard patch check --file <patch>
@@ -825,6 +825,7 @@ async function dispatch(parsed) {
         limit: parsed.limit || 1,
         coverageFile: parsed.coverage,
         coverageAfterFile: parsed["coverage-after"],
+        coverageCommand: parsed["coverage-command"],
         runTests: Boolean(parsed.run),
         repairFailures: Boolean(parsed.repair),
         testCommand: parsed["test-command"],

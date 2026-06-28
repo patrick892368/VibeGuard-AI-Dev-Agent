@@ -832,6 +832,78 @@ function loadCoverageAfter(options, root) {
   return loadCoverageInput(options, root, "coverageAfterFile", "coverageAfterText");
 }
 
+function coverageInputExists(root, filePath) {
+  if (!filePath) return false;
+  try {
+    return fs.existsSync(resolveInsideRoot(root, filePath));
+  } catch {
+    return false;
+  }
+}
+
+function runCoverageCommand(root, engine, options = {}, phase = "coverage") {
+  if (!options.coverageCommand) return null;
+  try {
+    return {
+      phase,
+      ...runCommandWithPolicy(root, options.coverageCommand, engine, {
+        confirmed: Boolean(options.confirmed),
+        dryRun: Boolean(options.dryRun),
+        auditLog: options.auditLog
+      })
+    };
+  } catch (error) {
+    return {
+      phase,
+      status: "blocked",
+      command: options.coverageCommand,
+      error: error.message
+    };
+  }
+}
+
+function coverageFileReady(root, options = {}, runResult = null) {
+  if (options.coverageText) return true;
+  if (!options.coverageFile) return false;
+  if (!options.coverageCommand) return true;
+  return runResult?.status === "passed" && coverageInputExists(root, options.coverageFile);
+}
+
+function applyCoverageAfterRun(root, analysis, afterRun, engine, options = {}) {
+  if (!afterRun || options.coverageAfterFile || options.coverageAfterText) return analysis;
+  if (!analysis.coverage) {
+    return {
+      ...analysis,
+      coverageDeltaStatus: {
+        status: "not_compared",
+        reason: "coverage_before_missing"
+      }
+    };
+  }
+  if (afterRun.status !== "passed" || !coverageInputExists(root, options.coverageFile)) {
+    return {
+      ...analysis,
+      coverageDeltaStatus: {
+        status: "not_compared",
+        reason: `coverage_command_after_${afterRun.status}`
+      }
+    };
+  }
+
+  const coverageAfter = loadCoverage({
+    ...options,
+    engine,
+    coverageText: null
+  }, root);
+  const coverageDelta = compareCoverageReports(analysis.coverage, coverageAfter);
+  return {
+    ...analysis,
+    coverageAfter,
+    coverageDelta,
+    coverageDeltaStatus: describeCoverageDelta(analysis.coverage, coverageAfter, coverageDelta)
+  };
+}
+
 function pythonBehaviorAssertion(hint) {
   if (hint.kind === "python_mock_call") {
     const args = hint.params.map((param) => (param === hint.dependency ? param : pythonLiteral(hint.samples[param]))).join(", ");
@@ -1562,10 +1634,11 @@ export function analyzeTestTargets(options = {}) {
 }
 
 function buildSuggestedTestsState(root, engine, options = {}) {
+  const coverageBeforeRun = runCoverageCommand(root, engine, options, "before");
   const analysis = analyzeTestTargets({
     root,
     engine,
-    coverageFile: options.coverageFile,
+    coverageFile: coverageFileReady(root, options, coverageBeforeRun) ? options.coverageFile : undefined,
     coverageText: options.coverageText,
     coverageAfterFile: options.coverageAfterFile,
     coverageAfterText: options.coverageAfterText,
@@ -1590,17 +1663,20 @@ function buildSuggestedTestsState(root, engine, options = {}) {
   const testRuns = hasRepairRuns
     ? mergeRepairedRuns(initialTestRuns, repairRuns)
     : initialTestRuns;
+  const coverageAfterRun = runCoverageCommand(root, engine, options, "after");
+  const analysisWithCoverage = applyCoverageAfterRun(root, analysis, coverageAfterRun, engine, options);
   const gitPlan = buildTestWriterGitPlan(written, testRuns, options);
   const gitPolicy = gitPlan
     ? checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) })
     : null;
   return {
-    analysis,
+    analysis: analysisWithCoverage,
     written,
     initialTestRuns,
     repairRuns,
     hasRepairRuns,
     testRuns,
+    coverageRuns: [coverageBeforeRun, coverageAfterRun].filter(Boolean),
     gitPlan,
     gitPolicy
   };
@@ -1611,6 +1687,7 @@ function buildSuggestedTestsResult(state, gitExecution) {
     ...state.analysis,
     written: state.written,
     testRuns: state.testRuns,
+    coverageRuns: state.coverageRuns,
     gitPlan: state.gitPlan,
     gitPolicy: state.gitPolicy,
     gitExecution

@@ -91,6 +91,7 @@ test("MCP tools expose input schemas", () => {
   const byName = new Map(mcpInternals.tools.map((tool) => [tool.name, tool]));
   assert.equal(byName.get("fix_error").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("write_tests").inputSchema.properties.githubUseApi.type, "boolean");
+  assert.equal(byName.get("write_tests").inputSchema.properties.coverageCommand.type, "string");
   assert.equal(byName.get("review_pr").inputSchema.properties.githubPr.type, "string");
   assert.equal(byName.get("review_pr").inputSchema.properties.publishComment.type, "boolean");
   assert.equal(byName.get("review_pr").inputSchema.properties.commentPr.type, "string");
@@ -902,6 +903,49 @@ def greeting():
   assert.equal(result.repairRuns[0].status, "repaired");
   assert.equal(result.testRuns[0].status, "passed");
   assert.equal(result.testRuns[0].repaired, true);
+});
+
+test("MCP write_tests can run coverage command and return coverage delta", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.writeFileSync(path.join(root, "src", "math.js"), `export function uncovered() {
+  return false;
+}
+`, "utf8");
+  fs.writeFileSync(path.join(root, "coverage-script.cjs"), `const fs = require("node:fs");
+const hasGeneratedTest = fs.existsSync("src/math.test.js");
+fs.writeFileSync("coverage.json", JSON.stringify({
+  files: {
+    "src/math.js": {
+      missing_lines: hasGeneratedTest ? [] : [2],
+      summary: { percent_covered: hasGeneratedTest ? 100 : 0 }
+    }
+  }
+}));
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 12,
+    method: "tools/call",
+    params: {
+      name: "write_tests",
+      arguments: {
+        write: true,
+        run: true,
+        limit: 1,
+        coverageFile: "coverage.json",
+        coverageCommand: "node coverage-script.cjs"
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.deepEqual(result.coverageRuns.map((run) => [run.phase, run.status]), [["before", "passed"], ["after", "passed"]]);
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.coverageDeltaStatus.status, "compared");
+  assert.equal(result.coverageDelta.summary.missingLinesReduced, 1);
 });
 
 test("MCP write_tests blocks denied coverage files before analysis", async () => {

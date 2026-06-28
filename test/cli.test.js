@@ -330,6 +330,49 @@ test("CLI test command accepts coverage report", () => {
   assert.equal(parsed.coverageDelta.summary.missingLinesReduced, 1);
 });
 
+test("CLI test --write can run coverage command and report delta", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-coverage-command-"));
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.writeFileSync(path.join(root, "src", "math.js"), `export function uncovered() {
+  return false;
+}
+`, "utf8");
+  fs.writeFileSync(path.join(root, "coverage-script.cjs"), `const fs = require("node:fs");
+const hasGeneratedTest = fs.existsSync("src/math.test.js");
+fs.writeFileSync("coverage.json", JSON.stringify({
+  files: {
+    "src/math.js": {
+      missing_lines: hasGeneratedTest ? [] : [2],
+      summary: { percent_covered: hasGeneratedTest ? 100 : 0 }
+    }
+  }
+}));
+`, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "test",
+    "--write",
+    "--coverage",
+    "coverage.json",
+    "--coverage-command",
+    "node coverage-script.cjs",
+    "--run",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+  assert.deepEqual(parsed.coverageRuns.map((run) => [run.phase, run.status]), [["before", "passed"], ["after", "passed"]]);
+  assert.equal(parsed.testRuns[0].status, "passed");
+  assert.equal(parsed.coverageDeltaStatus.status, "compared");
+  assert.equal(parsed.coverageDelta.summary.missingLinesReduced, 1);
+});
+
 test("CLI test command blocks denied coverage input files", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-coverage-deny-"));
   fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");

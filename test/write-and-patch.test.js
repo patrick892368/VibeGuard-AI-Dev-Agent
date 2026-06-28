@@ -275,6 +275,42 @@ export function uncovered() {
   assert.match(generated, /assert\.equal\(mod\.uncovered\(\), false\)/);
 });
 
+test("writeSuggestedTests can run coverage command before and after generated tests", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), `export function uncovered() {
+  return false;
+}
+`, "utf8");
+  fs.writeFileSync(path.join(root, "coverage-script.cjs"), `const fs = require("node:fs");
+const hasGeneratedTest = fs.existsSync("src/math.test.js");
+fs.writeFileSync("coverage.json", JSON.stringify({
+  files: {
+    "src/math.js": {
+      missing_lines: hasGeneratedTest ? [] : [2],
+      summary: { percent_covered: hasGeneratedTest ? 100 : 0 }
+    }
+  }
+}));
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, {
+    limit: 1,
+    coverageFile: "coverage.json",
+    coverageCommand: "node coverage-script.cjs",
+    runTests: true
+  });
+
+  assert.deepEqual(result.coverageRuns.map((run) => [run.phase, run.status]), [["before", "passed"], ["after", "passed"]]);
+  assert.equal(result.coverageTargets[0].sourceFile, "src/math.js");
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.coverageDeltaStatus.status, "compared");
+  assert.equal(result.coverageDelta.summary.missingLinesReduced, 1);
+  assert.equal(result.coverageDelta.files[0].status, "improved");
+});
+
 test("writeSuggestedTests writes simple Python behavior assertions", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));
