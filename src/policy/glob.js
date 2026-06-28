@@ -46,8 +46,23 @@ export function matchAnyGlob(filePath, patterns = []) {
   return patterns.some((pattern) => matchGlob(filePath, pattern));
 }
 
+function commandPatternToRegExp(pattern) {
+  let source = "";
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index];
+    if (char === "*") {
+      source += ".*";
+    } else if (char === "?") {
+      source += ".";
+    } else {
+      source += escapeRegex(char);
+    }
+  }
+  return new RegExp(`^${source}$`);
+}
+
 export function matchCommand(command, pattern) {
   const normalizedCommand = command.trim().replace(/\s+/g, " ");
   const normalizedPattern = pattern.trim().replace(/\s+/g, " ");
-  return globToRegExp(normalizedPattern).test(normalizedCommand) || normalizedCommand.includes(normalizedPattern);
+  return commandPatternToRegExp(normalizedPattern).test(normalizedCommand) || normalizedCommand.includes(normalizedPattern);
 }

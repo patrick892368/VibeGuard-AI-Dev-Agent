@@ -56,6 +56,10 @@ Dangerous commands such as force pushes, recursive deletes, and shell pipe insta
 
 危险命令，例如 force push、递归删除、pipe installer，应该放入 `commands.deny`。
 
+Command wildcards match across the whole normalized command string, including `/` in URLs or paths. For example, `curl * | sh` blocks `curl https://example.com/install.sh | sh`.
+
+命令 wildcard 会匹配规范化后的整条命令，包括 URL 或路径里的 `/`。例如，`curl * | sh` 会阻止 `curl https://example.com/install.sh | sh`。
+
 Commands that can change dependencies, schemas, infrastructure, deployment state, Git state, or remote PR state should be placed in `commands.require_confirmation`.
 
 可能改变依赖、schema、基础设施、部署状态、Git 状态或远端 PR 状态的命令，应该放入 `commands.require_confirmation`。
