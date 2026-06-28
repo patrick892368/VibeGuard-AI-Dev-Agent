@@ -179,6 +179,32 @@ public class Calculator {
   assert.match(generated, /assertEquals\("ada", Calculator\.normalize\(" Ada "\)\)/);
 });
 
+test("writeSuggestedTests writes Java JUnit exception assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "Numbers.java"), `package com.example;
+
+public class Numbers {
+    public int requirePositive(int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("negative");
+        }
+        return value;
+    }
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "src", "test", "java", "com", "example", "NumbersTest.java"), "utf8");
+
+  assert.equal(result.written.length, 1);
+  assert.deepEqual(result.candidates[0].functions, ["requirePositive"]);
+  assert.match(generated, /import static org\.junit\.jupiter\.api\.Assertions\.assertThrows;/);
+  assert.match(generated, /Numbers target = new Numbers\(\)/);
+  assert.match(generated, /assertThrows\(IllegalArgumentException\.class, \(\) -> target\.requirePositive\(-2\)\)/);
+});
+
 test("writeSuggestedTests can dry-run a generated Java test command through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "pom.xml"), "<project></project>\n", "utf8");

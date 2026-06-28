@@ -481,13 +481,19 @@ function inferJavaAssertions(text) {
       .map((hint) => ({ ...hint, static: Boolean(match[1]) })));
   }
 
+  const exceptionPattern = /public\s+(static\s+)?[\w.<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*\{\s*if\s*\(([^)]*)\)\s*\{\s*throw\s+new\s+([a-zA-Z_$][\w$.]*)\s*\([^;{}]*\);?\s*}\s*return\s+([^;{}]+);?\s*}/g;
+  for (const match of text.matchAll(exceptionPattern)) {
+    hints.push(...exceptionAssertions(match[2], javaParamNames(match[3]), match[4], match[5])
+      .map((hint) => ({ ...hint, static: Boolean(match[1]) })));
+  }
+
   return uniqueBehaviorHints(hints);
 }
 
 function uniqueBehaviorHints(hints) {
   const seen = new Set();
   return hints.filter((hint) => {
-    const key = `${hint.name}:${JSON.stringify(hint.args)}:${JSON.stringify(hint.expected)}:${hint.static ? "static" : "instance"}`;
+    const key = `${hint.name}:${JSON.stringify(hint.args)}:${JSON.stringify(hint.expected)}:${hint.throws || ""}:${hint.static ? "static" : "instance"}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -834,6 +840,10 @@ function javaLiteral(value) {
   return JSON.stringify(String(value));
 }
 
+function javaErrorClass(errorName) {
+  return `${String(errorName || "RuntimeException").split(".").pop()}.class`;
+}
+
 function javaBehaviorAssertions(candidate, assertionHints) {
   const { className, canInstantiateNoArg } = candidate.metadata || {};
   if (!className) return "";
@@ -844,6 +854,9 @@ function javaBehaviorAssertions(candidate, assertionHints) {
   const assertions = usable.map((hint) => {
     const receiver = hint.static ? className : "target";
     const args = hint.args.map(javaLiteral).join(", ");
+    if (hint.throws) {
+      return `        assertThrows(${javaErrorClass(hint.throws)}, () -> ${receiver}.${hint.name}(${args}));`;
+    }
     return `        assertEquals(${javaLiteral(hint.expected)}, ${receiver}.${hint.name}(${args}));`;
   }).join("\n");
   return `${setup}${assertions}`;
@@ -899,10 +912,12 @@ if __name__ == "__main__":
     const { packageName, className } = candidate.metadata || {};
     const packageLine = packageName ? `package ${packageName};\n\n` : "";
     const behaviorAssertions = javaBehaviorAssertions(candidate, assertionHints);
+    const hasThrowAssertions = assertionHints.some((hint) => hint.throws && (hint.static || candidate.metadata?.canInstantiateNoArg));
     return `${packageLine}import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+${hasThrowAssertions ? "import static org.junit.jupiter.api.Assertions.assertThrows;\n" : ""}
 
 class ${className}Test {
     @Test
