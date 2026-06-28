@@ -600,12 +600,16 @@ test("writeSuggestedTests returns a repair plan for assertion failures", () => {
 test("writeOnboardingDocs writes onboarding and architecture docs through policy", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "README.md"), "# Demo\n", "utf8");
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "index.js"), "export function run() {}\n", "utf8");
   const engine = engineFor(root);
 
   const result = writeOnboardingDocs(root, engine);
   assert.equal(result.written.length, 2);
   assert.ok(fs.existsSync(path.join(root, "docs", "ONBOARDING.md")));
   assert.ok(fs.existsSync(path.join(root, "docs", "ARCHITECTURE.md")));
+  assert.match(fs.readFileSync(path.join(root, "docs", "ONBOARDING.md"), "utf8"), /Core Modules/);
+  assert.match(fs.readFileSync(path.join(root, "docs", "ARCHITECTURE.md"), "utf8"), /src \/ entrypoint/);
 });
 
 test("applyPatchWithPolicy supports check-only patch validation", () => {

@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { scanRepository } from "../src/repo/scan.js";
 import { analyzeTestTargets, compareCoverageReports, parseCoverageReport } from "../src/agents/testWriter.js";
-import { analyzeRepository, buildOnboardingMarkdown, recommendFirstTasks, verifySuggestedCommands } from "../src/agents/onboard.js";
+import { analyzeRepository, buildOnboardingMarkdown, identifyCoreModules, recommendFirstTasks, verifySuggestedCommands } from "../src/agents/onboard.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-repo-"));
@@ -293,11 +293,36 @@ test("buildOnboardingMarkdown includes command and architecture sections", () =>
   assert.match(markdown, /建议命令/);
   assert.match(markdown, /Command Checks/);
   assert.match(markdown, /命令检查/);
+  assert.match(markdown, /Core Modules/);
+  assert.match(markdown, /核心模块/);
   assert.match(markdown, /mermaid/);
   assert.match(markdown, /Baseline test command/);
   assert.match(markdown, /npm test/);
+  assert.equal(result.coreModules[0].path, "src");
   assert.equal(result.firstTasks[0].id, "baseline-command");
   assert.equal(result.commandChecks[0].status, "available");
+});
+
+test("identifyCoreModules ranks entrypoints, routes, services, and models", () => {
+  const modules = identifyCoreModules({
+    files: [
+      "src/index.js",
+      "src/routes/users.js",
+      "src/services/userService.js",
+      "src/models/user.js",
+      "src/helpers/format.js"
+    ],
+    frameworks: ["Express"],
+    entrypoints: ["src/index.js"],
+    testFiles: [],
+    suggestedCommands: ["npm test"]
+  });
+
+  assert.equal(modules[0].path, "src");
+  assert.equal(modules[0].kind, "entrypoint");
+  assert.ok(modules.some((module) => module.path === "src/routes" && module.kind === "web-routing"));
+  assert.ok(modules.some((module) => module.path === "src/services" && module.kind === "business-logic"));
+  assert.ok(modules.some((module) => module.path === "src/models" && module.kind === "data-model"));
 });
 
 test("recommendFirstTasks returns repo-specific low-risk tasks", () => {
