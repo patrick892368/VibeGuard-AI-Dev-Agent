@@ -11,7 +11,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTestsAsync } from "../agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
-import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
@@ -118,6 +118,8 @@ const tools = [
     inputSchema: objectSchema({
       diff: stringSchema,
       diffFile: stringSchema,
+      githubPr: stringSchema,
+      useApi: booleanSchema,
       writeComment: stringSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
@@ -139,6 +141,8 @@ const tools = [
     inputSchema: objectSchema({
       diff: stringSchema,
       diffFile: stringSchema,
+      githubPr: stringSchema,
+      useApi: booleanSchema,
       writeBody: stringSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
@@ -222,6 +226,7 @@ const tools = [
       commitId: stringSchema,
       diff: stringSchema,
       diffFile: stringSchema,
+      githubPr: stringSchema,
       limit: numberSchema,
       useApi: booleanSchema,
       execute: booleanSchema,
@@ -399,6 +404,54 @@ function githubPrerequisitePolicy(root, commands, stage, confirmed) {
   return policy.status === "allow" ? null : policy;
 }
 
+async function readGitHubPrDiff(root, args = {}, stage = "github_pr_diff_policy") {
+  if (!args.githubPr) return null;
+  const command = `gh pr diff ${args.githubPr}`;
+  const commandBlocked = githubPrerequisitePolicy(root, [command], stage, Boolean(args.confirmed));
+  if (commandBlocked) return commandBlocked;
+  if (args.useApi) {
+    const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], stage, Boolean(args.confirmed));
+    if (prerequisiteBlocked) return prerequisiteBlocked;
+  }
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  try {
+    const result = await getPullRequestDiffWithGh(root, {
+      pr: args.githubPr,
+      env: loadRuntimeEnv(root),
+      dryRun: false,
+      useApi: Boolean(args.useApi),
+      engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
+    if (result.status !== "fetched") {
+      return {
+        ...result,
+        stage: result.stage || stage
+      };
+    }
+    return result.diff;
+  } catch (error) {
+    return {
+      status: "failed",
+      stage,
+      error: error.message
+    };
+  }
+}
+
+async function diffTextFromArgs(root, args = {}, engine, stage = "github_pr_diff_policy") {
+  if (args.githubPr) return readGitHubPrDiff(root, args, stage);
+  if (args.diffFile) {
+    return readFileWithPolicy(root, args.diffFile, engine, {
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    }).content;
+  }
+  return args.diff || "";
+}
+
 async function callTool(name, args, root) {
   if (name === "check_policy") {
     const { config } = loadConfig(root);
@@ -529,12 +582,8 @@ async function callTool(name, args, root) {
   if (name === "review_pr") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    const diffText = args.diffFile
-      ? readFileWithPolicy(root, args.diffFile, engine, {
-        confirmed: Boolean(args.confirmed),
-        auditLog: args.auditLog
-      }).content
-      : args.diff || "";
+    const diffText = await diffTextFromArgs(root, args, engine, "review_pr_github_diff_policy");
+    if (typeof diffText !== "string") return diffText;
     if (args.writeComment) {
       return writeReviewComment(root, diffText, args.writeComment, engine, {
         confirmed: Boolean(args.confirmed),
@@ -555,12 +604,8 @@ async function callTool(name, args, root) {
   if (name === "summarize_pr") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    const diffText = args.diffFile
-      ? readFileWithPolicy(root, args.diffFile, engine, {
-        confirmed: Boolean(args.confirmed),
-        auditLog: args.auditLog
-      }).content
-      : args.diff || "";
+    const diffText = await diffTextFromArgs(root, args, engine, "summarize_pr_github_diff_policy");
+    if (typeof diffText !== "string") return diffText;
     if (args.writeBody) {
       return writePrSummaryBody(root, diffText, args.writeBody, engine, {
         confirmed: Boolean(args.confirmed),
@@ -721,12 +766,8 @@ async function callTool(name, args, root) {
     const env = loadRuntimeEnv(root);
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
-    const diffText = args.diffFile
-      ? readFileWithPolicy(root, args.diffFile, engine, {
-        confirmed: Boolean(args.confirmed),
-        auditLog: args.auditLog
-      }).content
-      : args.diff || "";
+    const diffText = await diffTextFromArgs(root, args, engine, "github_review_comments_diff_policy");
+    if (typeof diffText !== "string") return diffText;
     const review = analyzeReviewDiff(diffText);
     const dryRun = await createReviewCommentsWithGh(root, {
       pr: args.pr,

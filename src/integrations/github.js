@@ -43,6 +43,11 @@ export function buildGhPrArgs(options = {}) {
   return args;
 }
 
+export function buildGhPrDiffArgs(options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  return ["pr", "diff", String(options.pr)];
+}
+
 export function buildGhPrCommentArgs(options = {}) {
   if (!options.pr) throw new Error("GitHub PR number is required");
   const args = ["pr", "comment", String(options.pr)];
@@ -207,7 +212,7 @@ async function githubApiRequest(root, apiOptions = {}) {
   const response = await fetchImpl(`${baseUrl}/repos/${repository.owner}/${repository.repo}${apiOptions.path}`, {
     method: apiOptions.method || "GET",
     headers: {
-      accept: "application/vnd.github+json",
+      accept: apiOptions.accept || "application/vnd.github+json",
       authorization: `Bearer ${token}`,
       "content-type": "application/json",
       "x-github-api-version": "2022-11-28"
@@ -218,7 +223,25 @@ async function githubApiRequest(root, apiOptions = {}) {
     throw new Error(`GitHub API request failed with HTTP ${response.status}`);
   }
   if (response.status === 204) return null;
+  if (apiOptions.responseType === "text") return response.text();
   return response.json();
+}
+
+async function getPullRequestDiffWithApi(root, options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  const diff = await githubApiRequest(root, {
+    ...options,
+    method: "GET",
+    path: `/pulls/${options.pr}`,
+    accept: "application/vnd.github.v3.diff",
+    responseType: "text"
+  });
+  return {
+    status: "fetched",
+    method: "api",
+    pr: Number(options.pr),
+    diff
+  };
 }
 
 async function createPullRequestWithApi(root, options = {}) {
@@ -357,6 +380,36 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
     return createPullRequestWithApi(root, options);
   }
   requirePassedStdout(result, "GitHub PR creation");
+}
+
+export async function getPullRequestDiffWithGh(root = process.cwd(), options = {}) {
+  const args = buildGhPrDiffArgs(options);
+  const command = `gh ${args.join(" ")}`;
+  if (options.dryRun !== false) {
+    return {
+      status: "dry_run",
+      command
+    };
+  }
+  requireExecutionPolicy(options, "GitHub PR diff");
+  if (options.useApi) {
+    checkOptionalCommandPolicy(root, command, options, "github_pr_diff");
+    return getPullRequestDiffWithApi(root, options);
+  }
+  const result = runProtectedArgv(root, ["gh", ...args], options);
+  if (result.status === "passed") {
+    return {
+      status: "fetched",
+      method: "gh",
+      pr: Number(options.pr),
+      diff: result.stdout || ""
+    };
+  }
+  if (result.status === "deny" || result.status === "require_confirmation") return result;
+  if (isMissingGhResult(result) && resolveToken(options.env)) {
+    return getPullRequestDiffWithApi(root, options);
+  }
+  requirePassedStdout(result, "GitHub PR diff");
 }
 
 export async function commentPullRequestWithGh(root = process.cwd(), options = {}) {

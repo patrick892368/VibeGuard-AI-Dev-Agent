@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { hookTemplate, installHook, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrDiffArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { buildDebugRepairPlan, generateDebugPatch } from "../src/llm/provider.js";
@@ -75,6 +75,8 @@ test("public API exports GitHub batch review helpers", async () => {
   assert.equal(typeof api.buildDebugRepairPlan, "function");
   assert.equal(typeof api.createReviewCommentsWithGh, "function");
   assert.equal(typeof api.checkGitHubCommandsPolicy, "function");
+  assert.equal(typeof api.buildGhPrDiffArgs, "function");
+  assert.equal(typeof api.getPullRequestDiffWithGh, "function");
   assert.equal(typeof api.checkGitPlanPolicy, "function");
   assert.equal(typeof api.executeGitPlan, "function");
   assert.equal(typeof api.executeGitPlanAsync, "function");
@@ -309,6 +311,43 @@ test("GitHub PR creation can use REST API fallback", async () => {
     head: "codex/fix-bug",
     draft: true
   });
+});
+
+test("GitHub PR diff can use REST API fallback", async () => {
+  const root = tempGitHubRepo();
+  let request;
+  const diff = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1,2 @@
+ old
++new
+`;
+
+  const result = await getPullRequestDiffWithGh(root, {
+    pr: 12,
+    dryRun: false,
+    useApi: true,
+    engine: permissivePolicyEngine(root),
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      request = { url, options };
+      return {
+        ok: true,
+        status: 200,
+        async text() {
+          return diff;
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "fetched");
+  assert.equal(result.method, "api");
+  assert.equal(result.pr, 12);
+  assert.equal(result.diff, diff);
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls/12");
+  assert.equal(request.options.headers.accept, "application/vnd.github.v3.diff");
 });
 
 test("GitHub REST API PR execution honors direct helper command policy", async () => {

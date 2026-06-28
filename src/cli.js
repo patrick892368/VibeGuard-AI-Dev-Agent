@@ -15,7 +15,7 @@ import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch
 import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -30,19 +30,19 @@ Usage:
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--github-api]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
   vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--github-api]
-  vibeguard review [--diff <file>] [--write-comment <file>]
+  vibeguard review [--diff <file>] [--github-pr <number>] [--write-comment <file>] [--github-api]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
   vibeguard patch apply --file <patch> [--confirm]
   vibeguard hooks list
   vibeguard hooks print <pre-commit|pre-push|commit-msg>
   vibeguard hooks install <hook> --allow-git-dir
-  vibeguard pr summary [--diff <file>] [--write-body <file>]
+  vibeguard pr summary [--diff <file>] [--github-pr <number>] [--write-body <file>] [--github-api]
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
   vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
-  vibeguard github review-comments --pr <number> --commit <sha> [--diff <file>] [--limit <n>] [--execute] [--confirm] [--github-api]
+  vibeguard github review-comments --pr <number> --commit <sha> [--diff <file>] [--github-pr <number>] [--limit <n>] [--execute] [--confirm] [--github-api]
   vibeguard github checks [--branch <branch>] [--limit <n>] [--execute] [--github-api]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
@@ -287,18 +287,61 @@ function readGitDiffWithPolicy(parsed, root, options = {}) {
   return readStdinIfAvailable();
 }
 
-function reviewCommand(parsed, root) {
-  let diffText = "";
-  if (parsed.diff) {
-    diffText = readInputFileWithPolicy(root, parsed.diff, parsed);
-  } else {
-    const diffResult = readGitDiffWithPolicy(parsed, root, {
-      preferCached: true,
-      stage: "review_git_diff_policy"
-    });
-    if (typeof diffResult !== "string") return diffResult;
-    diffText = diffResult;
+async function readGitHubPrDiffWithPolicy(parsed, root, options = {}) {
+  if (!parsed["github-pr"]) return null;
+  const command = `gh pr diff ${parsed["github-pr"]}`;
+  const blocked = githubMutationPolicy(root, command, options.stage || "github_pr_diff_policy", Boolean(parsed.confirm));
+  if (blocked) return blocked;
+  if (parsed["github-api"]) {
+    const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], options.stage || "github_pr_diff_policy", Boolean(parsed.confirm));
+    if (prerequisiteBlocked) return prerequisiteBlocked;
   }
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  try {
+    const result = await getPullRequestDiffWithGh(root, {
+      pr: parsed["github-pr"],
+      env: loadRuntimeEnv(root),
+      dryRun: false,
+      useApi: Boolean(parsed["github-api"]),
+      engine,
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
+    if (result.status !== "fetched") {
+      return {
+        ...result,
+        stage: result.stage || options.stage || "github_pr_diff"
+      };
+    }
+    return result.diff;
+  } catch (error) {
+    return {
+      status: "failed",
+      stage: options.stage || "github_pr_diff",
+      error: error.message
+    };
+  }
+}
+
+async function diffInputAsync(parsed, root, options = {}) {
+  if (parsed["github-pr"]) return readGitHubPrDiffWithPolicy(parsed, root, options);
+  if (parsed.diff) return readInputFileWithPolicy(root, parsed.diff, parsed);
+  const stdin = readStdinIfAvailable();
+  if (stdin.trim()) return stdin;
+  return readGitDiffWithPolicy(parsed, root, {
+    preferCached: Boolean(options.preferCached),
+    stage: options.gitStage || "pr_summary_git_diff_policy"
+  });
+}
+
+async function reviewCommand(parsed, root) {
+  const diffText = await diffInputAsync(parsed, root, {
+    preferCached: true,
+    gitStage: "review_git_diff_policy",
+    stage: "review_github_pr_diff_policy"
+  });
+  if (typeof diffText !== "string") return diffText;
   if (!diffText.trim()) throw new Error("review requires a git diff, --diff <file>, or diff text on stdin");
   if (parsed["write-comment"]) {
     const { config } = loadConfig(root);
@@ -527,7 +570,11 @@ async function githubCommand(parsed, root, subcommand) {
   }
   if (subcommand === "review-comments") {
     const commitId = parsed.commit || parsed["commit-id"];
-    const diffText = diffInput(parsed, root);
+    const diffText = await diffInputAsync(parsed, root, {
+      gitStage: "github_review_comments_git_diff_policy",
+      stage: "github_review_comments_pr_diff_policy"
+    });
+    if (typeof diffText !== "string") return diffText;
     const review = analyzeReviewDiff(diffText);
     const dryRun = await createReviewCommentsWithGh(root, {
       pr: parsed.pr,
@@ -728,7 +775,7 @@ async function dispatch(parsed) {
       auditLog: parsed["audit-log"]
     });
   }
-  if (command === "review") return reviewCommand(parsed, root);
+  if (command === "review") return await reviewCommand(parsed, root);
   if (command === "onboard") {
     if (parsed.write) {
       const { config } = loadConfig(root);
@@ -740,7 +787,9 @@ async function dispatch(parsed) {
   if (command === "patch") return patchCommand(parsed, root, subcommand);
   if (command === "hooks") return hooksCommand(parsed, root, subcommand);
   if (command === "pr" && subcommand === "summary") {
-    const diffText = diffInput(parsed, root);
+    const diffText = await diffInputAsync(parsed, root, {
+      stage: "pr_summary_github_pr_diff_policy"
+    });
     if (typeof diffText !== "string") return diffText;
     if (parsed["write-body"]) {
       const { config } = loadConfig(root);

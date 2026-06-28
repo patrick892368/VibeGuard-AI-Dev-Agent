@@ -33,6 +33,11 @@ const server = http.createServer((request, response) => {
   let body = "";
   request.on("data", (chunk) => { body += chunk; });
   request.on("end", () => {
+    if (request.headers.accept && request.headers.accept.includes("diff")) {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end("diff --git a/src/db.js b/src/db.js\\n--- a/src/db.js\\n+++ b/src/db.js\\n@@ -1 +1,2 @@\\n export function run() {}\\n+db.query(\\"SELECT * FROM users WHERE id = \\" + id)\\n");
+      return;
+    }
     response.writeHead(201, { "content-type": "application/json" });
     response.end(JSON.stringify({ html_url: "https://github.com/owner/repo/pull/7", number: 7, request_body: body }));
   });
@@ -556,6 +561,41 @@ test("CLI review checks git diff command policy before default diff reads", () =
   assert.equal(parsed.stage, "review_git_diff_policy");
   assert.equal(parsed.command, "git diff --cached");
   assert.match(parsed.policy.reason, /Command matches deny policy: git diff/);
+});
+
+test("CLI review can fetch GitHub PR diff through REST fallback", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-github-pr-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  const api = await startFakeGitHubApi();
+
+  let parsed;
+  try {
+    const output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "review",
+      "--github-pr",
+      "12",
+      "--github-api",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: "token",
+        GITHUB_API_URL: api.url
+      }
+    });
+    parsed = JSON.parse(output);
+  } finally {
+    api.close();
+  }
+
+  assert.match(parsed.summary, /1 changed file/);
+  assert.ok(parsed.findings.some((finding) => finding.file === "src/db.js" && finding.category === "security"));
 });
 
 test("CLI GitHub review-comments builds a policy-gated batch dry-run from a diff", () => {
