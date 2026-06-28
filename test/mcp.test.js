@@ -123,6 +123,82 @@ test("MCP initialized notification does not produce a response", async () => {
   assert.equal(response, null);
 });
 
+test("MCP review_pr reads diff files through path policy", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 12,
+    method: "tools/call",
+    params: {
+      name: "review_pr",
+      arguments: {
+        diffFile: "reports/change.diff"
+      }
+    }
+  }, root);
+
+  const result = response.result.structuredContent;
+  assert.equal(result.files[0], "src/db.js");
+  assert.ok(result.findings.some((finding) => finding.category === "security"));
+});
+
+test("MCP review_pr blocks denied diff files before analysis", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 13,
+    method: "tools/call",
+    params: {
+      name: "review_pr",
+      arguments: {
+        diffFile: ".env"
+      }
+    }
+  }, root);
+
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
+});
+
+test("MCP summarize_pr reads diff files through path policy", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1,2 @@
+ export function run() {}
++// TODO wire validation
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 14,
+    method: "tools/call",
+    params: {
+      name: "summarize_pr",
+      arguments: {
+        diffFile: "reports/change.diff"
+      }
+    }
+  }, root);
+
+  const result = response.result.structuredContent;
+  assert.match(result.body, /src\/app\.js/);
+  assert.ok(result.review.findings.some((finding) => finding.category === "maintainability"));
+});
+
 test("MCP github_pr returns a dry-run PR command", async () => {
   const response = await handleMcpRequest({
     jsonrpc: "2.0",

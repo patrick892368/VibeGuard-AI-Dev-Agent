@@ -115,6 +115,7 @@ const tools = [
     description: "Analyze a unified diff for review findings.",
     inputSchema: objectSchema({
       diff: stringSchema,
+      diffFile: stringSchema,
       writeComment: stringSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
@@ -135,6 +136,7 @@ const tools = [
     description: "Build a GitHub-ready PR summary from a unified diff.",
     inputSchema: objectSchema({
       diff: stringSchema,
+      diffFile: stringSchema,
       writeBody: stringSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
@@ -483,15 +485,21 @@ async function callTool(name, args, root) {
     });
   }
   if (name === "review_pr") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const diffText = args.diffFile
+      ? readFileWithPolicy(root, args.diffFile, engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      }).content
+      : args.diff || "";
     if (args.writeComment) {
-      const { config } = loadConfig(root);
-      const engine = new PolicyEngine(config, { root });
-      return writeReviewComment(root, args.diff || "", args.writeComment, engine, {
+      return writeReviewComment(root, diffText, args.writeComment, engine, {
         confirmed: Boolean(args.confirmed),
         auditLog: args.auditLog
       });
     }
-    return analyzeReviewDiff(args.diff || "");
+    return analyzeReviewDiff(diffText);
   }
   if (name === "apply_patch_safely") {
     const { config } = loadConfig(root);
@@ -503,15 +511,21 @@ async function callTool(name, args, root) {
     });
   }
   if (name === "summarize_pr") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const diffText = args.diffFile
+      ? readFileWithPolicy(root, args.diffFile, engine, {
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog
+      }).content
+      : args.diff || "";
     if (args.writeBody) {
-      const { config } = loadConfig(root);
-      const engine = new PolicyEngine(config, { root });
-      return writePrSummaryBody(root, args.diff || "", args.writeBody, engine, {
+      return writePrSummaryBody(root, diffText, args.writeBody, engine, {
         confirmed: Boolean(args.confirmed),
         auditLog: args.auditLog
       });
     }
-    return buildPrSummary(args.diff || "");
+    return buildPrSummary(diffText);
   }
   if (name === "detect_github") return detectGitHubRepository(root);
   if (name === "github_pr") {

@@ -123,9 +123,9 @@ Available tools:
 
 `onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、结构化依赖清单、结构化 `coreModules`、仓库相关 Mermaid 图、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。
 
-`review_pr` can return structured findings and, when `writeComment` is provided, write the PR comment body through policy.
+`review_pr` can accept pasted `diff` or a `diffFile` read through path policy, return structured findings, and, when `writeComment` is provided, write the PR comment body through policy.
 
-`review_pr` 可以返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
+`review_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
 
 `apply_patch_safely` validates a unified diff through patch validation, path policy, and `git apply --check` by default; it only applies when `apply` is true.
 
@@ -135,9 +135,9 @@ CLI patch input files, including `policy check --patch`, `patch check/apply --fi
 
 CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --file` 和 `fix --patch <file>`，都会先经过路径 policy 读取，然后才解析内容。
 
-`summarize_pr` can return a GitHub-ready PR body and, when `writeBody` is provided, write that body through policy.
+`summarize_pr` can accept pasted `diff` or a `diffFile` read through path policy, return a GitHub-ready PR body, and, when `writeBody` is provided, write that body through policy.
 
-`summarize_pr` 可以返回 GitHub-ready PR body；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
+`summarize_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回 GitHub-ready PR body；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
 
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 
