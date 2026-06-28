@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
@@ -156,6 +156,16 @@ test("parseGitHubRemote supports https and ssh remotes", () => {
   });
 });
 
+test("GitHub detection honors direct helper prerequisite command policy", () => {
+  const root = tempGitHubRepo();
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: ["git remote get-url origin"], require_confirmation: [] }
+  }, { root });
+
+  assert.throws(() => detectGitHubRepository(root, { engine }), /Command matches deny policy: git remote get-url origin/);
+});
+
 test("GitHub PR creation is dry-run by default", async () => {
   assert.deepEqual(buildGhPrArgs({ title: "Fix bug", bodyFile: "pr.md", draft: true }), [
     "pr",
@@ -207,6 +217,47 @@ test("GitHub PR creation can use REST API fallback", async () => {
     head: "codex/fix-bug",
     draft: true
   });
+});
+
+test("GitHub REST API PR execution honors direct helper command policy", async () => {
+  const root = tempGitHubRepo();
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["gh pr create"] }
+  }, { root });
+
+  await assert.rejects(() => createPullRequestWithGh(root, {
+    title: "Fix bug",
+    body: "body",
+    head: "codex/fix-bug",
+    dryRun: false,
+    useApi: true,
+    engine,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  }), /Command requires human confirmation: gh pr create/);
+});
+
+test("GitHub REST API PR execution checks current-branch prerequisite policy", async () => {
+  const root = tempGitHubRepo();
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["git branch --show-current"] }
+  }, { root });
+
+  await assert.rejects(() => createPullRequestWithGh(root, {
+    title: "Fix bug",
+    body: "body",
+    dryRun: false,
+    useApi: true,
+    engine,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  }), /Command requires human confirmation: git branch --show-current/);
 });
 
 test("GitHub REST API body files cannot escape the repository root", async () => {

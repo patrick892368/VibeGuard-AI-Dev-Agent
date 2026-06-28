@@ -18,7 +18,8 @@ export function parseGitHubRemote(remoteUrl) {
   return null;
 }
 
-export function detectGitHubRepository(root = process.cwd()) {
+export function detectGitHubRepository(root = process.cwd(), options = {}) {
+  checkOptionalCommandPolicy(root, GITHUB_DETECT_COMMAND, options, "github_detect");
   const remote = execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" }).trim();
   const parsed = parseGitHubRemote(remote);
   if (!parsed) {
@@ -108,7 +109,26 @@ function resolveToken(env = process.env) {
   return env.GITHUB_TOKEN || env.GH_TOKEN || null;
 }
 
-function currentBranch(root) {
+function policyAllowedOutcome(policy, options = {}) {
+  return policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed);
+}
+
+function checkOptionalCommandPolicy(root, command, options = {}, operation = "github_command") {
+  if (!options.engine) return null;
+  const policy = options.engine.checkCommand(command);
+  appendAuditEvent(root, options.engine, options.auditLog, {
+    operation,
+    command,
+    policyStatus: policy.status,
+    outcome: policyAllowedOutcome(policy, options) ? "allowed" : "blocked",
+    reason: policy.reason
+  }, { confirmed: options.confirmed });
+  assertPolicyAllowed(policy, { confirmed: options.confirmed });
+  return policy;
+}
+
+function currentBranch(root, options = {}) {
+  checkOptionalCommandPolicy(root, GITHUB_CURRENT_BRANCH_COMMAND, options, "github_current_branch");
   return execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
 }
 
@@ -129,7 +149,7 @@ function checkBodyFileReadPolicy(root, bodyFile, options = {}) {
     operation: "read_github_body",
     target: bodyFile,
     policyStatus: policy.status,
-    outcome: policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    outcome: policyAllowedOutcome(policy, options) ? "allowed" : "blocked",
     reason: policy.reason
   }, { confirmed: options.confirmed });
   assertPolicyAllowed(policy, { confirmed: options.confirmed });
@@ -149,7 +169,7 @@ async function githubApiRequest(root, apiOptions = {}) {
   const token = resolveToken(env);
   if (!token) throw new Error("GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API fallback");
 
-  const repository = apiOptions.repository || detectGitHubRepository(root);
+  const repository = apiOptions.repository || detectGitHubRepository(root, apiOptions);
   const baseUrl = (env.GITHUB_API_URL || "https://api.github.com").replace(/\/$/, "");
   const fetchImpl = apiOptions.fetch || globalThis.fetch;
   if (!fetchImpl) throw new Error("fetch is required for GitHub REST API fallback");
@@ -177,7 +197,7 @@ async function createPullRequestWithApi(root, options = {}) {
     title: options.title,
     body: readBody(root, options),
     base: options.base || "main",
-    head: options.head || currentBranch(root),
+    head: options.head || currentBranch(root, options),
     draft: Boolean(options.draft)
   };
   const data = await githubApiRequest(root, {
@@ -283,12 +303,14 @@ async function listWorkflowRunsWithApi(root, options = {}) {
 
 export async function createPullRequestWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrArgs(options);
+  const command = `gh ${args.join(" ")}`;
   if (options.dryRun !== false) {
     return {
       status: "dry_run",
-      command: `gh ${args.join(" ")}`
+      command
     };
   }
+  checkOptionalCommandPolicy(root, command, options, "github_pr");
   if (options.useApi) return createPullRequestWithApi(root, options);
   try {
     const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
@@ -305,12 +327,14 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
 
 export async function commentPullRequestWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrCommentArgs(options);
+  const command = `gh ${args.join(" ")}`;
   if (options.dryRun !== false) {
     return {
       status: "dry_run",
-      command: `gh ${args.join(" ")}`
+      command
     };
   }
+  checkOptionalCommandPolicy(root, command, options, "github_comment");
   if (options.useApi) return commentPullRequestWithApi(root, options);
   try {
     const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
@@ -327,12 +351,14 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
 
 export async function createReviewCommentWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrReviewCommentArgs(options);
+  const command = `gh ${args.join(" ")}`;
   if (options.dryRun !== false) {
     return {
       status: "dry_run",
-      command: `gh ${args.join(" ")}`
+      command
     };
   }
+  checkOptionalCommandPolicy(root, command, options, "github_review_comment");
   if (options.useApi) return createReviewCommentWithApi(root, options);
   try {
     const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
@@ -379,7 +405,10 @@ export async function createReviewCommentsWithGh(root = process.cwd(), options =
       env: options.env,
       dryRun: options.dryRun,
       useApi: options.useApi,
-      fetch: options.fetch
+      fetch: options.fetch,
+      engine: options.engine,
+      confirmed: options.confirmed,
+      auditLog: options.auditLog
     });
     results.push({
       index: index + 1,
@@ -432,12 +461,14 @@ export function checkGitHubCommandsPolicy(items = [], engine, options = {}) {
 
 export async function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
   const args = buildGhRunListArgs(options);
+  const command = `gh ${args.join(" ")}`;
   if (options.dryRun !== false) {
     return {
       status: "dry_run",
-      command: `gh ${args.join(" ")}`
+      command
     };
   }
+  checkOptionalCommandPolicy(root, command, options, "github_checks");
   if (options.useApi) return listWorkflowRunsWithApi(root, options);
 
   try {
