@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { scanRepository } from "../src/repo/scan.js";
 import { analyzeTestTargets, compareCoverageReports, parseCoverageReport } from "../src/agents/testWriter.js";
 import { analyzeRepository, buildOnboardingMarkdown, identifyCoreModules, recommendFirstTasks, verifySuggestedCommands } from "../src/agents/onboard.js";
+import { PolicyEngine } from "../src/policy/engine.js";
 
 function tempRepo() {
   return fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-repo-"));
@@ -101,6 +102,25 @@ test("analyzeTestTargets finds source functions without likely tests", () => {
   assert.equal(result.candidates.length, 1);
   assert.equal(result.candidates[0].sourceFile, "src/math.js");
   assert.deepEqual(result.candidates[0].functions, ["add"]);
+});
+
+test("analyzeTestTargets skips denied source files before reading test targets", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  fs.writeFileSync(path.join(root, "secret.py"), "def leak():\n    return 'secret'\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["src/**"], deny: ["secret.py"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const result = analyzeTestTargets({ root, engine });
+
+  assert.deepEqual(result.candidates.map((candidate) => candidate.sourceFile), ["src/math.js"]);
+  assert.equal(result.sourceReadPolicy.status, "deny");
+  assert.equal(result.sourceReadPolicy.skipped, 1);
+  assert.equal(result.skippedSourceFiles[0].sourceFile, "secret.py");
+  assert.equal(result.skippedSourceFiles[0].policy.operation, "read_test_target");
 });
 
 test("parseCoverageReport parses coverage.py JSON", () => {

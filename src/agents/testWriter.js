@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { listRepoFiles, readTextIfExists } from "../repo/files.js";
 import { scanRepository } from "../repo/scan.js";
+import { loadConfig } from "../config/loadConfig.js";
+import { PolicyEngine } from "../policy/engine.js";
+import { appendAuditEvent } from "../policy/audit.js";
 import { readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../runner/safeCommand.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "../integrations/gitPlan.js";
@@ -1202,8 +1205,49 @@ function hasRuntimeTestTargets(candidate) {
   return candidate.sourceFile.endsWith(".java") && candidate.interfaces?.length > 0;
 }
 
+function policyAllowed(result, options = {}) {
+  return result.status === "allow" || (result.status === "require_confirmation" && options.confirmed);
+}
+
+function testTargetReadPolicy(root, engine, file, options = {}) {
+  const policy = engine.checkPath(file, "read_test_target");
+  const allowed = policyAllowed(policy, options);
+  const auditLog = appendAuditEvent(root, engine, options.auditLog, {
+    operation: "read_test_target",
+    target: file,
+    policyStatus: policy.status,
+    outcome: allowed ? "allowed" : "blocked",
+    reason: policy.reason
+  }, options);
+  return {
+    sourceFile: file,
+    status: policy.status,
+    outcome: allowed ? "allowed" : "blocked",
+    reason: policy.reason,
+    policy,
+    auditLog
+  };
+}
+
+function summarizeSourceReadPolicy(results) {
+  const skipped = results.filter((result) => result.outcome === "blocked");
+  const status = skipped.some((result) => result.status === "deny")
+    ? "deny"
+    : skipped.length > 0
+      ? "require_confirmation"
+      : "allow";
+  return {
+    status,
+    total: results.length,
+    allowed: results.length - skipped.length,
+    skipped: skipped.length,
+    results: results.filter((result) => result.status !== "allow")
+  };
+}
+
 export function analyzeTestTargets(options = {}) {
   const root = options.root || process.cwd();
+  const engine = options.engine || new PolicyEngine(loadConfig(root).config, { root });
   const files = listRepoFiles(root);
   const repo = scanRepository(root);
   const coverage = loadCoverage(options, root);
@@ -1217,7 +1261,11 @@ export function analyzeTestTargets(options = {}) {
   );
 
   const candidates = [];
+  const sourceReadResults = [];
   for (const file of sourceFiles) {
+    const sourceRead = testTargetReadPolicy(root, engine, file, options);
+    sourceReadResults.push(sourceRead);
+    if (sourceRead.outcome !== "allowed") continue;
     const text = readTextIfExists(root, file);
     if (!text) continue;
     const isPython = file.endsWith(".py");
@@ -1269,6 +1317,8 @@ export function analyzeTestTargets(options = {}) {
     coverageDelta,
     coverageDeltaStatus: describeCoverageDelta(coverage, coverageAfter, coverageDelta),
     coverageTargets: coverageTargets(sortedCandidates),
+    sourceReadPolicy: summarizeSourceReadPolicy(sourceReadResults),
+    skippedSourceFiles: sourceReadResults.filter((result) => result.outcome === "blocked"),
     candidates: sortedCandidates
   };
 }
