@@ -90,6 +90,8 @@ test("runDoctor returns next actions for missing provider and GitHub execution a
     "enable_github_execution"
   ]);
   assert.match(result.nextActions[0].command, /XAI_API_KEY|GROK_API_KEY/);
+  assert.match(result.nextActions[1].reason, /PR\/comment\/review-comment writes/);
+  assert.doesNotMatch(result.nextActions[1].reason, /check execution/);
 });
 
 test("runDoctor honors policy before detecting GitHub remotes", () => {

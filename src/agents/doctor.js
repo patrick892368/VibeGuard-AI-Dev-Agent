@@ -99,7 +99,7 @@ function buildNextActions({ policy, github, githubAuth, provider, tools }) {
   if (!tools.gh.available && !githubAuth.hasToken) {
     actions.push({
       id: "enable_github_execution",
-      reason: "Neither gh CLI nor GITHUB_TOKEN/GH_TOKEN is available for real GitHub PR/comment/check execution.",
+      reason: "Neither gh CLI nor GITHUB_TOKEN/GH_TOKEN is available for real GitHub PR/comment/review-comment writes.",
       command: "Install and authenticate gh, or set GITHUB_TOKEN/GH_TOKEN"
     });
   }
@@ -184,8 +184,8 @@ function buildCapabilityReadiness({ policy, github, githubAuth, provider, tools 
       githubExecutionReady
         ? null
         : githubRemoteReady
-          ? "GitHub remote is detected, but real PR/comment/check execution needs authenticated gh or GITHUB_TOKEN/GH_TOKEN."
-          : "A GitHub origin remote is required for PR creation, comments, review comments, and CI checks.",
+          ? "GitHub remote is detected, but real PR/comment/review-comment writes need authenticated gh or GITHUB_TOKEN/GH_TOKEN. Public read-only PR diff, PR head, and Actions checks can use unauthenticated REST GETs."
+          : "A GitHub origin remote is required for PR creation, comments, review comments, PR diff, PR head, and CI checks.",
       {
         hasRemote: githubRemoteReady,
         hasGh: Boolean(tools.gh.available),
