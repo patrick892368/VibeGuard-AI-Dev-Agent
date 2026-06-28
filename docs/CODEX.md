@@ -314,6 +314,7 @@ node ./bin/vibeguard.js pr summary --diff reports/change.diff --write-body repor
 node ./bin/vibeguard.js pr summary --github-pr 12 --github-api --write-body reports/pr-body.md --json
 node ./bin/vibeguard.js pr plan --diff reports/change.diff --write-body reports/pr-body.md --json
 node ./bin/vibeguard.js pr plan --github-pr 12 --github-api --write-body reports/pr-body.md --json
+node ./bin/vibeguard.js pr plan --diff reports/change.diff --write-body reports/pr-body.md --push --execute-git-plan --confirm --github-api --json
 node ./bin/vibeguard.js github review-comments --pr 12 --github-pr 12 --github-api --json
 node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff reports/change.diff --json
 ```

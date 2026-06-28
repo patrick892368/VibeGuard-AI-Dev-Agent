@@ -287,6 +287,7 @@ Execute PR creation only when ready:
 确认就绪后才执行 PR 创建：
 
 ```bash
+vibeguard pr plan --diff reports/change.diff --write-body reports/pr-body.md --push --execute-git-plan --confirm --github-api
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm --github-api
 ```

@@ -185,6 +185,58 @@ test("buildPrPlanWorkflow prepares a policy-gated branch commit and PR plan", as
   assert.equal(result.gitExecution, null);
 });
 
+test("buildPrPlanWorkflow can execute branch commit and REST PR creation after confirmation", async () => {
+  const root = tempGitHubRepo();
+  execFileSync("git", ["config", "user.email", "vibeguard@example.com"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.name", "VibeGuard Test"], { cwd: root, encoding: "utf8" });
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
+  execFileSync("git", ["add", "src/app.js"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["commit", "-m", "init"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, "src", "app.js"), "new\n", "utf8");
+  const diff = execFileSync("git", ["diff"], { cwd: root, encoding: "utf8" });
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["git switch -c", "git commit", "gh pr create"] }
+  }, { root });
+  let request;
+
+  const result = await buildPrPlanWorkflow(root, diff, engine, {
+    writeBody: "reports/pr-body.md",
+    executeGitPlan: true,
+    confirmed: true,
+    githubUseApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/9", number: 9 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.gitPolicy.status, "allow");
+  assert.equal(result.gitPolicy.rawStatus, "require_confirmation");
+  assert.equal(result.gitExecution.status, "executed");
+  assert.deepEqual(result.gitExecution.results.map((item) => item.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.equal(result.gitExecution.results[3].method, "api");
+  assert.equal(result.gitExecution.results[3].url, "https://github.com/owner/repo/pull/9");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(request.body.title, result.title);
+  assert.equal(request.body.head, result.branch);
+  assert.equal(request.body.draft, true);
+  assert.match(request.body.body, /Review Action Items/);
+});
+
 test("generateDebugPatch is unavailable without provider env", async () => {
   const result = await generateDebugPatch({ summary: { type: "Error" } }, {});
   assert.equal(result.status, "unavailable");
