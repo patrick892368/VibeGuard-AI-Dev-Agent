@@ -6,6 +6,7 @@ import { assertPolicyAllowed } from "../policy/safeWrite.js";
 
 export const GITHUB_DETECT_COMMAND = "git remote get-url origin";
 export const GITHUB_CURRENT_BRANCH_COMMAND = "git branch --show-current";
+const EXEC_OPTIONS = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
 
 export function parseGitHubRemote(remoteUrl) {
   const trimmed = remoteUrl.trim();
@@ -21,7 +22,7 @@ export function parseGitHubRemote(remoteUrl) {
 export function detectGitHubRepository(root = process.cwd(), options = {}) {
   requireExecutionPolicy(options, "GitHub detection");
   checkOptionalCommandPolicy(root, GITHUB_DETECT_COMMAND, options, "github_detect");
-  const remote = execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" }).trim();
+  const remote = execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, ...EXEC_OPTIONS }).trim();
   const parsed = parseGitHubRemote(remote);
   if (!parsed) {
     throw new Error(`origin is not a GitHub remote: ${remote}`);
@@ -136,7 +137,7 @@ function requireExecutionPolicy(options = {}, operation = "GitHub execution") {
 
 function currentBranch(root, options = {}) {
   checkOptionalCommandPolicy(root, GITHUB_CURRENT_BRANCH_COMMAND, options, "github_current_branch");
-  return execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
+  return execFileSync("git", ["branch", "--show-current"], { cwd: root, ...EXEC_OPTIONS }).trim();
 }
 
 function resolveInsideRoot(root, filePath) {
@@ -321,7 +322,7 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
   checkOptionalCommandPolicy(root, command, options, "github_pr");
   if (options.useApi) return createPullRequestWithApi(root, options);
   try {
-    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
     return {
       status: "created",
       method: "gh",
@@ -346,7 +347,7 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
   checkOptionalCommandPolicy(root, command, options, "github_comment");
   if (options.useApi) return commentPullRequestWithApi(root, options);
   try {
-    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
     return {
       status: "commented",
       method: "gh",
@@ -371,7 +372,7 @@ export async function createReviewCommentWithGh(root = process.cwd(), options = 
   checkOptionalCommandPolicy(root, command, options, "github_review_comment");
   if (options.useApi) return createReviewCommentWithApi(root, options);
   try {
-    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
     return {
       status: "review_commented",
       method: "gh",
@@ -483,7 +484,7 @@ export async function listWorkflowRunsWithGh(root = process.cwd(), options = {})
   if (options.useApi) return listWorkflowRunsWithApi(root, options);
 
   try {
-    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
     return {
       status: "completed",
       method: "gh",

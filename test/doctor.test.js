@@ -87,3 +87,27 @@ commands:
   assert.equal(result.github.status, "unavailable");
   assert.match(result.github.error, /Command matches deny policy: git remote get-url origin/);
 });
+
+test("runDoctor honors policy before probing local tools", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-doctor-tool-policy-"));
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny:
+    - "git --version"
+  require_confirmation: []
+`, "utf8");
+
+  const result = runDoctor({
+    root,
+    env: { XAI_API_KEY: "secret-value" }
+  });
+
+  assert.equal(result.tools.git.available, false);
+  assert.equal(result.tools.git.command, "git --version");
+  assert.match(result.tools.git.detail, /Command matches deny policy: git --version/);
+});

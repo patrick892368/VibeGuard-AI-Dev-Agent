@@ -1,19 +1,38 @@
-import { execFileSync } from "node:child_process";
 import { gitConfigValue } from "../config/env.js";
 import { loadConfig } from "../config/loadConfig.js";
 import { detectGitHubRepository } from "../integrations/github.js";
 import { PolicyEngine } from "../policy/engine.js";
+import { commandDisplay, runArgvWithPolicy } from "../runner/safeCommand.js";
 
-function commandAvailable(command, args = ["--version"]) {
-  try {
-    const stdout = execFileSync(command, args, { encoding: "utf8" });
+function firstLine(...texts) {
+  for (const text of texts) {
+    const line = String(text || "").split(/\r?\n/).find(Boolean);
+    if (line) return line;
+  }
+  return null;
+}
+
+function commandAvailable(root, argv, engine) {
+  const command = commandDisplay(argv);
+  if (!engine) {
     return {
-      available: true,
-      detail: stdout.split(/\r?\n/)[0] || "available"
+      available: false,
+      command,
+      detail: "Policy config did not load; command probe skipped."
+    };
+  }
+  try {
+    const result = runArgvWithPolicy(root, argv, engine);
+    return {
+      available: result.exitCode === 0,
+      command,
+      detail: firstLine(result.stdout, result.stderr, result.error) || (result.exitCode === 0 ? "available" : "unavailable"),
+      policyStatus: result.policy.status
     };
   } catch (error) {
     return {
       available: false,
+      command,
       detail: error.message
     };
   }
@@ -123,8 +142,8 @@ export function runDoctor(options = {}) {
   }
 
   const tools = options.toolStatus || {
-    git: commandAvailable("git", ["--version"]),
-    gh: commandAvailable("gh", ["--version"])
+    git: commandAvailable(root, ["git", "--version"], engine),
+    gh: commandAvailable(root, ["gh", "--version"], engine)
   };
   const githubAuth = {
     hasToken: Boolean(env.GITHUB_TOKEN || env.GH_TOKEN)
