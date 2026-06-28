@@ -81,6 +81,19 @@ function actionItems(findings) {
   }));
 }
 
+function reviewComments(findings) {
+  return findings
+    .filter((item) => item.file && item.line)
+    .map((item) => ({
+      path: item.file,
+      line: item.line,
+      side: "RIGHT",
+      severity: item.severity,
+      category: item.category,
+      body: `**VibeGuard ${item.severity.toUpperCase()} ${item.category}**\n\n${item.message}\n\nRecommendation: ${item.recommendation}`
+    }));
+}
+
 function findingLocation(item) {
   return item.line ? `${item.file}:${item.line}` : item.file;
 }
@@ -166,6 +179,7 @@ export function analyzeReviewDiff(diffText, options = {}) {
     summary: `${files.length} changed file(s), ${findings.length} finding(s).`,
     summaryBySeverity,
     actionItems: actionItems(findings),
+    reviewComments: reviewComments(findings),
     markdown: buildReviewMarkdown(files, findings, summaryBySeverity),
     findings
   };

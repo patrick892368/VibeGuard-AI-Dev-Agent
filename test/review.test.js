@@ -22,6 +22,12 @@ test("analyzeReviewDiff reports risky source changes without tests", () => {
   assert.ok(result.findings.some((finding) => finding.category === "testing"));
   assert.ok(result.findings.some((finding) => /parameterized queries/.test(finding.recommendation)));
   assert.ok(result.actionItems.some((item) => item.file === "src/db.js" && /parameterized queries/.test(item.action)));
+  assert.ok(result.reviewComments.some((comment) =>
+    comment.path === "src/db.js" &&
+    comment.line === 2 &&
+    comment.side === "RIGHT" &&
+    /parameterized queries/.test(comment.body)
+  ));
   assert.equal(result.summaryBySeverity.high, 1);
   assert.equal(result.summaryBySeverity.medium, 1);
   assert.match(result.markdown, /VibeGuard Review/);
