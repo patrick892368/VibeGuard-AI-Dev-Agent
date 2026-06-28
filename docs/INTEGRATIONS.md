@@ -164,9 +164,9 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 
 `summarize_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回 GitHub-ready PR body 以及自动 title、branch、commit message 元数据；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
 
-`plan_pr` accepts the same diff sources as `summarize_pr`, can write the PR body through policy with `writeBody`, and returns `gitPlan`, `gitPolicy`, and optional `gitExecution` so Codex can continue into protected branch, commit, push, and PR creation without bypassing `.vibeguard.yaml`.
+`plan_pr` accepts the same diff sources as `summarize_pr`, can write the PR body through policy with `writeBody`, and returns `gitPlan`, `gitPolicy`, and optional `gitExecution` so Codex can continue into protected branch, commit, push, and PR creation without bypassing `.vibeguard.yaml`. `gitPolicy.pathResults` includes PR body-file checks and every file that would be staged by `git add`.
 
-`plan_pr` 接收和 `summarize_pr` 相同的 diff 来源，可用 `writeBody` 经过 policy 写出 PR body，并返回 `gitPlan`、`gitPolicy` 和可选 `gitExecution`，让 Codex 可以继续执行受保护的 branch、commit、push、PR 创建流程，而不绕过 `.vibeguard.yaml`。
+`plan_pr` 接收和 `summarize_pr` 相同的 diff 来源，可用 `writeBody` 经过 policy 写出 PR body，并返回 `gitPlan`、`gitPolicy` 和可选 `gitExecution`，让 Codex 可以继续执行受保护的 branch、commit、push、PR 创建流程，而不绕过 `.vibeguard.yaml`。`gitPolicy.pathResults` 会包含 PR body 文件检查，以及每个将被 `git add` 暂存的文件。
 
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 

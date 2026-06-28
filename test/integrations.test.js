@@ -1139,6 +1139,26 @@ test("checkGitPlanPolicy blocks denied PR body files", () => {
   assert.equal(policy.pathResults[0].policy.operation, "read_pr_body");
 });
 
+test("checkGitPlanPolicy blocks denied staged files", () => {
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  });
+  const plan = buildFixGitPlan({
+    changedFiles: [".env"],
+    branch: "codex/fix-error",
+    commitMessage: "fix: error",
+    commit: true
+  });
+
+  const policy = checkGitPlanPolicy(plan, engine);
+
+  assert.equal(policy.status, "deny");
+  assert.equal(policy.pathResults[0].step, "stage_files");
+  assert.equal(policy.pathResults[0].path, ".env");
+  assert.equal(policy.pathResults[0].policy.operation, "stage_file");
+});
+
 test("executeGitPlan dispatches create_pr through the protected command runner", () => {
   const engine = new PolicyEngine({
     paths: { allow: ["**"], deny: [], require_confirmation: [] },
@@ -1265,5 +1285,30 @@ test("executeGitPlan blocks denied PR body files before running commands", () =>
   assert.equal(result.status, "deny");
   assert.equal(result.stage, "git_plan_policy");
   assert.deepEqual(result.results, []);
+  assert.equal(result.policy.pathResults[0].path, ".env");
+});
+
+test("executeGitPlan blocks denied staged files before running commands", () => {
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  });
+  const plan = buildFixGitPlan({
+    changedFiles: [".env"],
+    branch: "codex/fix-error",
+    commitMessage: "fix: error",
+    commit: true
+  });
+
+  const result = executeGitPlan(process.cwd(), plan, engine, {
+    runArgvWithPolicy() {
+      throw new Error("runArgvWithPolicy should not be called");
+    }
+  });
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "git_plan_policy");
+  assert.deepEqual(result.results, []);
+  assert.equal(result.policy.pathResults[0].step, "stage_files");
   assert.equal(result.policy.pathResults[0].path, ".env");
 });

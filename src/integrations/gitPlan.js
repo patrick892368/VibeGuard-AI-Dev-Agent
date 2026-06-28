@@ -22,7 +22,7 @@ export function buildFixGitPlan(options = {}) {
   if (options.commit) {
     const addArgv = ["git", "add", ...changedFiles];
     const commitArgv = ["git", "commit", "-m", commitMessage];
-    commands.push({ step: "stage_files", argv: addArgv, command: commandDisplay(addArgv) });
+    commands.push({ step: "stage_files", argv: addArgv, command: commandDisplay(addArgv), files: changedFiles });
     commands.push({ step: "commit", argv: commitArgv, command: commandDisplay(commitArgv) });
   }
 
@@ -68,13 +68,21 @@ export function checkGitPlanPolicy(gitPlan, engine, options = {}) {
     command: command.command,
     policy: engine.checkCommand(command.command)
   }));
-  const pathResults = (gitPlan?.commands || [])
+  const bodyFileResults = (gitPlan?.commands || [])
     .filter((command) => command.bodyFile)
     .map((command) => ({
       step: command.step,
       path: command.bodyFile,
       policy: engine.checkPath(command.bodyFile, "read_pr_body")
     }));
+  const stagedFileResults = (gitPlan?.commands || [])
+    .filter((command) => Array.isArray(command.files))
+    .flatMap((command) => command.files.map((file) => ({
+      step: command.step,
+      path: file,
+      policy: engine.checkPath(file, "stage_file")
+    })));
+  const pathResults = [...bodyFileResults, ...stagedFileResults];
   const rawStatus = summarizeCommandStatus([...results, ...pathResults]);
   const status = rawStatus === "require_confirmation" && options.confirmed ? "allow" : rawStatus;
 
