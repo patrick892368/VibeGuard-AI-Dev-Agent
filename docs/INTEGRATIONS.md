@@ -207,6 +207,10 @@ The current Codex flow supports patch artifact output, stack-trace based minimal
 
 当前 Codex 流程支持 patch artifact 输出、基于 stack trace 的最小测试选择、Git/PR dry-run 计划、确认后执行 branch/commit/push/PR、fixture 评测历史和环境诊断。
 
+Fixture evaluation copies scenarios into temporary directories without internally initializing Git repos; patch check/apply still runs through the normal policy-gated patch workflow.
+
+Fixture 评测会把场景复制到临时目录，但不会在内部初始化 Git 仓库；patch check/apply 仍由正常的、受 policy 保护的 patch workflow 处理。
+
 ## Deferred Agent Integrations / 暂缓 Agent 集成
 
 These integrations are deferred until Codex is stable:

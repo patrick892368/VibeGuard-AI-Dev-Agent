@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { loadConfig } from "../config/loadConfig.js";
 import { loadRuntimeEnv } from "../config/env.js";
 import { PolicyEngine } from "../policy/engine.js";
@@ -47,13 +46,6 @@ function copyFixtureToTemp(repoRoot, fixture) {
 
   const target = fs.mkdtempSync(path.join(os.tmpdir(), `vibeguard-eval-${fixture.id}-`));
   fs.cpSync(source, target, { recursive: true });
-  execFileSync("git", ["init"], { cwd: target, encoding: "utf8" });
-  execFileSync("git", ["config", "core.autocrlf", "false"], { cwd: target, encoding: "utf8" });
-  execFileSync("git", ["add", "."], { cwd: target, encoding: "utf8" });
-  execFileSync("git", ["-c", "user.email=test@example.com", "-c", "user.name=Test", "commit", "-m", "fixture"], {
-    cwd: target,
-    encoding: "utf8"
-  });
   return target;
 }
 
