@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
+export const GITHUB_DETECT_COMMAND = "git remote get-url origin";
+export const GITHUB_CURRENT_BRANCH_COMMAND = "git branch --show-current";
+
 export function parseGitHubRemote(remoteUrl) {
   const trimmed = remoteUrl.trim();
   const https = trimmed.match(/^https:\/\/github\.com\/([^/]+)\/([^/.]+)(?:\.git)?$/);

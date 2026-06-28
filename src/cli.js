@@ -16,7 +16,7 @@ import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch
 import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -347,9 +347,23 @@ function githubBodyFilePolicy(root, bodyFile, stage, confirmed) {
   return null;
 }
 
+function githubPrerequisitePolicy(root, commands, stage, confirmed) {
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const policy = checkGitHubCommandsPolicy(commands.map((command, index) => ({ index: index + 1, command })), engine, {
+    confirmed,
+    stage
+  });
+  return policy.status === "allow" ? null : policy;
+}
+
 async function githubCommand(parsed, root, subcommand) {
   const env = loadRuntimeEnv(root);
-  if (subcommand === "detect") return detectGitHubRepository(root);
+  if (subcommand === "detect") {
+    const blocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_detect_policy", Boolean(parsed.confirm));
+    if (blocked) return blocked;
+    return detectGitHubRepository(root);
+  }
   if (subcommand === "pr") {
     const options = {
       title: parsed.title,
@@ -369,6 +383,10 @@ async function githubCommand(parsed, root, subcommand) {
     if (parsed.execute) {
       const blocked = githubMutationPolicy(root, dryRun.command, "github_pr_policy", Boolean(parsed.confirm));
       if (blocked) return blocked;
+      const prerequisites = [GITHUB_DETECT_COMMAND];
+      if (!options.head) prerequisites.push(GITHUB_CURRENT_BRANCH_COMMAND);
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, prerequisites, "github_pr_prerequisite_policy", Boolean(parsed.confirm));
+      if (prerequisiteBlocked) return prerequisiteBlocked;
     }
     return createPullRequestWithGh(root, {
       ...options,
@@ -392,6 +410,8 @@ async function githubCommand(parsed, root, subcommand) {
     if (parsed.execute) {
       const blocked = githubMutationPolicy(root, dryRun.command, "github_comment_policy", Boolean(parsed.confirm));
       if (blocked) return blocked;
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_comment_prerequisite_policy", Boolean(parsed.confirm));
+      if (prerequisiteBlocked) return prerequisiteBlocked;
     }
     return commentPullRequestWithGh(root, {
       ...options,
@@ -422,6 +442,8 @@ async function githubCommand(parsed, root, subcommand) {
     if (parsed.execute) {
       const blocked = githubMutationPolicy(root, dryRun.command, "github_review_comment_policy", Boolean(parsed.confirm));
       if (blocked) return blocked;
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_review_comment_prerequisite_policy", Boolean(parsed.confirm));
+      if (prerequisiteBlocked) return prerequisiteBlocked;
     }
     return createReviewCommentWithGh(root, {
       ...options,
@@ -453,6 +475,16 @@ async function githubCommand(parsed, root, subcommand) {
         review,
         publish: dryRun
       };
+    }
+    if (parsed.execute) {
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_review_comments_prerequisite_policy", Boolean(parsed.confirm));
+      if (prerequisiteBlocked) {
+        return {
+          ...prerequisiteBlocked,
+          review,
+          publish: dryRun
+        };
+      }
     }
     const publish = parsed.execute
       ? await createReviewCommentsWithGh(root, {
@@ -490,6 +522,13 @@ async function githubCommand(parsed, root, subcommand) {
       if (commandPolicy.status !== "allow") {
         return {
           ...commandPolicy,
+          dryRun
+        };
+      }
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_checks_prerequisite_policy", Boolean(parsed.confirm));
+      if (prerequisiteBlocked) {
+        return {
+          ...prerequisiteBlocked,
           dryRun
         };
       }

@@ -532,6 +532,77 @@ commands:
   assert.equal(parsed.dryRun.status, "dry_run");
 });
 
+test("CLI GitHub detect is gated by command policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-detect-policy-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "git remote get-url origin"
+`, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "detect",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "require_confirmation");
+  assert.equal(parsed.stage, "github_detect_policy");
+  assert.equal(parsed.command, "git remote get-url origin");
+});
+
+test("CLI GitHub PR execute checks branch prerequisite policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-branch-policy-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "git branch --show-current"
+`, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "pr",
+    "--title",
+    "Fix bug",
+    "--execute",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "require_confirmation");
+  assert.equal(parsed.stage, "github_pr_prerequisite_policy");
+  assert.equal(parsed.command, "git branch --show-current");
+});
+
 test("CLI pr summary can write a policy-gated body file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-body-"));
   fs.mkdirSync(path.join(root, "reports"), { recursive: true });

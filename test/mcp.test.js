@@ -380,6 +380,73 @@ commands:
   assert.equal(result.dryRun.status, "dry_run");
 });
 
+test("MCP detect_github is gated by command policy", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "git remote get-url origin"
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 19,
+    method: "tools/call",
+    params: {
+      name: "detect_github",
+      arguments: {}
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "github_detect_policy");
+  assert.equal(result.command, "git remote get-url origin");
+});
+
+test("MCP github_pr execute checks branch prerequisite policy", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "git branch --show-current"
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 20,
+    method: "tools/call",
+    params: {
+      name: "github_pr",
+      arguments: {
+        title: "Fix bug",
+        execute: true
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "github_pr_prerequisite_policy");
+  assert.equal(result.command, "git branch --show-current");
+});
+
 test("MCP debug_error reads log files through path policy", async () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined\n", "utf8");

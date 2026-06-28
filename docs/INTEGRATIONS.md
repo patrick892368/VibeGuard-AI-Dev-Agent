@@ -229,6 +229,10 @@ Detect the repository:
 vibeguard github detect
 ```
 
+`github detect` checks `git remote get-url origin` through command policy before reading the remote. PR execute paths also check fallback prerequisites such as `git branch --show-current` when VibeGuard may need to build a REST API payload.
+
+`github detect` 会先通过 command policy 检查 `git remote get-url origin`，然后才读取 remote。PR execute 路径在可能需要构造 REST API payload 时，也会检查 `git branch --show-current` 等 fallback prerequisite。
+
 Create a draft PR through the GitHub CLI or the REST API fallback when `GITHUB_TOKEN` / `GH_TOKEN` is present. The command is dry-run by default:
 
 通过 GitHub CLI 创建 draft PR；如果存在 `GITHUB_TOKEN` / `GH_TOKEN`，执行时也可使用 REST API fallback。默认 dry-run：

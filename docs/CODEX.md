@@ -142,6 +142,10 @@ Include remote push and draft PR creation only when GitHub remote and `gh` auth 
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --json
 ```
 
+GitHub detect and PR fallback prerequisites are command-policy gated. If repository policy requires confirmation for `git remote get-url origin` or `git branch --show-current`, Codex must stop at the returned policy result until confirmation is present.
+
+GitHub detect 和 PR fallback prerequisite 会经过 command policy。如果仓库策略要求确认 `git remote get-url origin` 或 `git branch --show-current`，Codex 必须停在返回的 policy 结果，直到已有确认。
+
 Run deterministic fixture demos:
 
 运行确定性 fixture demo：

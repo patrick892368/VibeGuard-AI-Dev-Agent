@@ -29,7 +29,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff；`--file` 输入路径本身也会先经过 read policy。Checks or applies unified diffs through policy; `--file` input paths also pass read policy first.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
 - `vibeguard pr summary`: 从 diff 生成包含 review findings 和 actionItems 的 GitHub-ready PR body；可用 `--write-body` 经过 policy 写出 PR body 文件。Builds a GitHub-ready PR body with review findings and actionItems from a diff; `--write-body` can write the PR body file through policy.
-- `vibeguard github`: 检测 GitHub remote、创建 PR、发布普通评论/单条或批量文件行级 review comment、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，`--body-file` 和批量 diff 输入会先经过 path policy，`checks --execute` 也会先经过 command policy。Detects GitHub remotes, creates PRs, posts general comments and single or batched file-line review comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, `--body-file` plus batched diff inputs are checked by path policy first, and `checks --execute` is gated by command policy.
+- `vibeguard github`: 检测 GitHub remote、创建 PR、发布普通评论/单条或批量文件行级 review comment、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，`--body-file` 和批量 diff 输入会先经过 path policy，detect、PR fallback prerequisite 和 `checks --execute` 也会先经过 command policy。Detects GitHub remotes, creates PRs, posts general comments and single or batched file-line review comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, `--body-file` plus batched diff inputs are checked by path policy first, and detect, PR fallback prerequisites, and `checks --execute` are gated by command policy.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary` / `audit report`: 汇总 JSONL 审计日志，或写出 Markdown 审计报告。Summarizes JSONL audit logs or writes a Markdown audit report.
@@ -236,6 +236,10 @@ node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --
 
 Default policy requires confirmation for `git switch -c`, `git commit`, `git push`, `gh pr create`, `gh pr comment`, and `gh api`. Remote PR/comment actions also require a GitHub remote and authenticated `gh`, or an available GitHub token fallback.
 
+GitHub detect and REST fallback prerequisites such as `git remote get-url origin` and `git branch --show-current` are also checked through command policy before execution.
+
+GitHub detect 和 REST fallback 需要的 `git remote get-url origin`、`git branch --show-current` 等 prerequisite 命令，也会在执行前经过 command policy。
+
 ## Policy-as-Code / Policy-as-Code
 
 `.vibeguard.yaml` 定义仓库安全边界：
@@ -310,7 +314,7 @@ The test suite covers:
 - Onboarding command checks，用于标注建议命令的依据、缺失 wrapper 或需要确认的依赖。Onboarding command checks for suggested command evidence, missing wrappers, or dependencies that need confirmation.
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
 - 本地 branch / commit / push 的受保护执行。Confirmed protected local branch / commit / push flows.
-- PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、CI checks execute policy、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, CI checks execute policy, policy confirmation, and REST fallback.
+- PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, policy confirmation, and REST fallback.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.

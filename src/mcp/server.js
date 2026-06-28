@@ -11,7 +11,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
-import { checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
@@ -145,7 +145,9 @@ const tools = [
   {
     name: "detect_github",
     description: "Detect the GitHub origin repository for the current repo.",
-    inputSchema: objectSchema()
+    inputSchema: objectSchema({
+      confirmed: booleanSchema
+    })
   },
   {
     name: "github_pr",
@@ -374,6 +376,16 @@ function githubBodyFilePolicy(root, bodyFile, stage, confirmed) {
   return null;
 }
 
+function githubPrerequisitePolicy(root, commands, stage, confirmed) {
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const policy = checkGitHubCommandsPolicy(commands.map((command, index) => ({ index: index + 1, command })), engine, {
+    confirmed,
+    stage
+  });
+  return policy.status === "allow" ? null : policy;
+}
+
 async function callTool(name, args, root) {
   if (name === "check_policy") {
     const { config } = loadConfig(root);
@@ -541,7 +553,11 @@ async function callTool(name, args, root) {
     }
     return buildPrSummary(diffText);
   }
-  if (name === "detect_github") return detectGitHubRepository(root);
+  if (name === "detect_github") {
+    const blocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_detect_policy", Boolean(args.confirmed));
+    if (blocked) return blocked;
+    return detectGitHubRepository(root);
+  }
   if (name === "github_pr") {
     const env = loadRuntimeEnv(root);
     const bodyFileBlocked = githubBodyFilePolicy(root, args.bodyFile, "github_pr_body_file_policy", Boolean(args.confirmed));
@@ -568,6 +584,10 @@ async function callTool(name, args, root) {
           policy
         };
       }
+      const prerequisites = [GITHUB_DETECT_COMMAND];
+      if (!args.head) prerequisites.push(GITHUB_CURRENT_BRANCH_COMMAND);
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, prerequisites, "github_pr_prerequisite_policy", Boolean(args.confirmed));
+      if (prerequisiteBlocked) return prerequisiteBlocked;
     }
     return createPullRequestWithGh(root, {
       title: args.title,
@@ -603,6 +623,8 @@ async function callTool(name, args, root) {
           policy
         };
       }
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_comment_prerequisite_policy", Boolean(args.confirmed));
+      if (prerequisiteBlocked) return prerequisiteBlocked;
     }
     return commentPullRequestWithGh(root, {
       pr: args.pr,
@@ -645,6 +667,8 @@ async function callTool(name, args, root) {
           policy
         };
       }
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_review_comment_prerequisite_policy", Boolean(args.confirmed));
+      if (prerequisiteBlocked) return prerequisiteBlocked;
     }
     return createReviewCommentWithGh(root, {
       ...options,
@@ -680,6 +704,16 @@ async function callTool(name, args, root) {
         review,
         publish: dryRun
       };
+    }
+    if (args.execute === true) {
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_review_comments_prerequisite_policy", Boolean(args.confirmed));
+      if (prerequisiteBlocked) {
+        return {
+          ...prerequisiteBlocked,
+          review,
+          publish: dryRun
+        };
+      }
     }
     const publish = args.execute === true
       ? await createReviewCommentsWithGh(root, {
@@ -717,6 +751,13 @@ async function callTool(name, args, root) {
       if (commandPolicy.status !== "allow") {
         return {
           ...commandPolicy,
+          dryRun
+        };
+      }
+      const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_checks_prerequisite_policy", Boolean(args.confirmed));
+      if (prerequisiteBlocked) {
+        return {
+          ...prerequisiteBlocked,
           dryRun
         };
       }
