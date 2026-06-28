@@ -16,7 +16,7 @@ import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch
 import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -42,6 +42,7 @@ Usage:
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm]
+  vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm]
   vibeguard github checks [--branch <branch>] [--limit <n>] [--execute]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
@@ -392,6 +393,36 @@ async function githubCommand(parsed, root, subcommand) {
       if (blocked) return blocked;
     }
     return commentPullRequestWithGh(root, {
+      ...options,
+      env,
+      dryRun: !parsed.execute
+    });
+  }
+  if (subcommand === "review-comment") {
+    const options = {
+      pr: parsed.pr,
+      bodyFile: parsed["body-file"],
+      body: parsed.body,
+      commitId: parsed.commit || parsed["commit-id"],
+      path: parsed.path,
+      line: parsed.line ? Number(parsed.line) : undefined,
+      side: parsed.side,
+      startLine: parsed["start-line"] ? Number(parsed["start-line"]) : undefined,
+      startSide: parsed["start-side"],
+      subjectType: parsed["subject-type"]
+    };
+    const bodyFileBlocked = githubBodyFilePolicy(root, options.bodyFile, "github_review_comment_body_file_policy", Boolean(parsed.confirm));
+    if (bodyFileBlocked) return bodyFileBlocked;
+    const dryRun = await createReviewCommentWithGh(root, {
+      ...options,
+      env,
+      dryRun: true
+    });
+    if (parsed.execute) {
+      const blocked = githubMutationPolicy(root, dryRun.command, "github_review_comment_policy", Boolean(parsed.confirm));
+      if (blocked) return blocked;
+    }
+    return createReviewCommentWithGh(root, {
       ...options,
       env,
       dryRun: !parsed.execute

@@ -92,6 +92,7 @@ Available tools:
 - `github_pr`
 - `github_checks`
 - `github_comment`
+- `github_review_comment`
 - `eval_fixtures`
 - `eval_history`
 - `doctor`
@@ -241,6 +242,15 @@ Post a PR comment through the GitHub CLI or REST API fallback. The command is dr
 ```bash
 vibeguard github comment --pr 12 --body-file review.md
 vibeguard github comment --pr 12 --body-file review.md --execute --confirm
+```
+
+Post a file-line PR review comment when a finding has a concrete diff line. It requires the PR head commit SHA, file path, and diff line:
+
+当 finding 有明确 diff 行号时，可以发布文件行级 PR review comment。它需要 PR head commit SHA、文件路径和 diff line：
+
+```bash
+vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md
+vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --execute --confirm
 ```
 
 PR and comment body files are checked through path policy before dry-run or execution; do not pass denied files such as `.env`.

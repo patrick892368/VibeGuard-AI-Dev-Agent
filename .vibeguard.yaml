@@ -62,6 +62,7 @@ commands:
     - "git push"
     - "gh pr create"
     - "gh pr comment"
+    - "gh api"
 
 agents:
   debug:

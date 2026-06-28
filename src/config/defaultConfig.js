@@ -32,7 +32,8 @@ export const defaultConfig = {
       "git commit",
       "git push",
       "gh pr create",
-      "gh pr comment"
+      "gh pr comment",
+      "gh api"
     ]
   },
   agents: {

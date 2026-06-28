@@ -303,11 +303,17 @@ Post a PR summary or review note:
 ```bash
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --json
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --json
+node ./bin/vibeguard.js github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --json
+node ./bin/vibeguard.js github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --execute --confirm --json
 ```
 
 The MCP-style server exposes the same GitHub PR path as `github_pr`, which returns a dry-run `gh pr create` command unless `execute` is true and policy confirmation is present.
 
 MCP-style server 也通过 `github_pr` 暴露同一条 GitHub PR 路径；默认返回 dry-run 的 `gh pr create` 命令，只有 `execute` 为 true 且通过 policy 确认时才执行。
+
+For file-line PR review comments, use `github review-comment` or MCP `github_review_comment` with the PR head commit SHA, file path, and diff line.
+
+对于文件行级 PR review comment，使用 `github review-comment` 或 MCP `github_review_comment`，并传入 PR head commit SHA、文件路径和 diff line。
 
 When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` through the GitHub REST API fallback. Policy confirmation is still required for PR creation and PR comments.
 

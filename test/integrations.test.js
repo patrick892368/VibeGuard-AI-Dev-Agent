@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, buildGhPrCommentArgs, buildGhRunListArgs, commentPullRequestWithGh, createPullRequestWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { generateDebugPatch } from "../src/llm/provider.js";
@@ -280,6 +280,103 @@ test("CLI GitHub PR blocks denied body files before dry-run", () => {
   assert.equal(result.status, "deny");
   assert.equal(result.stage, "github_pr_body_file_policy");
   assert.equal(result.policy.path, ".env");
+});
+
+test("GitHub PR review comments are dry-run by default", async () => {
+  assert.deepEqual(buildGhPrReviewCommentArgs({
+    pr: 12,
+    bodyFile: "review.md",
+    commitId: "abc123",
+    path: "src/app.js",
+    line: 10
+  }), [
+    "api",
+    "repos/{owner}/{repo}/pulls/12/comments",
+    "--method",
+    "POST",
+    "--field",
+    "body=@review.md",
+    "--field",
+    "commit_id=abc123",
+    "--field",
+    "path=src/app.js",
+    "--field",
+    "line=10",
+    "--field",
+    "side=RIGHT"
+  ]);
+  const result = await createReviewCommentWithGh(process.cwd(), {
+    pr: 12,
+    body: "review",
+    commitId: "abc123",
+    path: "src/app.js",
+    line: 10
+  });
+  assert.equal(result.status, "dry_run");
+  assert.match(result.command, /gh api repos\/\{owner\}\/\{repo\}\/pulls\/12\/comments/);
+});
+
+test("GitHub PR review comments can use REST API fallback", async () => {
+  const root = tempGitHubRepo();
+  let request;
+  const result = await createReviewCommentWithGh(root, {
+    pr: 12,
+    body: "review",
+    commitId: "abc123",
+    path: "src/app.js",
+    line: 10,
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/1#discussion_r1", id: 1 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "review_commented");
+  assert.equal(result.method, "api");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls/12/comments");
+  assert.deepEqual(request.body, {
+    body: "review",
+    commit_id: "abc123",
+    path: "src/app.js",
+    line: 10,
+    side: "RIGHT"
+  });
+});
+
+test("CLI GitHub PR review comment execute requires command confirmation", () => {
+  const output = execFileSync(process.execPath, [
+    bin,
+    "github",
+    "review-comment",
+    "--pr",
+    "12",
+    "--body",
+    "review",
+    "--commit",
+    "abc123",
+    "--path",
+    "src/app.js",
+    "--line",
+    "10",
+    "--execute",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const result = JSON.parse(output);
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "github_review_comment_policy");
+  assert.match(result.command, /gh api repos\/\{owner\}\/\{repo\}\/pulls\/12\/comments/);
 });
 
 test("GitHub checks are dry-run by default", async () => {

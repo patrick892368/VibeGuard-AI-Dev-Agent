@@ -45,6 +45,35 @@ export function buildGhPrCommentArgs(options = {}) {
   return args;
 }
 
+export function buildGhPrReviewCommentArgs(options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  if (!options.commitId) throw new Error("GitHub PR review comment commitId is required");
+  if (!options.path) throw new Error("GitHub PR review comment path is required");
+  if (!options.line) throw new Error("GitHub PR review comment line is required");
+  if (!options.bodyFile && !options.body) throw new Error("GitHub PR review comment body or bodyFile is required");
+
+  const args = [
+    "api",
+    `repos/{owner}/{repo}/pulls/${options.pr}/comments`,
+    "--method",
+    "POST",
+    "--field",
+    options.bodyFile ? `body=@${options.bodyFile}` : `body=${options.body}`,
+    "--field",
+    `commit_id=${options.commitId}`,
+    "--field",
+    `path=${options.path}`,
+    "--field",
+    `line=${Number(options.line)}`,
+    "--field",
+    `side=${options.side || "RIGHT"}`
+  ];
+  if (options.startLine) args.push("--field", `start_line=${Number(options.startLine)}`);
+  if (options.startSide) args.push("--field", `start_side=${options.startSide}`);
+  if (options.subjectType) args.push("--field", `subject_type=${options.subjectType}`);
+  return args;
+}
+
 export function buildGhRunListArgs(options = {}) {
   const args = [
     "run",
@@ -146,6 +175,43 @@ async function commentPullRequestWithApi(root, options = {}) {
   };
 }
 
+function reviewCommentPayload(root, options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  if (!options.commitId) throw new Error("GitHub PR review comment commitId is required");
+  if (!options.path) throw new Error("GitHub PR review comment path is required");
+  const line = Number(options.line);
+  if (!Number.isInteger(line) || line <= 0) throw new Error("GitHub PR review comment line must be a positive integer");
+  const body = readBody(root, options);
+  if (!body) throw new Error("GitHub PR review comment body or bodyFile is required");
+
+  const payload = {
+    body,
+    commit_id: options.commitId,
+    path: options.path,
+    line,
+    side: options.side || "RIGHT"
+  };
+  if (options.startLine) payload.start_line = Number(options.startLine);
+  if (options.startSide) payload.start_side = options.startSide;
+  if (options.subjectType) payload.subject_type = options.subjectType;
+  return payload;
+}
+
+async function createReviewCommentWithApi(root, options = {}) {
+  const data = await githubApiRequest(root, {
+    ...options,
+    method: "POST",
+    path: `/pulls/${options.pr}/comments`,
+    body: reviewCommentPayload(root, options)
+  });
+  return {
+    status: "review_commented",
+    method: "api",
+    url: data.html_url || data.url,
+    id: data.id || null
+  };
+}
+
 async function listWorkflowRunsWithApi(root, options = {}) {
   const params = new URLSearchParams({
     per_page: String(options.limit || 10)
@@ -219,6 +285,28 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
   } catch (error) {
     if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
     return commentPullRequestWithApi(root, options);
+  }
+}
+
+export async function createReviewCommentWithGh(root = process.cwd(), options = {}) {
+  const args = buildGhPrReviewCommentArgs(options);
+  if (options.dryRun !== false) {
+    return {
+      status: "dry_run",
+      command: `gh ${args.join(" ")}`
+    };
+  }
+  if (options.useApi) return createReviewCommentWithApi(root, options);
+  try {
+    const stdout = execFileSync("gh", args, { cwd: root, encoding: "utf8" });
+    return {
+      status: "review_commented",
+      method: "gh",
+      output: stdout.trim()
+    };
+  } catch (error) {
+    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+    return createReviewCommentWithApi(root, options);
   }
 }
 

@@ -14,6 +14,6 @@ export { applyPatchWithPolicy } from "./patch/safeApply.js";
 export { validateUnifiedDiff } from "./patch/validatePatch.js";
 export { generateDebugPatch } from "./llm/provider.js";
 export { runCommandWithPolicy } from "./runner/safeCommand.js";
-export { parseGitHubRemote, detectGitHubRepository, createPullRequestWithGh } from "./integrations/github.js";
+export { parseGitHubRemote, detectGitHubRepository, createPullRequestWithGh, commentPullRequestWithGh, createReviewCommentWithGh, listWorkflowRunsWithGh } from "./integrations/github.js";
 export { buildFixGitPlan } from "./integrations/gitPlan.js";
 export { evaluateFixFixtures } from "./eval/fixtures.js";

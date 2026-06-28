@@ -166,6 +166,55 @@ test("MCP github_comment blocks denied body files before dry-run", async () => {
   assert.equal(result.policy.path, ".env");
 });
 
+test("MCP github_review_comment returns a dry-run review comment command", async () => {
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 14,
+    method: "tools/call",
+    params: {
+      name: "github_review_comment",
+      arguments: {
+        pr: "12",
+        body: "review",
+        commitId: "abc123",
+        path: "src/app.js",
+        line: 10
+      }
+    }
+  }, tempRepo());
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "dry_run");
+  assert.match(result.command, /gh api repos\/\{owner\}\/\{repo\}\/pulls\/12\/comments/);
+  assert.match(result.command, /commit_id=abc123/);
+});
+
+test("MCP github_review_comment blocks denied body files before dry-run", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 15,
+    method: "tools/call",
+    params: {
+      name: "github_review_comment",
+      arguments: {
+        pr: "12",
+        bodyFile: ".env",
+        commitId: "abc123",
+        path: "src/app.js",
+        line: 10
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "github_review_comment_body_file_policy");
+  assert.equal(result.policy.path, ".env");
+});
+
 test("MCP debug_error reads log files through path policy", async () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined\n", "utf8");

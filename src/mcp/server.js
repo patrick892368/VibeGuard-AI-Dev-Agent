@@ -11,7 +11,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
-import { commentPullRequestWithGh, createPullRequestWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
@@ -176,6 +176,24 @@ const tools = [
       pr: stringSchema,
       bodyFile: stringSchema,
       body: stringSchema,
+      execute: booleanSchema,
+      confirmed: booleanSchema
+    })
+  },
+  {
+    name: "github_review_comment",
+    description: "Create a GitHub PR review comment on a specific file line. Dry-run by default.",
+    inputSchema: objectSchema({
+      pr: stringSchema,
+      bodyFile: stringSchema,
+      body: stringSchema,
+      commitId: stringSchema,
+      path: stringSchema,
+      line: numberSchema,
+      side: stringSchema,
+      startLine: numberSchema,
+      startSide: stringSchema,
+      subjectType: stringSchema,
       execute: booleanSchema,
       confirmed: booleanSchema
     })
@@ -560,6 +578,45 @@ async function callTool(name, args, root) {
       bodyFile: args.bodyFile,
       body: args.body,
       env,
+      dryRun: args.execute !== true
+    });
+  }
+  if (name === "github_review_comment") {
+    const env = loadRuntimeEnv(root);
+    const bodyFileBlocked = githubBodyFilePolicy(root, args.bodyFile, "github_review_comment_body_file_policy", Boolean(args.confirmed));
+    if (bodyFileBlocked) return bodyFileBlocked;
+    const options = {
+      pr: args.pr,
+      bodyFile: args.bodyFile,
+      body: args.body,
+      commitId: args.commitId,
+      path: args.path,
+      line: args.line,
+      side: args.side,
+      startLine: args.startLine,
+      startSide: args.startSide,
+      subjectType: args.subjectType,
+      env
+    };
+    const dryRun = await createReviewCommentWithGh(root, {
+      ...options,
+      dryRun: true
+    });
+    if (args.execute === true) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      const policy = engine.checkCommand(dryRun.command);
+      if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
+        return {
+          status: policy.status,
+          stage: "github_review_comment_policy",
+          command: dryRun.command,
+          policy
+        };
+      }
+    }
+    return createReviewCommentWithGh(root, {
+      ...options,
       dryRun: args.execute !== true
     });
   }
