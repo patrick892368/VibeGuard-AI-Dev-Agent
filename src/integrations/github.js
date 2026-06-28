@@ -110,10 +110,20 @@ function currentBranch(root) {
   return execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim();
 }
 
+function resolveInsideRoot(root, filePath) {
+  const absoluteRoot = path.resolve(root);
+  const absolute = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(absoluteRoot, filePath);
+  const relative = path.relative(absoluteRoot, absolute);
+  if (relative && (relative.startsWith("..") || path.isAbsolute(relative))) {
+    throw new Error(`Path escapes repository root: ${filePath}`);
+  }
+  return absolute;
+}
+
 function readBody(root, options = {}) {
   if (options.body) return options.body;
   if (!options.bodyFile) return "";
-  const bodyPath = path.isAbsolute(options.bodyFile) ? options.bodyFile : path.join(root, options.bodyFile);
+  const bodyPath = resolveInsideRoot(root, options.bodyFile);
   return fs.readFileSync(bodyPath, "utf8");
 }
 

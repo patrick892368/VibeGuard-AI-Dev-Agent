@@ -209,6 +209,23 @@ test("GitHub PR creation can use REST API fallback", async () => {
   });
 });
 
+test("GitHub REST API body files cannot escape the repository root", async () => {
+  const root = tempGitHubRepo();
+  const outside = path.join(os.tmpdir(), `vibeguard-outside-${Date.now()}.md`);
+  fs.writeFileSync(outside, "body", "utf8");
+
+  await assert.rejects(() => createPullRequestWithGh(root, {
+    title: "Fix bug",
+    bodyFile: outside,
+    dryRun: false,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  }), /Path escapes repository root/);
+});
+
 test("GitHub PR comments are dry-run by default", async () => {
   assert.deepEqual(buildGhPrCommentArgs({ pr: 12, bodyFile: "review.md" }), [
     "pr",
