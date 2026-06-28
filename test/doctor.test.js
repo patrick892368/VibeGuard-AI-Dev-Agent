@@ -41,6 +41,39 @@ test("runDoctor reports the Grok default model when no model is configured", () 
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
 });
 
+test("runDoctor reports final capability readiness", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-doctor-readiness-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+
+  const result = runDoctor({
+    root,
+    env: {
+      VIBEGUARD_LLM_PROVIDER: "grok",
+      XAI_API_KEY: "secret-value",
+      GITHUB_TOKEN: "github-secret"
+    },
+    toolStatus: {
+      git: { available: true, detail: "git version test" },
+      gh: { available: false, detail: "missing" }
+    }
+  });
+  const readiness = new Map(result.capabilityReadiness.capabilities.map((item) => [item.id, item]));
+
+  assert.equal(result.capabilityReadiness.status, "ready");
+  assert.equal(result.capabilityReadiness.counts.ready, 7);
+  assert.equal(readiness.get("policy_as_code").ready, true);
+  assert.equal(readiness.get("ai_debug_agent").ready, true);
+  assert.equal(readiness.get("repo_onboarding_agent").ready, true);
+  assert.equal(readiness.get("test_writer_agent").ready, true);
+  assert.equal(readiness.get("pr_review_agent").ready, true);
+  assert.equal(readiness.get("codex_grok_integration").provider, "grok");
+  assert.equal(readiness.get("github_pr_loop").hasToken, true);
+  assert.equal(readiness.get("github_pr_loop").hasGh, false);
+  assert.equal(JSON.stringify(result).includes("secret-value"), false);
+  assert.equal(JSON.stringify(result).includes("github-secret"), false);
+});
+
 test("runDoctor returns next actions for missing provider and GitHub execution auth", () => {
   const result = runDoctor({
     root: process.cwd(),

@@ -39,9 +39,9 @@ node ./bin/vibeguard.js policy check --command "npm test" --json
 node ./bin/vibeguard.js policy check --path src/index.js --audit-log reports/audit.jsonl --json
 ```
 
-`doctor` reports provider presence, readiness, the effective default model, and machine-readable `nextActions` without exposing API keys.
+`doctor` reports provider presence, readiness, the effective default model, machine-readable `capabilityReadiness` for the final VibeGuard capability loop, and `nextActions` without exposing API keys.
 
-`doctor` 会报告 provider 是否存在、是否 ready、实际默认模型，以及机器可读的 `nextActions`，但不会暴露 API key。
+`doctor` 会报告 provider 是否存在、是否 ready、实际默认模型、面向最终能力闭环的机器可读 `capabilityReadiness`，以及 `nextActions`，但不会暴露 API key。
 
 Analyze an error log:
 

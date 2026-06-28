@@ -106,6 +106,104 @@ function buildNextActions({ policy, github, githubAuth, provider, tools }) {
   return actions;
 }
 
+function capability(id, title, titleZh, status, reason = null, details = {}) {
+  return {
+    id,
+    title,
+    titleZh,
+    status,
+    ready: status === "ready",
+    reason,
+    ...details
+  };
+}
+
+function buildCapabilityReadiness({ policy, github, githubAuth, provider, tools }) {
+  const policyReady = policy.status === "loaded";
+  const providerReady = provider.ready;
+  const githubRemoteReady = github.status === "detected";
+  const githubExecutionReady = githubRemoteReady && (tools.gh.available || githubAuth.hasToken);
+  const grokProvider = provider.provider === "grok" || provider.provider === "xai";
+  const capabilities = [
+    capability(
+      "policy_as_code",
+      "Policy-as-Code safety base",
+      "Policy-as-Code 安全底座",
+      policyReady ? "ready" : "blocked",
+      policyReady ? null : "Policy config failed to load."
+    ),
+    capability(
+      "ai_debug_agent",
+      "AI Debug Agent",
+      "AI Debug Agent",
+      !policyReady ? "blocked" : providerReady ? "ready" : "partial",
+      !policyReady
+        ? "Policy is required before reading logs, generating patches, applying patches, or running tests."
+        : providerReady
+          ? null
+          : "Log parsing and repair plans are available, but AI patch generation needs a configured provider."
+    ),
+    capability(
+      "repo_onboarding_agent",
+      "AI Repo Onboarding Agent",
+      "AI Repo Onboarding Agent",
+      policyReady ? "ready" : "blocked",
+      policyReady ? null : "Repository metadata reads must pass policy before onboarding."
+    ),
+    capability(
+      "test_writer_agent",
+      "AI Test Writer Agent",
+      "AI Test Writer Agent",
+      policyReady ? "ready" : "blocked",
+      policyReady ? null : "Source reads, generated test writes, and test commands must pass policy."
+    ),
+    capability(
+      "pr_review_agent",
+      "AI PR Review Agent",
+      "AI PR Review Agent",
+      policyReady ? "ready" : "blocked",
+      policyReady ? null : "Diff reads, comment writes, and publish commands must pass policy."
+    ),
+    capability(
+      "codex_grok_integration",
+      "Codex + Grok integration",
+      "Codex + Grok 集成",
+      providerReady && grokProvider ? "ready" : providerReady ? "partial" : "blocked",
+      providerReady && grokProvider
+        ? null
+        : providerReady
+          ? "A provider is configured, but it is not the current priority Grok/xAI provider."
+          : provider.reason,
+      { provider: provider.provider, model: provider.model }
+    ),
+    capability(
+      "github_pr_loop",
+      "GitHub PR loop",
+      "GitHub PR 闭环",
+      githubExecutionReady ? "ready" : githubRemoteReady ? "partial" : "blocked",
+      githubExecutionReady
+        ? null
+        : githubRemoteReady
+          ? "GitHub remote is detected, but real PR/comment/check execution needs authenticated gh or GITHUB_TOKEN/GH_TOKEN."
+          : "A GitHub origin remote is required for PR creation, comments, review comments, and CI checks.",
+      {
+        hasRemote: githubRemoteReady,
+        hasGh: Boolean(tools.gh.available),
+        hasToken: Boolean(githubAuth.hasToken)
+      }
+    )
+  ];
+  const counts = capabilities.reduce((summary, item) => {
+    summary[item.status] = (summary[item.status] || 0) + 1;
+    return summary;
+  }, { ready: 0, partial: 0, blocked: 0 });
+  return {
+    status: counts.blocked > 0 ? "blocked" : counts.partial > 0 ? "partial" : "ready",
+    counts,
+    capabilities
+  };
+}
+
 export function runDoctor(options = {}) {
   const root = options.root || process.cwd();
   const env = options.env || process.env;
@@ -166,6 +264,7 @@ export function runDoctor(options = {}) {
   };
   return {
     ...result,
+    capabilityReadiness: buildCapabilityReadiness(result),
     nextActions: buildNextActions(result)
   };
 }
