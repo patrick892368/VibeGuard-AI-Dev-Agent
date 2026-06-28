@@ -231,6 +231,27 @@ test("writeSuggestedTests writes simple JavaScript branch assertions", () => {
   assert.match(generated, /assert\.equal\(mod\.normalizeName\(" Ada "\), "ada"\)/);
 });
 
+test("writeSuggestedTests writes async JavaScript behavior assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "asyncMath.js"), `export async function add(a, b) {
+  return a + b;
+}
+
+export const normalize = async (name) => name.trim().toLowerCase();
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "asyncMath.test.js"), "utf8");
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /test\("covers simple behavior", async \(\) => \{/);
+  assert.match(generated, /assert\.equal\(await mod\.add\(2, 3\), 5\)/);
+  assert.match(generated, /assert\.equal\(await mod\.normalize\(" Ada "\), "ada"\)/);
+});
+
 test("writeSuggestedTests writes simple Python branch assertions", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));

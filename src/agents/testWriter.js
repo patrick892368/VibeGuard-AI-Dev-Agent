@@ -328,31 +328,32 @@ function exceptionAssertions(name, params, condition, errorName) {
   }];
 }
 
-function simpleAssertion(name, params, expression) {
-  const normalized = expression.trim().replace(/;$/, "");
+function simpleAssertion(name, params, expression, options = {}) {
+  const normalized = expression.trim().replace(/;$/, "").replace(/^await\s+/, "");
+  const asyncHint = Boolean(options.async);
   if (params.length === 0) {
-    if (normalized === "true" || normalized === "True") return { name, args: [], expected: true };
-    if (normalized === "false" || normalized === "False") return { name, args: [], expected: false };
+    if (normalized === "true" || normalized === "True") return { name, args: [], expected: true, async: asyncHint };
+    if (normalized === "false" || normalized === "False") return { name, args: [], expected: false, async: asyncHint };
     const stringLiteral = normalized.match(/^["']([^"']*)["']$/);
-    if (stringLiteral) return { name, args: [], expected: stringLiteral[1] };
+    if (stringLiteral) return { name, args: [], expected: stringLiteral[1], async: asyncHint };
   }
   if (params.length === 1) {
     const [value] = params;
     if (normalized === `${value}.trim()` || normalized === `${value}.strip()`) {
-      return { name, args: [" Ada "], expected: "Ada" };
+      return { name, args: [" Ada "], expected: "Ada", async: asyncHint };
     }
     if (normalized === `${value}.trim().toLowerCase()` || normalized === `${value}.strip().lower()`) {
-      return { name, args: [" Ada "], expected: "ada" };
+      return { name, args: [" Ada "], expected: "ada", async: asyncHint };
     }
     const objectSample = objectSampleForExpression(value, normalized);
     if (objectSample) {
-      return { name, args: [objectSample], expected: expectedFromExpression(value, normalized, objectSample) };
+      return { name, args: [objectSample], expected: expectedFromExpression(value, normalized, objectSample), async: asyncHint };
     }
   }
   if (params.length === 2) {
     const [left, right] = params;
     if (normalized === `${left} + ${right}` || normalized === `${right} + ${left}`) {
-      return { name, args: [2, 3], expected: 5 };
+      return { name, args: [2, 3], expected: 5, async: asyncHint };
     }
   }
   return null;
@@ -379,16 +380,18 @@ function inferPythonAssertions(text) {
 function inferJavaScriptAssertions(text) {
   const hints = [];
   const patterns = [
-    /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g,
-    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g
+    { pattern: /(?:export\s+)?async\s+function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g, async: true },
+    { pattern: /(?<!async\s)(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g, async: false },
+    { pattern: /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*async\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: true },
+    { pattern: /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: false }
   ];
-  for (const pattern of patterns) {
+  for (const { pattern, async } of patterns) {
     for (const match of text.matchAll(pattern)) {
-      const hint = simpleAssertion(match[1], splitParams(match[2]), match[3]);
+      const hint = simpleAssertion(match[1], splitParams(match[2]), match[3], { async });
       if (hint) hints.push(hint);
     }
   }
-  const branchPattern = /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*if\s*\(([^)]*)\)\s*(?:{\s*)?return\s+([^;{}]+);?\s*(?:}\s*)?return\s+([^;{}]+);?\s*}/g;
+  const branchPattern = /(?<!async\s)(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*if\s*\(([^)]*)\)\s*(?:{\s*)?return\s+([^;{}]+);?\s*(?:}\s*)?return\s+([^;{}]+);?\s*}/g;
   for (const match of text.matchAll(branchPattern)) {
     hints.push(...branchAssertions(match[1], splitParams(match[2]), match[3], match[4], match[5]));
   }
@@ -696,7 +699,9 @@ function jsErrorConstructor(errorName) {
 
 function jsBehaviorAssertion(hint) {
   const call = `mod.${hint.name}(${hint.args.map(jsLiteral).join(", ")})`;
+  if (hint.throws && hint.async) return `  await assert.rejects(() => ${call}, ${jsErrorConstructor(hint.throws)});`;
   if (hint.throws) return `  assert.throws(() => ${call}, ${jsErrorConstructor(hint.throws)});`;
+  if (hint.async) return `  assert.equal(await ${call}, ${jsLiteral(hint.expected)});`;
   return `  assert.equal(${call}, ${jsLiteral(hint.expected)});`;
 }
 
@@ -778,6 +783,8 @@ class ${className}Test {
     ...classes.map((name) => jsClassAssertion(name, candidate))
   ].join("\n") || "  assert.ok(mod);";
   const behaviorAssertions = assertionHints.map(jsBehaviorAssertion).join("\n");
+  const behaviorIsAsync = assertionHints.some((hint) => hint.async);
+  const behaviorCallback = behaviorIsAsync ? "async () =>" : "() =>";
   if (candidate.metadata?.moduleSystem === "commonjs") {
     return `const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -786,7 +793,7 @@ const mod = require("${importPath}");
 test("exports expected functions and classes", () => {
 ${assertions}
 });
-${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAssertions}\n});\n` : ""}
+${behaviorAssertions ? `\ntest("covers simple behavior", ${behaviorCallback} {\n${behaviorAssertions}\n});\n` : ""}
 `;
   }
 
@@ -797,7 +804,7 @@ import * as mod from "${importPath}";
 test("exports expected functions and classes", () => {
 ${assertions}
 });
-${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAssertions}\n});\n` : ""}
+${behaviorAssertions ? `\ntest("covers simple behavior", ${behaviorCallback} {\n${behaviorAssertions}\n});\n` : ""}
 `;
 }
 
