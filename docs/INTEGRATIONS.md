@@ -317,6 +317,10 @@ vibeguard github checks --branch codex/fix-bug --limit 5 --execute
 
 `checks --execute` 会先把生成的 `gh run list` 命令交给 command policy 检查，然后才调用 GitHub 或 REST fallback。
 
+Executed checks include a normalized `summary` with `status`, `gate`, counts, latest run, failing runs, and pending runs. Agents can use `gate: pass`, `fail`, `wait`, or `unknown` instead of parsing provider-specific workflow conclusions.
+
+执行后的 checks 会包含归一化 `summary`，提供 `status`、`gate`、计数、最新 run、失败 run 和等待 run。Agent 可以直接使用 `gate: pass`、`fail`、`wait` 或 `unknown`，不用自己解析不同 provider 的 workflow conclusion。
+
 `gh pr create` and `gh pr comment` require policy confirmation. Execution uses authenticated `gh` when available, or `GITHUB_TOKEN` / `GH_TOKEN` through the REST API fallback when `gh` is missing.
 
 `gh pr create` 和 `gh pr comment` 需要 policy 确认。执行时优先使用已认证的 `gh`；如果本机缺少 `gh`，可使用 `GITHUB_TOKEN` / `GH_TOKEN` 通过 REST API fallback 执行。

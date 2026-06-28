@@ -26,7 +26,8 @@ export {
   commentPullRequestWithGh,
   createReviewCommentWithGh,
   createReviewCommentsWithGh,
-  listWorkflowRunsWithGh
+  listWorkflowRunsWithGh,
+  summarizeWorkflowRuns
 } from "./integrations/github.js";
 export { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "./integrations/gitPlan.js";
 export { evaluateFixFixtures } from "./eval/fixtures.js";

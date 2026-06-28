@@ -38,6 +38,26 @@ const server = http.createServer((request, response) => {
       response.end("diff --git a/src/db.js b/src/db.js\\n--- a/src/db.js\\n+++ b/src/db.js\\n@@ -1 +1,2 @@\\n export function run() {}\\n+db.query(\\"SELECT * FROM users WHERE id = \\" + id)\\n");
       return;
     }
+    if (request.url.includes("/actions/runs")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        workflow_runs: [
+          {
+            id: 123,
+            status: "completed",
+            conclusion: "failure",
+            name: "CI",
+            head_branch: "main",
+            event: "pull_request",
+            workflow_name: "CI",
+            html_url: "https://github.com/owner/repo/actions/runs/123",
+            created_at: "2026-06-24T00:00:00Z",
+            updated_at: "2026-06-24T00:01:00Z"
+          }
+        ]
+      }));
+      return;
+    }
     response.writeHead(201, { "content-type": "application/json" });
     response.end(JSON.stringify({ html_url: "https://github.com/owner/repo/pull/7", number: 7, request_body: body }));
   });
@@ -798,6 +818,51 @@ commands:
   assert.equal(parsed.stage, "github_checks_policy");
   assert.match(parsed.command, /gh run list/);
   assert.equal(parsed.dryRun.status, "dry_run");
+});
+
+test("CLI GitHub checks returns a normalized CI summary through REST fallback", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-checks-api-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  writeCommandPolicy(root, { requireConfirmation: ["gh run list"] });
+  const api = await startFakeGitHubApi();
+
+  let parsed;
+  try {
+    const output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "github",
+      "checks",
+      "--branch",
+      "main",
+      "--limit",
+      "5",
+      "--execute",
+      "--confirm",
+      "--github-api",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: "token",
+        GITHUB_API_URL: api.url
+      }
+    });
+    parsed = JSON.parse(output);
+  } finally {
+    api.close();
+  }
+
+  assert.equal(parsed.status, "completed");
+  assert.equal(parsed.method, "api");
+  assert.equal(parsed.commandPolicy.status, "allow");
+  assert.equal(parsed.summary.status, "failing");
+  assert.equal(parsed.summary.gate, "fail");
+  assert.equal(parsed.summary.failingRuns[0].name, "CI");
 });
 
 test("CLI GitHub detect is gated by command policy", () => {

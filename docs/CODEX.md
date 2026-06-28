@@ -329,6 +329,10 @@ node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --execute
 
 `github checks --execute` 会先生成 `gh run list` dry-run 命令，并在读取远端 CI 状态前经过 command policy 检查。
 
+Executed checks return both raw workflow runs and `summary.status` / `summary.gate`, so Codex can treat `gate: pass` as merge-ready, `gate: fail` as blocking, `gate: wait` as pending, and `gate: unknown` as requiring human review.
+
+执行后的 checks 会同时返回原始 workflow runs 和 `summary.status` / `summary.gate`，因此 Codex 可以把 `gate: pass` 视为可合并、`gate: fail` 视为阻塞、`gate: wait` 视为等待中、`gate: unknown` 视为需要人工判断。
+
 Post a PR summary or review note:
 
 发布 PR summary 或 review note：

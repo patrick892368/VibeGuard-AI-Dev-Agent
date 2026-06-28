@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { hookTemplate, installHook, listHooks } from "../src/integrations/hooks.js";
-import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrDiffArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
+import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrDiffArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh, parseGitHubRemote, summarizeWorkflowRuns } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { buildDebugRepairPlan, generateDebugPatch } from "../src/llm/provider.js";
@@ -84,6 +84,7 @@ test("public API exports GitHub batch review helpers", async () => {
   assert.equal(typeof api.writeSuggestedTests, "function");
   assert.equal(typeof api.writeSuggestedTestsAsync, "function");
   assert.equal(typeof api.compareCoverageReports, "function");
+  assert.equal(typeof api.summarizeWorkflowRuns, "function");
   assert.equal(api.GITHUB_DETECT_COMMAND, "git remote get-url origin");
   assert.equal(api.GITHUB_CURRENT_BRANCH_COMMAND, "git branch --show-current");
 });
@@ -725,6 +726,29 @@ test("GitHub checks are dry-run by default", async () => {
   assert.match(result.command, /gh run list/);
 });
 
+test("GitHub workflow run summary produces a CI gate decision", () => {
+  const passing = summarizeWorkflowRuns([
+    { databaseId: 1, status: "completed", conclusion: "success", name: "CI" },
+    { databaseId: 2, status: "completed", conclusion: "skipped", name: "Docs" }
+  ]);
+  const failing = summarizeWorkflowRuns([
+    { databaseId: 3, status: "completed", conclusion: "failure", name: "CI", url: "https://example.com/run/3" },
+    { databaseId: 4, status: "in_progress", conclusion: null, name: "Lint" }
+  ]);
+  const pending = summarizeWorkflowRuns([
+    { databaseId: 5, status: "queued", conclusion: null, name: "CI" }
+  ]);
+
+  assert.equal(passing.status, "passing");
+  assert.equal(passing.gate, "pass");
+  assert.equal(failing.status, "failing");
+  assert.equal(failing.gate, "fail");
+  assert.equal(failing.failingRuns[0].name, "CI");
+  assert.equal(pending.status, "pending");
+  assert.equal(pending.gate, "wait");
+  assert.equal(summarizeWorkflowRuns([]).status, "no_runs");
+});
+
 test("GitHub checks can use REST API fallback", async () => {
   const root = tempGitHubRepo();
   let requestUrl;
@@ -762,6 +786,8 @@ test("GitHub checks can use REST API fallback", async () => {
 
   assert.equal(result.status, "completed");
   assert.equal(result.method, "api");
+  assert.equal(result.summary.status, "passing");
+  assert.equal(result.summary.gate, "pass");
   assert.match(requestUrl, /\/repos\/owner\/repo\/actions\/runs\?per_page=5&branch=codex%2Ffix-bug$/);
   assert.deepEqual(result.runs[0], {
     databaseId: 123,

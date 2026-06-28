@@ -100,6 +100,85 @@ export function buildGhRunListArgs(options = {}) {
   return args;
 }
 
+function workflowRunConclusion(run = {}) {
+  const status = String(run.status || "").toLowerCase();
+  const conclusion = String(run.conclusion || "").toLowerCase();
+  if (status && status !== "completed") return "pending";
+  if (!conclusion) return status === "completed" ? "unknown" : "pending";
+  if (["success", "neutral", "skipped"].includes(conclusion)) return "success";
+  if (["failure", "timed_out", "cancelled", "action_required", "startup_failure"].includes(conclusion)) return "failure";
+  return "unknown";
+}
+
+function workflowRunLabel(run = {}) {
+  return run.workflowName || run.name || `run ${run.databaseId || "unknown"}`;
+}
+
+function compactWorkflowRun(run = {}) {
+  return {
+    databaseId: run.databaseId ?? null,
+    name: workflowRunLabel(run),
+    status: run.status || null,
+    conclusion: run.conclusion || null,
+    headBranch: run.headBranch || null,
+    url: run.url || null
+  };
+}
+
+export function summarizeWorkflowRuns(runs = []) {
+  const counts = {
+    total: runs.length,
+    success: 0,
+    failure: 0,
+    pending: 0,
+    unknown: 0
+  };
+  const failingRuns = [];
+  const pendingRuns = [];
+  const unknownRuns = [];
+
+  for (const run of runs) {
+    const normalized = workflowRunConclusion(run);
+    counts[normalized] += 1;
+    if (normalized === "failure") failingRuns.push(compactWorkflowRun(run));
+    if (normalized === "pending") pendingRuns.push(compactWorkflowRun(run));
+    if (normalized === "unknown") unknownRuns.push(compactWorkflowRun(run));
+  }
+
+  let status = "passing";
+  let gate = "pass";
+  let conclusion = "success";
+  if (runs.length === 0) {
+    status = "no_runs";
+    gate = "unknown";
+    conclusion = "no_runs";
+  } else if (failingRuns.length > 0) {
+    status = "failing";
+    gate = "fail";
+    conclusion = "failure";
+  } else if (pendingRuns.length > 0) {
+    status = "pending";
+    gate = "wait";
+    conclusion = "pending";
+  } else if (unknownRuns.length > 0) {
+    status = "unknown";
+    gate = "unknown";
+    conclusion = "unknown";
+  }
+
+  return {
+    status,
+    gate,
+    conclusion,
+    counts,
+    latestRun: runs[0] ? compactWorkflowRun(runs[0]) : null,
+    failingRuns,
+    pendingRuns,
+    unknownRuns,
+    summary: `CI ${status}: ${counts.success} passing, ${counts.failure} failing, ${counts.pending} pending, ${counts.unknown} unknown.`
+  };
+}
+
 function normalizeLimit(limit, total) {
   if (limit === undefined || limit === null || limit === true) return total;
   const value = Number(limit);
@@ -566,19 +645,29 @@ export async function listWorkflowRunsWithGh(root = process.cwd(), options = {})
   requireExecutionPolicy(options, "GitHub checks");
   if (options.useApi) {
     checkOptionalCommandPolicy(root, command, options, "github_checks");
-    return listWorkflowRunsWithApi(root, options);
+    const result = await listWorkflowRunsWithApi(root, options);
+    return {
+      ...result,
+      summary: summarizeWorkflowRuns(result.runs)
+    };
   }
 
   const result = runProtectedArgv(root, ["gh", ...args], options);
   if (result.status === "passed") {
+    const runs = JSON.parse(result.stdout || "[]");
     return {
       status: "completed",
       method: "gh",
-      runs: JSON.parse(result.stdout || "[]")
+      runs,
+      summary: summarizeWorkflowRuns(runs)
     };
   }
   if (isMissingGhResult(result) && resolveToken(options.env)) {
-    return listWorkflowRunsWithApi(root, options);
+    const apiResult = await listWorkflowRunsWithApi(root, options);
+    return {
+      ...apiResult,
+      summary: summarizeWorkflowRuns(apiResult.runs)
+    };
   }
   requirePassedStdout(result, "GitHub checks");
 }

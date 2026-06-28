@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -16,6 +17,39 @@ function tempGitRepo() {
   fs.mkdirSync(path.join(root, "src"), { recursive: true });
   fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
   return root;
+}
+
+async function startFakeActionsApi() {
+  const server = http.createServer((request, response) => {
+    if (request.url.includes("/actions/runs")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({
+        workflow_runs: [
+          {
+            id: 456,
+            status: "queued",
+            conclusion: null,
+            name: "CI",
+            head_branch: "main",
+            event: "pull_request",
+            workflow_name: "CI",
+            html_url: "https://github.com/owner/repo/actions/runs/456",
+            created_at: "2026-06-24T00:00:00Z",
+            updated_at: "2026-06-24T00:01:00Z"
+          }
+        ]
+      }));
+      return;
+    }
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ message: "not found" }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve) => server.close(resolve))
+  };
 }
 
 test("MCP tools expose input schemas", () => {
@@ -510,6 +544,57 @@ commands:
   assert.equal(result.stage, "github_checks_policy");
   assert.match(result.command, /gh run list/);
   assert.equal(result.dryRun.status, "dry_run");
+});
+
+test("MCP github_checks returns a normalized CI summary through REST fallback", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "gh run list"
+`, "utf8");
+  const api = await startFakeActionsApi();
+  const oldToken = process.env.GITHUB_TOKEN;
+  const oldApiUrl = process.env.GITHUB_API_URL;
+  try {
+    process.env.GITHUB_TOKEN = "token";
+    process.env.GITHUB_API_URL = api.url;
+    const response = await handleMcpRequest({
+      jsonrpc: "2.0",
+      id: 21,
+      method: "tools/call",
+      params: {
+        name: "github_checks",
+        arguments: {
+          branch: "main",
+          execute: true,
+          confirmed: true,
+          useApi: true
+        }
+      }
+    }, root);
+    const result = response.result.structuredContent;
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.method, "api");
+    assert.equal(result.summary.status, "pending");
+    assert.equal(result.summary.gate, "wait");
+    assert.equal(result.summary.pendingRuns[0].name, "CI");
+  } finally {
+    if (oldToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = oldToken;
+    if (oldApiUrl === undefined) delete process.env.GITHUB_API_URL;
+    else process.env.GITHUB_API_URL = oldApiUrl;
+    await api.close();
+  }
 });
 
 test("MCP detect_github is gated by command policy", async () => {
