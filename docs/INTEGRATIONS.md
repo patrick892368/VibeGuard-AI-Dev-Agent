@@ -75,6 +75,10 @@ Install a hook with explicit confirmation:
 vibeguard hooks install pre-commit --allow-git-dir
 ```
 
+Hook installation writes to `.git/hooks/<hook>`, so `--allow-git-dir` is only the explicit operation flag. The target path must still pass `.vibeguard.yaml` path policy, and default policy denies `.git/**` unless the repository policy is changed.
+
+Hook 安装会写入 `.git/hooks/<hook>`，所以 `--allow-git-dir` 只是显式操作开关；目标路径仍必须通过 `.vibeguard.yaml` path policy。默认策略会拒绝 `.git/**`，除非仓库策略显式调整。
+
 ## MCP-Style Server / MCP-Style Server
 
 ```bash

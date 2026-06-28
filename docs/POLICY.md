@@ -95,7 +95,7 @@ All agents must call the Policy Engine before:
 - Reading coverage, diff, log, patch, PR body, or audit input files. / 读取 coverage、diff、log、patch、PR body 或 audit 输入文件。
 - Applying patches. / 应用 patch。
 - Running risky commands. / 执行风险命令。
-- Preparing Git hooks. / 准备 Git hooks。
+- Preparing Git hooks, including `.git/hooks/<hook>` writes. / 准备 Git hooks，包括写入 `.git/hooks/<hook>`。
 - Creating PR branches, pushes, PRs, or comments. / 创建 PR branch、push、PR 或 comment。
 - Writing reports or generated artifacts. / 写报告或生成物。
 

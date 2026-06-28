@@ -353,7 +353,14 @@ function hooksCommand(parsed, root, subcommand) {
   if (subcommand === "list") return { hooks: listHooks() };
   if (subcommand === "print") return hookTemplate(hookName);
   if (subcommand === "install") {
-    return installHook(root, hookName, { allowGitDir: Boolean(parsed["allow-git-dir"]) });
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return installHook(root, hookName, {
+      allowGitDir: Boolean(parsed["allow-git-dir"]),
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"],
+      engine
+    });
   }
   throw new Error(`Unknown hooks command: ${subcommand || ""}`);
 }

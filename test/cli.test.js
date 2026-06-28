@@ -342,6 +342,35 @@ def greeting():
   assert.equal(parsed.testRuns[0].repaired, true);
 });
 
+test("CLI hooks install checks .git hook path policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-hook-policy-"));
+
+  let output;
+  try {
+    output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "hooks",
+      "install",
+      "pre-commit",
+      "--allow-git-dir",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "deny");
+  assert.equal(parsed.stage, "hook_install_policy");
+  assert.equal(parsed.path, ".git/hooks/pre-commit");
+  assert.match(parsed.policy.reason, /Path matches deny policy/);
+});
+
 test("CLI debug --ai-patch marks non-diff AI output as denied", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-ai-"));
   fs.writeFileSync(path.join(root, ".vibeguard.yaml"), "version: 1\n", "utf8");

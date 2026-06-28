@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { hookTemplate, listHooks } from "../src/integrations/hooks.js";
+import { hookTemplate, installHook, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
@@ -23,6 +23,43 @@ function tempGitHubRepo() {
 test("hook templates include pre-commit policy check", () => {
   assert.ok(listHooks().includes("pre-commit"));
   assert.match(hookTemplate("pre-commit"), /policy check/);
+});
+
+test("installHook requires explicit Git directory confirmation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-hook-confirm-"));
+  const result = installHook(root, "pre-commit");
+
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "hook_install_git_dir_confirmation");
+  assert.equal(result.path, ".git/hooks/pre-commit");
+});
+
+test("installHook checks .git hook paths through policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-hook-policy-"));
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".git/**"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const result = installHook(root, "pre-commit", { allowGitDir: true, engine });
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "hook_install_policy");
+  assert.equal(result.policy.path, ".git/hooks/pre-commit");
+});
+
+test("installHook writes hooks only after policy allows the target path", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-hook-install-"));
+  const engine = new PolicyEngine({
+    paths: { allow: [".git/hooks/**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const result = installHook(root, "pre-commit", { allowGitDir: true, engine });
+
+  assert.equal(result.status, "installed");
+  assert.equal(result.policy.status, "allow");
+  assert.match(fs.readFileSync(path.join(root, ".git", "hooks", "pre-commit"), "utf8"), /policy check/);
 });
 
 test("public API exports GitHub batch review helpers", async () => {

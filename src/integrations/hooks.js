@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { writeFileWithPolicy } from "../policy/safeWrite.js";
 
 const templates = {
   "pre-commit": `#!/bin/sh
@@ -37,12 +38,36 @@ export function hookTemplate(name) {
 }
 
 export function installHook(root, name, options = {}) {
+  const relativePath = `.git/hooks/${name}`;
   if (!options.allowGitDir) {
-    throw new Error("Installing hooks writes to .git/hooks. Re-run with --allow-git-dir to confirm this explicit Git integration operation.");
+    return {
+      status: "require_confirmation",
+      stage: "hook_install_git_dir_confirmation",
+      hook: name,
+      path: relativePath,
+      reason: "Installing hooks writes to .git/hooks. Re-run with --allow-git-dir to confirm this explicit Git integration operation."
+    };
   }
-  const target = path.join(root, ".git", "hooks", name);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, hookTemplate(name), { encoding: "utf8", mode: 0o755 });
+  if (!options.engine) {
+    throw new Error("installHook requires a PolicyEngine");
+  }
+
+  const policy = options.engine.checkPath(relativePath, "install_hook");
+  if (policy.status !== "allow" && !(policy.status === "require_confirmation" && options.confirmed)) {
+    return {
+      status: policy.status,
+      stage: "hook_install_policy",
+      hook: name,
+      path: relativePath,
+      policy
+    };
+  }
+
+  const written = writeFileWithPolicy(root, relativePath, hookTemplate(name), options.engine, {
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
+  const target = path.join(root, relativePath);
   try {
     fs.chmodSync(target, 0o755);
   } catch {
@@ -51,7 +76,9 @@ export function installHook(root, name, options = {}) {
   return {
     status: "installed",
     hook: name,
-    path: path.relative(root, target).replace(/\\/g, "/")
+    path: path.relative(root, target).replace(/\\/g, "/"),
+    policy,
+    written
   };
 }
 
