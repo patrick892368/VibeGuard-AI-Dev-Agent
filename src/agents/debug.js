@@ -64,17 +64,30 @@ export function parseJavaStack(logText, root = process.cwd(), repoFiles = listRe
   for (const line of lines) {
     const match = line.match(JAVA_FRAME);
     if (!match) continue;
+    const symbol = match[1];
     const filename = match[2];
     const candidates = repoFiles.filter((file) => file.endsWith(`/${filename}`) || file === filename);
     if (candidates.length === 0) continue;
+    const packageHint = javaPackagePathHint(symbol, filename);
+    const file = packageHint
+      ? candidates.find((candidate) => candidate === packageHint || candidate.endsWith(`/${packageHint}`)) || candidates[0]
+      : candidates[0];
     frames.push({
       language: "java",
-      file: candidates[0],
+      file,
       line: Number(match[3]),
-      symbol: match[1]
+      symbol
     });
   }
   return frames;
+}
+
+function javaPackagePathHint(symbol, filename) {
+  const className = filename.replace(/\.java$/, "");
+  const parts = String(symbol || "").split(".").filter(Boolean);
+  const classIndex = parts.findIndex((part) => part === className || part.startsWith(`${className}$`));
+  if (classIndex <= 0) return null;
+  return `${parts.slice(0, classIndex + 1).join("/")}.java`;
 }
 
 export function detectErrorSummary(logText) {

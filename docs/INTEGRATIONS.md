@@ -36,9 +36,9 @@ vibeguard audit summary --file reports/audit.jsonl
 vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 ```
 
-`debug` returns a structured `explanation` with a user-facing message, likely cause, and evidence such as error type, stack location, and framework. Source snippets are included only when path policy allows reading that file.
+`debug` returns a structured `explanation` with a user-facing message, likely cause, and evidence such as error type, stack location, and framework. Java stack traces use fully qualified package names to disambiguate duplicate source filenames. Source snippets are included only when path policy allows reading that file.
 
-`debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。源码片段只有在 path policy 允许读取该文件时才会返回。
+`debug` 会返回结构化 `explanation`，包含面向用户的说明、可能原因，以及错误类型、栈位置、框架等 evidence。Java 栈会用完整包名消歧同名源码文件。源码片段只有在 path policy 允许读取该文件时才会返回。
 
 When `debug --ai-patch` or `fix` calls a provider, the patch source includes `repairPlan` with the primary file, target files, strategy, policy/apply-check requirements, and suggested validation commands. This is returned even for provider unavailable/error states when debug context is available.
 

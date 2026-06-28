@@ -90,6 +90,21 @@ test("parseJavaStack maps Java stack frames to repository files", () => {
   assert.deepEqual(result.likelyFiles, ["src/main/java/com/example/App.java"]);
 });
 
+test("parseJavaStack uses package names to disambiguate duplicate Java filenames", () => {
+  const log = `java.lang.IllegalStateException: boom
+    at com.example.App.run(App.java:22)`;
+
+  const frames = parseJavaStack(log, tempRepo(), [
+    "src/main/java/org/demo/App.java",
+    "src/main/java/com/example/App.java"
+  ]);
+
+  assert.equal(frames.length, 1);
+  assert.equal(frames[0].file, "src/main/java/com/example/App.java");
+  assert.equal(frames[0].line, 22);
+  assert.equal(frames[0].symbol, "com.example.App.run");
+});
+
 test("analyzeDebugLog adds Django context for template errors", () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "manage.py"), "from django.core.management import execute_from_command_line\n", "utf8");
