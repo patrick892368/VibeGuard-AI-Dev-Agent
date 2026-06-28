@@ -74,6 +74,35 @@ test("analyzeReviewDiff flags secret literals, html sinks, and sync filesystem c
   assert.ok(result.actionItems.some((item) => /HTML sink/.test(item.action)));
 });
 
+test("analyzeReviewDiff flags bug-prone additions", () => {
+  const diff = `diff --git a/src/cache.py b/src/cache.py
+--- a/src/cache.py
++++ b/src/cache.py
+@@ -1 +1,3 @@
++def collect(items=[]):
++    return items
++except: pass
+diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1,3 @@
+ export function run() {}
++if (ready = computeReady()) return ready
++try { run() } catch (error) {}
+`;
+
+  const result = analyzeReviewDiff(diff);
+  const bugMessages = result.findings
+    .filter((finding) => finding.category === "bug")
+    .map((finding) => finding.message);
+
+  assert.ok(bugMessages.some((message) => message.includes("Mutable default argument")));
+  assert.ok(bugMessages.some((message) => message.includes("Assignment inside conditional")));
+  assert.ok(bugMessages.some((message) => message.includes("Swallowed exception")));
+  assert.ok(result.actionItems.some((item) => item.category === "bug" && /sentinel default/.test(item.action)));
+  assert.ok(result.reviewComments.some((comment) => comment.category === "bug" && comment.path === "src/app.js"));
+});
+
 test("writeReviewComment writes markdown through policy", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-review-comment-"));
   const engine = new PolicyEngine({

@@ -49,6 +49,9 @@ function recommendationFor(category, message) {
   if (category === "testing") return "Add or update a focused test that covers the changed source behavior.";
   if (category === "database") return "Document rollback, migration order, and deployment coordination before merge.";
   if (category === "deployment") return "Confirm CI/deploy blast radius and require an explicit reviewer for infrastructure changes.";
+  if (message.includes("Mutable default argument")) return "Use a sentinel default such as None and create a new collection inside the function.";
+  if (message.includes("Assignment inside conditional")) return "Move the assignment before the condition, or use an explicit comparison.";
+  if (message.includes("Swallowed exception")) return "Handle the exception, log enough context, or rethrow it instead of silently ignoring it.";
   if (category === "security") return "Review the changed file for secret exposure and remove sensitive data from the diff.";
   if (category === "maintainability") return "Link the TODO/FIXME to a tracked issue or complete it before merge.";
   return "Inspect this finding and add a concrete fix or justification before merge.";
@@ -162,6 +165,18 @@ export function analyzeReviewDiff(diffText, options = {}) {
     }
     if (/fs\.(readFileSync|writeFileSync)|readFileSync\(|writeFileSync\(/.test(value) && /\.(js|ts)$/.test(addition.file)) {
       findings.push(finding("medium", addition.file, "performance", "Synchronous filesystem I/O introduced. Confirm this is not on a request or hot path.", addition));
+    }
+    if (/^\s*def\s+\w+\([^)]*=\s*(\[\]|\{\}|set\(\))/.test(value) && /\.py$/.test(addition.file)) {
+      findings.push(finding("medium", addition.file, "bug", "Mutable default argument introduced. This can leak state across calls.", addition));
+    }
+    if (/\b(if|while)\s*\([^)]*(?<![=!<>])=(?![=>])[^)]*\)/.test(value) && /\.(js|ts|jsx|tsx)$/.test(addition.file)) {
+      findings.push(finding("medium", addition.file, "bug", "Assignment inside conditional introduced. Confirm this is not a mistaken comparison.", addition));
+    }
+    if (/\bcatch\s*(?:\([^)]*\))?\s*\{\s*\}/.test(value) && /\.(js|ts|jsx|tsx)$/.test(addition.file)) {
+      findings.push(finding("medium", addition.file, "bug", "Swallowed exception introduced. Empty catch blocks can hide failed operations.", addition));
+    }
+    if (/^\s*except(?:\s+[\w.]+)?\s*:\s*pass\s*(?:#.*)?$/.test(value) && /\.py$/.test(addition.file)) {
+      findings.push(finding("medium", addition.file, "bug", "Swallowed exception introduced. Bare pass handlers can hide failed operations.", addition));
     }
   }
 

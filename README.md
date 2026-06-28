@@ -328,7 +328,7 @@ The test suite covers:
 - Python / Node / Django-style / Spring Boot-style fixture 的 safe fix 工作流。Safe fix workflow over Python, Node, Django-style, and Spring Boot-style fixture projects.
 - AI patch fixture 评测。Fixture evaluation for AI patch dry-runs.
 - Python / Django / Node / Java / Spring Boot 报错解析。Python / Django / Node / Java / Spring Boot error parsing.
-- Review diff 分析、严重度汇总、可执行 actionItems 和 PR review comment body 的 policy-gated 写出。Review diff analysis, severity summaries, actionable actionItems, and policy-gated writing of PR review comment bodies.
+- Review diff 分析、bug/security/performance/testing 风险规则、严重度汇总、可执行 actionItems 和 PR review comment body 的 policy-gated 写出。Review diff analysis, bug/security/performance/testing risk rules, severity summaries, actionable actionItems, and policy-gated writing of PR review comment bodies.
 - `review` / `pr summary` 默认 `git diff` 读取的 command policy 门禁。Command-policy gates for default `git diff` reads in `review` and `pr summary`.
 - Git hook 安装写 `.git/hooks/<hook>` 前的 path policy 门禁。Path-policy gates before Git hook installation writes `.git/hooks/<hook>`.
 - 仓库扫描。Repository scanning.
