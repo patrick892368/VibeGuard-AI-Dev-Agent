@@ -1065,6 +1065,48 @@ test("CLI pr summary can write a policy-gated body file", () => {
   assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
 });
 
+test("CLI pr plan returns a policy-gated branch commit and PR dry-run plan", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-plan-"));
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  const diff = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), diff, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "pr",
+    "plan",
+    "--diff",
+    "reports/change.diff",
+    "--write-body",
+    "reports/pr-body.md",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.writtenBody.path, "reports/pr-body.md");
+  assert.equal(parsed.branch, "codex/add-tests-app");
+  assert.equal(parsed.commitMessage, "test: add coverage for app");
+  assert.deepEqual(parsed.gitPlan.commands.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.equal(parsed.gitPolicy.status, "require_confirmation");
+  assert.equal(parsed.gitExecution, null);
+});
+
 test("CLI pr summary checks git diff command policy before default diff reads", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-git-diff-policy-"));
   writeCommandPolicy(root, { deny: ["git diff"] });

@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { hookTemplate, installHook, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrDiffArgs, buildGhPrReviewCommentArgs, buildGhPrViewArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, getPullRequestHeadWithGh, listWorkflowRunsWithGh, parseGitHubRemote, summarizeWorkflowRuns } from "../src/integrations/github.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "../src/integrations/gitPlan.js";
-import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
+import { buildPrPlanWorkflow, buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { buildDebugRepairPlan, generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
 
@@ -85,6 +85,7 @@ test("public API exports GitHub batch review helpers", async () => {
   assert.equal(typeof api.executeGitPlanAsync, "function");
   assert.equal(typeof api.writeSuggestedTests, "function");
   assert.equal(typeof api.writeSuggestedTestsAsync, "function");
+  assert.equal(typeof api.buildPrPlanWorkflow, "function");
   assert.equal(typeof api.compareCoverageReports, "function");
   assert.equal(typeof api.summarizeWorkflowRuns, "function");
   assert.equal(api.GITHUB_DETECT_COMMAND, "git remote get-url origin");
@@ -150,6 +151,38 @@ test("writePrSummaryBody writes a GitHub-ready body through policy", () => {
   assert.equal(result.branch, "codex/add-tests-app");
   assert.equal(result.commitMessage, "test: add coverage for app");
   assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
+});
+
+test("buildPrPlanWorkflow prepares a policy-gated branch commit and PR plan", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-pr-plan-"));
+  const engine = new PolicyEngine({
+    paths: { allow: ["reports/**", "src/**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["git switch -c", "git commit", "gh pr create"] }
+  }, { root });
+  const diff = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+
+  const result = await buildPrPlanWorkflow(root, diff, engine, {
+    writeBody: "reports/pr-body.md"
+  });
+
+  assert.equal(result.writtenBody.path, "reports/pr-body.md");
+  assert.equal(result.branch, "codex/add-tests-app");
+  assert.equal(result.commitMessage, "test: add coverage for app");
+  assert.deepEqual(result.gitPlan.commands.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.equal(result.gitPlan.commands.find((command) => command.step === "create_pr").bodyFile, "reports/pr-body.md");
+  assert.equal(result.gitPolicy.status, "require_confirmation");
+  assert.equal(result.gitExecution, null);
 });
 
 test("generateDebugPatch is unavailable without provider env", async () => {

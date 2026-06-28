@@ -27,6 +27,9 @@ vibeguard review
 vibeguard review --diff reports/change.diff --write-comment reports/review.md
 vibeguard review --diff reports/change.diff --comment-pr 12 --execute --confirm --github-api
 vibeguard review --github-pr 12 --publish-comment --execute --confirm --github-api
+vibeguard pr summary --diff reports/change.diff --write-body reports/pr-body.md
+vibeguard pr plan --diff reports/change.diff --write-body reports/pr-body.md
+vibeguard pr plan --github-pr 12 --github-api --write-body reports/pr-body.md
 vibeguard github review-comments --pr 12 --github-pr 12 --github-api
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
 vibeguard onboard --write
@@ -64,9 +67,9 @@ Repository metadata reads used by `debug`, `fix`, `test`, and `onboard` pass pat
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。它会检查 Python mutable default、JavaScript/TypeScript 条件里的疑似赋值、吞掉异常等 bug-prone 新增代码，同时覆盖 secret、SQL/HTML/deserialization、SSRF、TLS 校验关闭、弱 hash、安全敏感随机数、动态执行、shell injection、Java `Runtime.exec` / `ProcessBuilder`、Java URL/URI SSRF、一般进程执行、performance、deployment、database、maintainability 和 testing 规则。未传 `--diff` 时，默认 `git diff` 读取会先经过 command policy；`--diff` 输入文件会经过路径 policy 读取；`--github-pr` 会通过 policy 检查后的 `gh pr diff` 或 REST fallback 读取远端 PR diff，公开仓库只读 GET 可无 token；`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown；`--comment-pr` 或 `--publish-comment` 可以把生成的 Markdown 直接、受 policy 保护地发布为 GitHub PR comment；`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
 
-`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, validation checkboxes, and machine-readable PR automation metadata: title, branch name, and commit message. Without an explicit diff file, PR number, or stdin diff, the default `git diff` read is command-policy gated. `githubPr` / `--github-pr` can pull remote PR diffs through the same GitHub helper path. `writeBody` writes that body through policy for GitHub PR creation.
+`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, validation checkboxes, and machine-readable PR automation metadata: title, branch name, and commit message. `plan_pr` / `pr plan` reuses the same metadata and also returns a policy-gated branch, stage, commit, and PR dry-run or execution plan. Without an explicit diff file, PR number, or stdin diff, the default `git diff` read is command-policy gated. `githubPr` / `--github-pr` can pull remote PR diffs through the same GitHub helper path. `writeBody` writes that body through policy for GitHub PR creation.
 
-`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems、验证 checklist，以及机器可读的 PR 自动化元数据：title、branch name 和 commit message。未传显式 diff 文件、PR 编号或 stdin diff 时，默认 `git diff` 读取会先经过 command policy。`githubPr` / `--github-pr` 可以复用同一 GitHub helper 路径拉取远端 PR diff。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
+`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems、验证 checklist，以及机器可读的 PR 自动化元数据：title、branch name 和 commit message。`plan_pr` / `pr plan` 会复用同一份元数据，并额外返回受 policy 保护的 branch、stage、commit、PR dry-run 或执行计划。未传显式 diff 文件、PR 编号或 stdin diff 时，默认 `git diff` 读取会先经过 command policy。`githubPr` / `--github-pr` 可以复用同一 GitHub helper 路径拉取远端 PR diff。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
 
 ## Git Hooks / Git Hooks
 
@@ -112,6 +115,7 @@ Available tools:
 - `review_pr`
 - `apply_patch_safely`
 - `summarize_pr`
+- `plan_pr`
 - `detect_github`
 - `github_pr`
 - `github_checks`
@@ -159,6 +163,10 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 `summarize_pr` can accept pasted `diff` or a `diffFile` read through path policy, return a GitHub-ready PR body plus automatic title, branch, and commit-message metadata, and, when `writeBody` is provided, write that body through policy.
 
 `summarize_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回 GitHub-ready PR body 以及自动 title、branch、commit message 元数据；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
+
+`plan_pr` accepts the same diff sources as `summarize_pr`, can write the PR body through policy with `writeBody`, and returns `gitPlan`, `gitPolicy`, and optional `gitExecution` so Codex can continue into protected branch, commit, push, and PR creation without bypassing `.vibeguard.yaml`.
+
+`plan_pr` 接收和 `summarize_pr` 相同的 diff 来源，可用 `writeBody` 经过 policy 写出 PR body，并返回 `gitPlan`、`gitPolicy` 和可选 `gitExecution`，让 Codex 可以继续执行受保护的 branch、commit、push、PR 创建流程，而不绕过 `.vibeguard.yaml`。
 
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 
@@ -265,8 +273,14 @@ Create a draft PR through the GitHub CLI or the REST API fallback when `GITHUB_T
 通过 GitHub CLI 创建 draft PR；如果存在 `GITHUB_TOKEN` / `GH_TOKEN`，执行时也可使用 REST API fallback。传 `--github-api` 可以强制走 REST API。默认 dry-run：
 
 ```bash
+vibeguard pr plan --diff reports/change.diff --write-body reports/pr-body.md
+vibeguard pr plan --github-pr 12 --github-api --write-body reports/pr-body.md
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
 ```
+
+`pr plan` derives the PR title, branch name, commit message, changed-file staging list, and PR body from a diff, then checks the generated branch/commit/PR commands and PR body file through Policy-as-Code before any execution.
+
+`pr plan` 会从 diff 派生 PR title、branch name、commit message、待 stage 文件列表和 PR body，并在任何执行前把生成的 branch/commit/PR 命令和 PR body 文件交给 Policy-as-Code 检查。
 
 Execute PR creation only when ready:
 
@@ -331,9 +345,9 @@ Executed checks include a normalized `summary` with `status`, `gate`, counts, la
 
 `gh pr create` 和 `gh pr comment` 需要 policy 确认。执行时优先使用已认证的 `gh`；如果本机缺少 `gh`，可使用 `GITHUB_TOKEN` / `GH_TOKEN` 通过 REST API fallback 执行。
 
-Git plans generated by Debug/Fix or Test Writer also check PR body files through `read_pr_body` path policy before protected Git/PR execution.
+Git plans generated by Debug/Fix, Test Writer, or generic PR planning also check PR body files through `read_pr_body` path policy before protected Git/PR execution.
 
-Debug/Fix 或 Test Writer 生成的 Git plan，也会在受保护的 Git/PR 执行前用 `read_pr_body` path policy 检查 PR body 文件。
+Debug/Fix、Test Writer 或通用 PR plan 生成的 Git plan，也会在受保护的 Git/PR 执行前用 `read_pr_body` path policy 检查 PR body 文件。
 
 Executed Debug/Fix Git plans route `create_pr` through the GitHub helper, so the same policy gates, `gh` execution, and token-based REST fallback are used by `fix --execute-git-plan --create-pr`. CLI `fix` accepts `--github-api`; MCP `fix_error` accepts `githubUseApi`; GitHub MCP tools accept `useApi`.
 

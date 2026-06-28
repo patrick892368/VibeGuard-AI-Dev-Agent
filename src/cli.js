@@ -7,7 +7,7 @@ import { analyzeDebugLog } from "./agents/debug.js";
 import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTestsAsync } from "./agents/testWriter.js";
 import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "./agents/review.js";
-import { buildPrSummary, writePrSummaryBody } from "./agents/pr.js";
+import { buildPrPlanWorkflow, buildPrSummary, writePrSummaryBody } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
 import { runDoctor } from "./agents/doctor.js";
 import { applyPatchWithPolicy } from "./patch/safeApply.js";
@@ -38,6 +38,7 @@ Usage:
   vibeguard hooks print <pre-commit|pre-push|commit-msg>
   vibeguard hooks install <hook> --allow-git-dir
   vibeguard pr summary [--diff <file>] [--github-pr <number>] [--write-body <file>] [--github-api]
+  vibeguard pr plan [--diff <file>] [--github-pr <number>] [--write-body <file>|--body-file <file>] [--branch <name>] [--commit-message <msg>] [--title <title>] [--push] [--no-branch] [--no-commit] [--no-pr] [--execute-git-plan] [--confirm] [--github-api]
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
@@ -883,6 +884,31 @@ async function dispatch(parsed) {
       });
     }
     return buildPrSummary(diffText);
+  }
+  if (command === "pr" && subcommand === "plan") {
+    const diffText = await diffInputAsync(parsed, root, {
+      stage: "pr_plan_github_pr_diff_policy",
+      gitStage: "pr_plan_git_diff_policy"
+    });
+    if (typeof diffText !== "string") return diffText;
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return await buildPrPlanWorkflow(root, diffText, engine, {
+      title: parsed.title,
+      branch: parsed.branch,
+      commitMessage: parsed["commit-message"],
+      bodyFile: parsed["body-file"],
+      writeBody: parsed["write-body"],
+      createBranch: !parsed["no-branch"],
+      commit: !parsed["no-commit"],
+      push: Boolean(parsed.push),
+      prDryRun: !parsed["no-pr"],
+      executeGitPlan: Boolean(parsed["execute-git-plan"]),
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"],
+      env: loadRuntimeEnv(root),
+      githubUseApi: Boolean(parsed["github-api"])
+    });
   }
   if (command === "github") return githubCommand(parsed, root, subcommand);
   if (command === "run") return runCommand(parsed, root);

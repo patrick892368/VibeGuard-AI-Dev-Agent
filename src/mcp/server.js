@@ -10,7 +10,7 @@ import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTestsAsync } from "../agents/testWriter.js";
 import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "../agents/review.js";
-import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
+import { buildPrPlanWorkflow, buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, getPullRequestHeadWithGh, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
@@ -150,6 +150,30 @@ const tools = [
       githubPr: stringSchema,
       useApi: booleanSchema,
       writeBody: stringSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    })
+  },
+  {
+    name: "plan_pr",
+    description: "Build a policy-gated branch, commit, and PR creation plan from a unified diff.",
+    inputSchema: objectSchema({
+      diff: stringSchema,
+      diffFile: stringSchema,
+      githubPr: stringSchema,
+      useApi: booleanSchema,
+      writeBody: stringSchema,
+      bodyFile: stringSchema,
+      title: stringSchema,
+      branch: stringSchema,
+      commitMessage: stringSchema,
+      createBranch: booleanSchema,
+      commit: booleanSchema,
+      push: booleanSchema,
+      prDryRun: booleanSchema,
+      executeGitPlan: booleanSchema,
+      githubUseApi: booleanSchema,
+      dryRun: booleanSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
     })
@@ -696,6 +720,29 @@ async function callTool(name, args, root) {
       });
     }
     return buildPrSummary(diffText);
+  }
+  if (name === "plan_pr") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const diffText = await diffTextFromArgs(root, args, engine, "plan_pr_github_diff_policy");
+    if (typeof diffText !== "string") return diffText;
+    return await buildPrPlanWorkflow(root, diffText, engine, {
+      title: args.title,
+      branch: args.branch,
+      commitMessage: args.commitMessage,
+      bodyFile: args.bodyFile,
+      writeBody: args.writeBody,
+      createBranch: args.createBranch !== false,
+      commit: args.commit !== false,
+      push: Boolean(args.push),
+      prDryRun: args.prDryRun !== false,
+      executeGitPlan: Boolean(args.executeGitPlan),
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog,
+      env: loadRuntimeEnv(root),
+      githubUseApi: Boolean(args.githubUseApi || args.useApi),
+      dryRun: Boolean(args.dryRun)
+    });
   }
   if (name === "detect_github") {
     const { config } = loadConfig(root);

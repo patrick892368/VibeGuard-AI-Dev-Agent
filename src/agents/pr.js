@@ -1,5 +1,6 @@
 import { analyzeReviewDiff } from "./review.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlanAsync } from "../integrations/gitPlan.js";
 
 function basename(file) {
   return String(file || "change").split("/").filter(Boolean).pop() || "change";
@@ -123,5 +124,62 @@ export function writePrSummaryBody(root, diffText, outputPath, engine, options =
   return {
     ...summary,
     writtenBody: writeFileWithPolicy(root, outputPath, summary.body, engine, options)
+  };
+}
+
+export async function buildPrPlanWorkflow(root, diffText, engine, options = {}) {
+  if (!engine) throw new Error("buildPrPlanWorkflow requires a PolicyEngine");
+  const summary = buildPrSummary(diffText);
+  const title = options.title || summary.title;
+  const branch = options.branch || summary.branch;
+  const commitMessage = options.commitMessage || summary.commitMessage;
+  const bodyFile = options.bodyFile || options.writeBody || null;
+  const writtenBody = options.writeBody
+    ? writeFileWithPolicy(root, options.writeBody, summary.body, engine, {
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
+    })
+    : null;
+  const gitPlan = buildFixGitPlan({
+    changedFiles: summary.review.files,
+    branch,
+    commitMessage,
+    title,
+    bodyFile,
+    body: bodyFile ? "" : summary.body,
+    createBranch: options.createBranch !== false,
+    commit: options.commit !== false,
+    push: Boolean(options.push),
+    prDryRun: options.prDryRun !== false
+  });
+  const gitPolicy = checkGitPlanPolicy(gitPlan, engine, {
+    confirmed: Boolean(options.confirmed)
+  });
+  const gitExecution = options.executeGitPlan
+    ? await executeGitPlanAsync(root, gitPlan, engine, {
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog,
+      env: options.env,
+      fetch: options.fetch,
+      useApi: Boolean(options.githubUseApi),
+      dryRun: Boolean(options.dryRun)
+    })
+    : null;
+
+  return {
+    ...summary,
+    title,
+    branch,
+    commitMessage,
+    automation: {
+      ...summary.automation,
+      title,
+      branch,
+      commitMessage
+    },
+    writtenBody,
+    gitPlan,
+    gitPolicy,
+    gitExecution
   };
 }

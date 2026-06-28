@@ -95,6 +95,8 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("review_pr").inputSchema.properties.publishComment.type, "boolean");
   assert.equal(byName.get("review_pr").inputSchema.properties.commentPr.type, "string");
   assert.equal(byName.get("summarize_pr").inputSchema.properties.githubPr.type, "string");
+  assert.equal(byName.get("plan_pr").inputSchema.properties.executeGitPlan.type, "boolean");
+  assert.equal(byName.get("plan_pr").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("github_pr").inputSchema.properties.useApi.type, "boolean");
   assert.equal(byName.get("github_checks").inputSchema.properties.confirmed.type, "boolean");
   assert.equal(byName.get("github_checks").inputSchema.properties.auditLog.type, "string");
@@ -395,6 +397,46 @@ test("MCP summarize_pr reads diff files through path policy", async () => {
   assert.equal(result.commitMessage, "test: add coverage for app");
   assert.deepEqual(result.automation.changedFiles, ["src/app.js"]);
   assert.ok(result.review.findings.some((finding) => finding.category === "maintainability"));
+});
+
+test("MCP plan_pr prepares a policy-gated Git and PR plan", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 141,
+    method: "tools/call",
+    params: {
+      name: "plan_pr",
+      arguments: {
+        diffFile: "reports/change.diff",
+        writeBody: "reports/pr-body.md"
+      }
+    }
+  }, root);
+
+  const result = response.result.structuredContent;
+  assert.equal(result.writtenBody.path, "reports/pr-body.md");
+  assert.equal(result.title, "Add coverage for app");
+  assert.equal(result.branch, "codex/add-tests-app");
+  assert.equal(result.commitMessage, "test: add coverage for app");
+  assert.deepEqual(result.gitPlan.commands.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.equal(result.gitPlan.commands.find((command) => command.step === "create_pr").bodyFile, "reports/pr-body.md");
+  assert.equal(result.gitPolicy.status, "require_confirmation");
+  assert.equal(result.gitExecution, null);
 });
 
 test("MCP github_pr returns a dry-run PR command", async () => {
