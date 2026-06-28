@@ -242,6 +242,10 @@ GitHub detect 和 REST fallback 需要的 `git remote get-url origin`、`git bra
 
 REST fallback body-file reads are also contained inside the repository root; direct GitHub helper calls can pass a `PolicyEngine` so real GitHub operations, prerequisite commands, and `bodyFile` reads go through the same policy gates.
 
+Git plan PR body files are checked through `read_pr_body` path policy before any protected branch/commit/push/PR execution.
+
+Git plan 中的 PR body 文件也会在受保护的 branch / commit / push / PR 执行前经过 `read_pr_body` path policy。
+
 ## Policy-as-Code / Policy-as-Code
 
 `.vibeguard.yaml` 定义仓库安全边界：
@@ -315,7 +319,7 @@ The test suite covers:
 - 仓库扫描。Repository scanning.
 - Onboarding command checks，用于标注建议命令的依据、缺失 wrapper 或需要确认的依赖。Onboarding command checks for suggested command evidence, missing wrappers, or dependencies that need confirmation.
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
-- 本地 branch / commit / push 的受保护执行。Confirmed protected local branch / commit / push flows.
+- 本地 branch / commit / push / PR plan 的受保护执行，并检查 PR body-file path policy。Confirmed protected local branch / commit / push / PR plan flows, including PR body-file path policy.
 - PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper GitHub command/path policy、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper GitHub command/path policy, policy confirmation, and REST fallback.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.

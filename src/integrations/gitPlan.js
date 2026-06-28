@@ -37,7 +37,7 @@ export function buildFixGitPlan(options = {}) {
     } else {
       prArgv.push("--body", options.body || "");
     }
-    commands.push({ step: "create_pr", argv: prArgv, command: commandDisplay(prArgv) });
+    commands.push({ step: "create_pr", argv: prArgv, command: commandDisplay(prArgv), bodyFile: options.bodyFile || null });
   }
 
   return {
@@ -55,14 +55,22 @@ export function checkGitPlanPolicy(gitPlan, engine, options = {}) {
     command: command.command,
     policy: engine.checkCommand(command.command)
   }));
-  const rawStatus = summarizeCommandStatus(results);
+  const pathResults = (gitPlan?.commands || [])
+    .filter((command) => command.bodyFile)
+    .map((command) => ({
+      step: command.step,
+      path: command.bodyFile,
+      policy: engine.checkPath(command.bodyFile, "read_pr_body")
+    }));
+  const rawStatus = summarizeCommandStatus([...results, ...pathResults]);
   const status = rawStatus === "require_confirmation" && options.confirmed ? "allow" : rawStatus;
 
   return {
     status,
     rawStatus,
     confirmed: Boolean(options.confirmed),
-    results
+    results,
+    pathResults
   };
 }
 
