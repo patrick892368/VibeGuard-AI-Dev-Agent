@@ -130,6 +130,28 @@ diff --git a/src/security.py b/src/security.py
   assert.ok(result.reviewComments.some((comment) => comment.path === "src/http.js" && comment.line === 2 && /SSRF/.test(comment.body)));
 });
 
+test("analyzeReviewDiff flags Java process execution and SSRF risks", () => {
+  const diff = `diff --git a/src/main/java/com/example/ProxyController.java b/src/main/java/com/example/ProxyController.java
+--- a/src/main/java/com/example/ProxyController.java
++++ b/src/main/java/com/example/ProxyController.java
+@@ -1 +1,5 @@
+ public class ProxyController {}
++Runtime.getRuntime().exec("deploy " + request.getParameter("name"));
++new ProcessBuilder("sh", "-c", command).start();
++URI.create(request.getParameter("callbackUrl"));
++new ProcessBuilder("java", "-version").start();
+`;
+
+  const result = analyzeReviewDiff(diff);
+  const shellFindings = result.findings.filter((finding) => finding.message.includes("Shell injection risk"));
+
+  assert.equal(shellFindings.length, 2);
+  assert.ok(shellFindings.every((finding) => finding.file.endsWith("ProxyController.java")));
+  assert.ok(result.findings.some((finding) => finding.message.includes("Potential SSRF") && finding.line === 4));
+  assert.ok(result.findings.some((finding) => finding.message.includes("Shell/process execution") && finding.line === 5));
+  assert.ok(result.reviewComments.some((comment) => comment.path.endsWith("ProxyController.java") && /SSRF/.test(comment.body)));
+});
+
 test("analyzeReviewDiff flags bug-prone additions", () => {
   const diff = `diff --git a/src/cache.py b/src/cache.py
 --- a/src/cache.py

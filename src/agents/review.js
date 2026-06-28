@@ -158,7 +158,8 @@ export function analyzeReviewDiff(diffText, options = {}) {
       /\baxios\.(?:get|post|put|delete|request)\s*\([^)]*(?:req\.|request\.|ctx\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
       /\b(?:got|request)\s*\([^)]*(?:req\.|request\.|ctx\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
       /\brequests\.(?:get|post|put|delete|request)\s*\([^)]*(?:req\.|request\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
-      /\burllib\.request\.urlopen\s*\([^)]*(?:req\.|request\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value);
+      /\burllib\.request\.urlopen\s*\([^)]*(?:req\.|request\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
+      /\b(?:new\s+URL|URI\.create|HttpRequest\.newBuilder|RestTemplate\.\w+|restTemplate\.\w+|WebClient\.create)\s*\([^)]*(?:req\.|request\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl|targetUri|targetUrl)/i.test(value);
     if (ssrfRisk) {
       findings.push(finding("high", addition.file, "security", "Potential SSRF sink introduced. Server-side requests should not fetch arbitrary user-controlled URLs.", addition));
     }
@@ -175,10 +176,12 @@ export function analyzeReviewDiff(diffText, options = {}) {
       /\b(exec|execSync)\s*\([^)]*(?:`|\+|\$\{)/.test(value) ||
       /\bspawn\s*\([^)]*\{[^}]*shell\s*:\s*true/.test(value) ||
       /\bsubprocess\.(?:run|Popen|call|check_call|check_output)\s*\([^)]*shell\s*=\s*True/.test(value) ||
-      /\bos\.system\s*\(/.test(value);
+      /\bos\.system\s*\(/.test(value) ||
+      /\bRuntime\.getRuntime\(\)\.exec\s*\([^)]*(?:\+|req\.|request\.|params|query|body|args|command|cmd)/i.test(value) ||
+      /\bnew\s+ProcessBuilder\s*\([^)]*(?:"sh"|"bash"|"-c"|req\.|request\.|params|query|body|args|command|cmd)/i.test(value);
     if (shellInjectionRisk) {
       findings.push(finding("high", addition.file, "security", "Shell injection risk introduced. Avoid shell=True, os.system, or shell exec with dynamic strings.", addition));
-    } else if (/\bexec(?:Sync|File|FileSync)?\s*\(|child_process|subprocess\./.test(value)) {
+    } else if (/\bexec(?:Sync|File|FileSync)?\s*\(|child_process|subprocess\.|Runtime\.getRuntime\(\)\.exec\s*\(|new\s+ProcessBuilder\s*\(/.test(value)) {
       findings.push(finding("medium", addition.file, "security", "Shell/process execution introduced. Validate inputs and enforce command policy.", addition));
     }
     if (/TODO|FIXME/.test(value)) {
