@@ -30,6 +30,10 @@ test("public API exports GitHub batch review helpers", async () => {
 
   assert.equal(typeof api.createReviewCommentsWithGh, "function");
   assert.equal(typeof api.checkGitHubCommandsPolicy, "function");
+  assert.equal(typeof api.checkGitPlanPolicy, "function");
+  assert.equal(typeof api.executeGitPlan, "function");
+  assert.equal(typeof api.writeSuggestedTests, "function");
+  assert.equal(typeof api.compareCoverageReports, "function");
   assert.equal(api.GITHUB_DETECT_COMMAND, "git remote get-url origin");
   assert.equal(api.GITHUB_CURRENT_BRANCH_COMMAND, "git branch --show-current");
 });

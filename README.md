@@ -321,6 +321,7 @@ The test suite covers:
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
 - 本地 branch / commit / push / PR plan 的受保护执行，并检查 PR body-file path policy。Confirmed protected local branch / commit / push / PR plan flows, including PR body-file path policy.
 - PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper GitHub command/path policy、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper GitHub command/path policy, policy confirmation, and REST fallback.
+- Public JS API exports for GitHub helpers, Git plan policy/execution, and Test Writer write/coverage helpers. / Public JS API 已导出 GitHub helper、Git plan policy/execution，以及 Test Writer 写测试和 coverage helper。
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
