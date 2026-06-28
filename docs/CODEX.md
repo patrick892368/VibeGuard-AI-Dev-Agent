@@ -345,7 +345,7 @@ For CLI and MCP-style GitHub PR/comment flows, `--body-file` / `bodyFile` is che
 - Use `--check-only` before applying patches. / 应用 patch 前先用 `--check-only`。
 - Prefer `fix --dry-run` before `fix --apply`. / 优先先跑 `fix --dry-run`，再跑 `fix --apply`。
 - Use `--auto-test` when stack-trace or source-file based minimal test selection is acceptable; it falls back to the repository command when no matching test file is found. / 当可以接受基于 stack trace 或源码文件选择最小测试时使用 `--auto-test`；找不到匹配测试文件时会回退到仓库测试命令。
-- Treat `gitPlan` as reviewable until `--execute-git-plan --confirm --apply` is present. / 没有 `--execute-git-plan --confirm --apply` 时，`gitPlan` 只是可审查计划。
+- Treat `gitPlan` as reviewable until `--execute-git-plan --confirm --apply` is present; inspect `gitPolicy.results` and `gitPolicy.pathResults` before execution. / 没有 `--execute-git-plan --confirm --apply` 时，`gitPlan` 只是可审查计划；执行前要检查 `gitPolicy.results` 和 `gitPolicy.pathResults`。
 - Execute remote `--push --create-pr` only after local branch, commit, tests, and PR body are reviewed. / 只有本地 branch、commit、测试和 PR body 都审查后才执行远端 `--push --create-pr`。
 - Use `run --command` for commands that should go through policy. / 需要经过 policy 的命令用 `run --command`。
 - Keep `ROADMAP.md` local and uncommitted. / `ROADMAP.md` 保持本地且不提交。

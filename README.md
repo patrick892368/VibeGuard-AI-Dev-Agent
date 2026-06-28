@@ -242,9 +242,9 @@ GitHub detect 和 REST fallback 需要的 `git remote get-url origin`、`git bra
 
 REST fallback body-file reads are also contained inside the repository root; direct GitHub helper calls can pass a `PolicyEngine` so real GitHub operations, prerequisite commands, and `bodyFile` reads go through the same policy gates.
 
-Git plan PR body files are checked through `read_pr_body` path policy before any protected branch/commit/push/PR execution.
+Git plan PR body files are checked through `read_pr_body` path policy before any protected branch/commit/push/PR execution. Fix dry-runs also include `gitPolicy` so Codex can review command and body-file policy before execution.
 
-Git plan 中的 PR body 文件也会在受保护的 branch / commit / push / PR 执行前经过 `read_pr_body` path policy。
+Git plan 中的 PR body 文件也会在受保护的 branch / commit / push / PR 执行前经过 `read_pr_body` path policy。Fix dry-run 也会返回 `gitPolicy`，方便 Codex 在执行前审查 command 和 body-file policy。
 
 ## Policy-as-Code / Policy-as-Code
 

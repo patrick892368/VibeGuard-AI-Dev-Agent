@@ -286,7 +286,7 @@ test("fix CLI returns branch commit PR dry-run plan", () => {
     "--commit",
     "--pr-dry-run",
     "--pr-body-file",
-    "patches/pr-body.md",
+    "fixes/pr-body.md",
     "--dry-run",
     "--json"
   ]);
@@ -302,6 +302,31 @@ test("fix CLI returns branch commit PR dry-run plan", () => {
     "create_pr"
   ]);
   assert.ok(result.gitPlan.commands.at(-1).argv.includes("--body-file"));
+  assert.equal(result.gitPolicy.status, "require_confirmation");
+  assert.equal(result.gitPolicy.pathResults[0].path, "fixes/pr-body.md");
+});
+
+test("fix CLI dry-run surfaces denied PR body-file policy", () => {
+  const root = copyFixture("node-bug");
+  const result = runCli([
+    "--root",
+    root,
+    "fix",
+    "--log",
+    "error.log",
+    "--patch",
+    "fixes/reference-error.patch",
+    "--create-pr",
+    "--pr-body-file",
+    ".env",
+    "--dry-run",
+    "--json"
+  ]);
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.gitPolicy.status, "deny");
+  assert.equal(result.gitPolicy.pathResults[0].path, ".env");
+  assert.equal(result.decision.gitPolicyStatus, "deny");
 });
 
 test("fix CLI blocks git plan execution without confirmation before patch apply", () => {

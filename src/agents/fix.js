@@ -447,11 +447,12 @@ export async function runFixWorkflow(options = {}) {
     })
     : null;
 
-  let gitPolicy = null;
-  if (options.executeGitPlan && options.apply && !options.dryRun && gitPlan) {
-    gitPolicy = checkGitPlanPolicy(gitPlan, engine, {
+  const gitPolicy = gitPlan
+    ? checkGitPlanPolicy(gitPlan, engine, {
       confirmed: Boolean(options.confirmed)
-    });
+    })
+    : null;
+  if (options.executeGitPlan && options.apply && !options.dryRun && gitPlan) {
     if (gitPolicy.status !== "allow") {
       const status = gitPolicy.status;
       return {
