@@ -383,7 +383,11 @@ function inferJavaScriptAssertions(text) {
     { pattern: /(?:export\s+)?async\s+function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g, async: true },
     { pattern: /(?<!async\s)(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g, async: false },
     { pattern: /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*async\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: true },
-    { pattern: /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: false }
+    { pattern: /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: false },
+    { pattern: /(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=\s*async\s+function\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g, async: true },
+    { pattern: /(?:exports|module\.exports)\[['"]([^'"]+)['"]\]\s*=\s*async\s+function\s*\(([^)]*)\)\s*{\s*return\s+([^;{}]+);?\s*}/g, async: true },
+    { pattern: /(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=\s*async\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: true },
+    { pattern: /(?:exports|module\.exports)\[['"]([^'"]+)['"]\]\s*=\s*async\s*\(([^)]*)\)\s*=>\s*([^;\n]+)/g, async: true }
   ];
   for (const { pattern, async } of patterns) {
     for (const match of text.matchAll(pattern)) {

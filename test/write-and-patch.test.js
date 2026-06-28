@@ -252,6 +252,27 @@ export const normalize = async (name) => name.trim().toLowerCase();
   assert.match(generated, /assert\.equal\(await mod\.normalize\(" Ada "\), "ada"\)/);
 });
 
+test("writeSuggestedTests writes CommonJS async export assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "service.js"), `exports.add = async function (a, b) {
+  return a + b;
+}
+
+module.exports["normalize"] = async (name) => name.trim();
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "service.test.js"), "utf8");
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /const mod = require\("\.\/service\.js"\)/);
+  assert.match(generated, /test\("covers simple behavior", async \(\) => \{/);
+  assert.match(generated, /assert\.equal\(await mod\.add\(2, 3\), 5\)/);
+  assert.match(generated, /assert\.equal\(await mod\.normalize\(" Ada "\), "Ada"\)/);
+});
+
 test("writeSuggestedTests writes simple Python branch assertions", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));
