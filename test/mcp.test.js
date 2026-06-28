@@ -29,6 +29,8 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("fix_error").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("write_tests").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("review_pr").inputSchema.properties.githubPr.type, "string");
+  assert.equal(byName.get("review_pr").inputSchema.properties.publishComment.type, "boolean");
+  assert.equal(byName.get("review_pr").inputSchema.properties.commentPr.type, "string");
   assert.equal(byName.get("summarize_pr").inputSchema.properties.githubPr.type, "string");
   assert.equal(byName.get("github_pr").inputSchema.properties.useApi.type, "boolean");
   assert.equal(byName.get("github_checks").inputSchema.properties.confirmed.type, "boolean");
@@ -178,6 +180,37 @@ test("MCP review_pr blocks denied diff files before analysis", async () => {
 
   assert.equal(response.result.isError, true);
   assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
+});
+
+test("MCP review_pr can build a PR comment publish dry-run", async () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 18,
+    method: "tools/call",
+    params: {
+      name: "review_pr",
+      arguments: {
+        diffFile: "reports/change.diff",
+        commentPr: "12"
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.commandPolicy.status, "require_confirmation");
+  assert.equal(result.review.reviewComments.length, 1);
+  assert.match(result.publish.command, /gh pr comment 12/);
 });
 
 test("MCP summarize_pr reads diff files through path policy", async () => {

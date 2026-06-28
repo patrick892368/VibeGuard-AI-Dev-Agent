@@ -598,6 +598,90 @@ test("CLI review can fetch GitHub PR diff through REST fallback", async () => {
   assert.ok(parsed.findings.some((finding) => finding.file === "src/db.js" && finding.category === "security"));
 });
 
+test("CLI review publish comment execute requires confirmation", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-publish-policy-"));
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "review",
+    "--diff",
+    "reports/change.diff",
+    "--comment-pr",
+    "12",
+    "--execute",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "require_confirmation");
+  assert.equal(parsed.stage, "review_comment_policy");
+  assert.equal(parsed.review.reviewComments.length, 1);
+  assert.match(parsed.publish.command, /gh pr comment 12/);
+});
+
+test("CLI review can publish a generated PR comment through REST fallback", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-publish-api-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.mkdirSync(path.join(root, "reports"), { recursive: true });
+  fs.writeFileSync(path.join(root, "reports", "change.diff"), `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`, "utf8");
+  const api = await startFakeGitHubApi();
+
+  let parsed;
+  try {
+    const output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "review",
+      "--diff",
+      "reports/change.diff",
+      "--comment-pr",
+      "12",
+      "--execute",
+      "--confirm",
+      "--github-api",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: "token",
+        GITHUB_API_URL: api.url
+      }
+    });
+    parsed = JSON.parse(output);
+  } finally {
+    api.close();
+  }
+
+  assert.equal(parsed.status, "commented");
+  assert.equal(parsed.commandPolicy.status, "allow");
+  assert.equal(parsed.publish.method, "api");
+  assert.match(parsed.publish.url, /github\.com\/owner\/repo\/pull\/7/);
+  assert.ok(parsed.review.findings.some((finding) => finding.file === "src/db.js" && finding.category === "security"));
+});
+
 test("CLI GitHub review-comments builds a policy-gated batch dry-run from a diff", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-comments-"));
   fs.mkdirSync(path.join(root, "reports"), { recursive: true });

@@ -73,6 +73,7 @@ test("public API exports GitHub batch review helpers", async () => {
   const api = await import("../src/index.js");
 
   assert.equal(typeof api.buildDebugRepairPlan, "function");
+  assert.equal(typeof api.publishReviewComment, "function");
   assert.equal(typeof api.createReviewCommentsWithGh, "function");
   assert.equal(typeof api.checkGitHubCommandsPolicy, "function");
   assert.equal(typeof api.buildGhPrDiffArgs, "function");

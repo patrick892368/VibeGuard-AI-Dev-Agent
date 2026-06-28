@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeReviewDiff, writeReviewComment } from "../src/agents/review.js";
+import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "../src/agents/review.js";
 import { PolicyEngine } from "../src/policy/engine.js";
 
 test("analyzeReviewDiff reports risky source changes without tests", () => {
@@ -94,4 +94,26 @@ test("writeReviewComment writes markdown through policy", () => {
   assert.equal(result.writtenComment.policy.status, "allow");
   assert.match(fs.readFileSync(path.join(root, "reports", "review.md"), "utf8"), /VibeGuard Review/);
   assert.match(fs.readFileSync(path.join(root, "reports", "review.md"), "utf8"), /parameterized queries/);
+});
+
+test("publishReviewComment returns a policy-gated dry-run", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-review-publish-"));
+  const engine = new PolicyEngine({
+    paths: { allow: ["reports/**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["gh pr comment"] }
+  }, { root });
+  const diff = `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`;
+
+  const result = await publishReviewComment(root, diff, engine, { pr: "12" });
+
+  assert.equal(result.status, "dry_run");
+  assert.equal(result.commandPolicy.status, "require_confirmation");
+  assert.equal(result.review.reviewComments.length, 1);
+  assert.match(result.publish.command, /gh pr comment 12/);
 });

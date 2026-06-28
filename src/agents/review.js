@@ -1,5 +1,6 @@
 import { parsePatchFiles } from "../patch/parsePatch.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
+import { GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh } from "../integrations/github.js";
 
 function changedEntries(diffText) {
   const entries = [];
@@ -190,5 +191,72 @@ export function writeReviewComment(root, diffText, outputPath, engine, options =
   return {
     ...review,
     writtenComment: writeFileWithPolicy(root, outputPath, review.markdown, engine, options)
+  };
+}
+
+export async function publishReviewComment(root, diffText, engine, options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required for review comment publishing");
+  const review = options.review || analyzeReviewDiff(diffText, options);
+  const writtenComment = options.writeComment
+    ? writeFileWithPolicy(root, options.writeComment, review.markdown, engine, options)
+    : undefined;
+  const commentOptions = {
+    pr: options.pr,
+    body: review.markdown,
+    useApi: Boolean(options.useApi),
+    env: options.env
+  };
+  const dryRun = await commentPullRequestWithGh(root, {
+    ...commentOptions,
+    dryRun: true
+  });
+  const commandPolicy = checkGitHubCommandsPolicy([{ index: 1, command: dryRun.command }], engine, {
+    confirmed: Boolean(options.confirmed),
+    stage: options.stage || "review_comment_policy"
+  });
+
+  if (options.execute === true && commandPolicy.status !== "allow") {
+    return {
+      status: commandPolicy.status,
+      stage: commandPolicy.stage,
+      review,
+      writtenComment,
+      commandPolicy,
+      publish: dryRun
+    };
+  }
+
+  if (options.execute === true) {
+    const prerequisitePolicy = checkGitHubCommandsPolicy([{ index: 1, command: GITHUB_DETECT_COMMAND }], engine, {
+      confirmed: Boolean(options.confirmed),
+      stage: options.prerequisiteStage || "review_comment_prerequisite_policy"
+    });
+    if (prerequisitePolicy.status !== "allow") {
+      return {
+        ...prerequisitePolicy,
+        review,
+        writtenComment,
+        commandPolicy,
+        publish: dryRun
+      };
+    }
+  }
+
+  const publish = options.execute === true
+    ? await commentPullRequestWithGh(root, {
+      ...commentOptions,
+      dryRun: false,
+      engine,
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
+    })
+    : dryRun;
+
+  return {
+    status: publish.status,
+    review,
+    writtenComment,
+    commandPolicy,
+    publish
   };
 }

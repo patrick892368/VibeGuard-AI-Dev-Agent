@@ -25,6 +25,8 @@ vibeguard test --coverage coverage/lcov.info
 vibeguard test --coverage coverage-before.json --coverage-after coverage-after.json
 vibeguard review
 vibeguard review --diff reports/change.diff --write-comment reports/review.md
+vibeguard review --diff reports/change.diff --comment-pr 12 --execute --confirm --github-api
+vibeguard review --github-pr 12 --publish-comment --execute --confirm --github-api
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
 vibeguard onboard --write
 vibeguard policy check --path src/index.js
@@ -49,9 +51,9 @@ When `debug --ai-patch` or `fix` calls a provider, the patch source includes `re
 
 `test` 会先通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。它会返回 `coverageDeltaStatus`，让调用方知道 before/after coverage 是否已比较。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
 
-`review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. Without `--diff`, default `git diff` reads are command-policy gated; `--diff` input files are read through path policy; `--github-pr` reads remote PR diffs through policy-checked `gh pr diff` or token REST fallback; `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`; and `github review-comments` can publish the generated file-line comments in a policy-gated batch.
+`review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. Without `--diff`, default `git diff` reads are command-policy gated; `--diff` input files are read through path policy; `--github-pr` reads remote PR diffs through policy-checked `gh pr diff` or token REST fallback; `--write-comment` writes Markdown through Policy-as-Code; `--comment-pr` or `--publish-comment` can directly publish that generated Markdown as a policy-gated GitHub PR comment; and `github review-comments` can publish the generated file-line comments in a policy-gated batch.
 
-`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。未传 `--diff` 时，默认 `git diff` 读取会先经过 command policy；`--diff` 输入文件会经过路径 policy 读取；`--github-pr` 会通过 policy 检查后的 `gh pr diff` 或 token REST fallback 读取远端 PR diff；`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`；`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
+`review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。未传 `--diff` 时，默认 `git diff` 读取会先经过 command policy；`--diff` 输入文件会经过路径 policy 读取；`--github-pr` 会通过 policy 检查后的 `gh pr diff` 或 token REST fallback 读取远端 PR diff；`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown；`--comment-pr` 或 `--publish-comment` 可以把生成的 Markdown 直接、受 policy 保护地发布为 GitHub PR comment；`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
 
 `summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes. Without an explicit diff file, PR number, or stdin diff, the default `git diff` read is command-policy gated. `githubPr` / `--github-pr` can pull remote PR diffs through the same GitHub helper path. `writeBody` writes that body through policy for GitHub PR creation.
 
@@ -133,9 +135,9 @@ Available tools:
 
 `onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、结构化依赖清单、结构化 `coreModules`、仓库相关 Mermaid 图、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。
 
-`review_pr` can accept pasted `diff` or a `diffFile` read through path policy, return structured findings, and, when `writeComment` is provided, write the PR comment body through policy.
+`review_pr` can accept pasted `diff`, a `diffFile` read through path policy, or `githubPr` fetched through the GitHub helper; it returns structured findings, can write the PR comment body through policy with `writeComment`, and can directly build or execute a policy-gated PR comment publish plan with `commentPr` or `publishComment`.
 
-`review_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
+`review_pr` 可以接收粘贴的 `diff`、通过 path policy 读取的 `diffFile`，或通过 GitHub helper 获取的 `githubPr`；它会返回结构化 findings，传入 `writeComment` 时会经过 policy 写出 PR 评论正文文件，也可以通过 `commentPr` 或 `publishComment` 直接生成或执行受 policy 保护的 PR comment 发布计划。
 
 `apply_patch_safely` validates a unified diff through patch validation, path policy, command policy for `git apply --check`, and then `git apply --check` by default; it only applies when `apply` is true, and `git apply` is command-policy gated too.
 
@@ -271,6 +273,9 @@ Post a PR comment through the GitHub CLI or REST API fallback. Pass `--github-ap
 通过 GitHub CLI 或 REST API fallback 发布 PR comment。传 `--github-api` 可以强制走 REST API。默认 dry-run：
 
 ```bash
+vibeguard review --diff reports/change.diff --comment-pr 12
+vibeguard review --diff reports/change.diff --comment-pr 12 --execute --confirm --github-api
+vibeguard review --github-pr 12 --publish-comment --execute --confirm --github-api
 vibeguard github comment --pr 12 --body-file review.md
 vibeguard github comment --pr 12 --body-file review.md --execute --confirm
 vibeguard github comment --pr 12 --body-file review.md --execute --confirm --github-api

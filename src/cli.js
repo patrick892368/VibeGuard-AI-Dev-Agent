@@ -6,7 +6,7 @@ import { PolicyEngine } from "./policy/engine.js";
 import { analyzeDebugLog } from "./agents/debug.js";
 import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTestsAsync } from "./agents/testWriter.js";
-import { analyzeReviewDiff, writeReviewComment } from "./agents/review.js";
+import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "./agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
 import { runDoctor } from "./agents/doctor.js";
@@ -30,7 +30,7 @@ Usage:
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--github-api]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
   vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--github-api]
-  vibeguard review [--diff <file>] [--github-pr <number>] [--write-comment <file>] [--github-api]
+  vibeguard review [--diff <file>] [--github-pr <number>] [--write-comment <file>] [--publish-comment|--comment-pr <number>] [--execute] [--confirm] [--github-api]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
   vibeguard patch apply --file <patch> [--confirm]
@@ -343,6 +343,25 @@ async function reviewCommand(parsed, root) {
   });
   if (typeof diffText !== "string") return diffText;
   if (!diffText.trim()) throw new Error("review requires a git diff, --diff <file>, or diff text on stdin");
+  const commentPr = parsed["comment-pr"] || (parsed["publish-comment"] && parsed["github-pr"]);
+  if (parsed["publish-comment"] && !commentPr) {
+    throw new Error("review --publish-comment requires --github-pr or --comment-pr <number>");
+  }
+  if (commentPr) {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return publishReviewComment(root, diffText, engine, {
+      pr: commentPr,
+      writeComment: parsed["write-comment"],
+      execute: Boolean(parsed.execute),
+      useApi: Boolean(parsed["github-api"]),
+      env: loadRuntimeEnv(root),
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"],
+      stage: "review_comment_policy",
+      prerequisiteStage: "review_comment_prerequisite_policy"
+    });
+  }
   if (parsed["write-comment"]) {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });

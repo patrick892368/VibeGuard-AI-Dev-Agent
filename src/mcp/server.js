@@ -9,7 +9,7 @@ import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTestsAsync } from "../agents/testWriter.js";
-import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
+import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
@@ -121,6 +121,9 @@ const tools = [
       githubPr: stringSchema,
       useApi: booleanSchema,
       writeComment: stringSchema,
+      publishComment: booleanSchema,
+      commentPr: stringSchema,
+      execute: booleanSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
     })
@@ -584,6 +587,23 @@ async function callTool(name, args, root) {
     const engine = new PolicyEngine(config, { root });
     const diffText = await diffTextFromArgs(root, args, engine, "review_pr_github_diff_policy");
     if (typeof diffText !== "string") return diffText;
+    const commentPr = args.commentPr || (args.publishComment ? args.githubPr : null);
+    if (args.publishComment && !commentPr) {
+      throw new Error("review_pr publishComment requires githubPr or commentPr");
+    }
+    if (commentPr) {
+      return await publishReviewComment(root, diffText, engine, {
+        pr: commentPr,
+        writeComment: args.writeComment,
+        execute: Boolean(args.execute),
+        useApi: Boolean(args.useApi),
+        env: loadRuntimeEnv(root),
+        confirmed: Boolean(args.confirmed),
+        auditLog: args.auditLog,
+        stage: "review_pr_comment_policy",
+        prerequisiteStage: "review_pr_comment_prerequisite_policy"
+      });
+    }
     if (args.writeComment) {
       return writeReviewComment(root, diffText, args.writeComment, engine, {
         confirmed: Boolean(args.confirmed),
