@@ -127,6 +127,22 @@ test("analyzeRepository can confirm protected metadata reads", () => {
   assert.equal(confirmed.scan.dependencies.some((dependency) => dependency.name === "Django"), true);
 });
 
+test("analyzeRepository includes suggested command policy checks", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ scripts: { test: "node --test" } }), "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: ["npm test"] }
+  }, { root });
+
+  const result = analyzeRepository({ root, engine });
+
+  assert.equal(result.commandChecks[0].command, "npm test");
+  assert.equal(result.commandChecks[0].policyStatus, "require_confirmation");
+  assert.equal(result.commandChecks[0].safeToRun, false);
+  assert.match(result.markdown, /Policy \/ 策略: require_confirmation/);
+});
+
 test("analyzeTestTargets finds source functions without likely tests", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

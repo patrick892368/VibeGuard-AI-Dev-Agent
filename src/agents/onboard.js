@@ -8,9 +8,12 @@ function bulletList(values, fallback = "Not detected / 未检测到") {
 
 function commandCheckList(checks) {
   if (!checks || checks.length === 0) return "- No suggested commands to verify / 没有可检查的建议命令";
-  return checks.map((check) =>
-    `- \`${check.command}\`: ${check.status}. ${check.reason} / ${check.reasonZh}`
-  ).join("\n");
+  return checks.map((check) => {
+    const policy = check.policyStatus
+      ? ` Policy / 策略: ${check.policyStatus}. ${check.policyReason}`
+      : "";
+    return `- \`${check.command}\`: ${check.status}. ${check.reason} / ${check.reasonZh}${policy}`;
+  }).join("\n");
 }
 
 function dependencyList(dependencies) {
@@ -153,55 +156,81 @@ export function identifyCoreModules(scan) {
     .slice(0, 8);
 }
 
-export function verifySuggestedCommands(scan) {
+function commandPolicyFields(command, options = {}) {
+  if (!options.engine) return {};
+  const policy = options.engine.checkCommand(command);
+  const allowed = policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed);
+  return {
+    policyStatus: policy.status,
+    policyReason: policy.reason,
+    policy,
+    safeToRun: allowed
+  };
+}
+
+function withCommandPolicy(check, options = {}) {
+  return {
+    ...check,
+    ...commandPolicyFields(check.command, options)
+  };
+}
+
+export function verifySuggestedCommands(scan, options = {}) {
   return (scan.suggestedCommands || []).map((command) => {
+    let check;
     if (command === "npm test" || command === "npm run lint") {
-      return {
+      check = {
         command,
         status: "available",
         reason: "package.json script was detected.",
         reasonZh: "已检测到 package.json script。"
       };
+      return withCommandPolicy(check, options);
     }
     if (command.startsWith("python manage.py ")) {
-      return {
+      check = {
         command,
         status: scan.files.includes("manage.py") ? "available" : "missing_entrypoint",
         reason: scan.files.includes("manage.py") ? "manage.py was detected." : "manage.py was not detected.",
         reasonZh: scan.files.includes("manage.py") ? "已检测到 manage.py。" : "未检测到 manage.py。"
       };
+      return withCommandPolicy(check, options);
     }
     if (command === "python -m pytest") {
-      return {
+      check = {
         command,
         status: "needs_dependency",
         reason: "Python tests were detected; verify pytest is installed before running.",
         reasonZh: "已检测到 Python 测试；运行前需要确认 pytest 已安装。"
       };
+      return withCommandPolicy(check, options);
     }
     if (command === "mvn test") {
-      return {
+      check = {
         command,
         status: scan.files.some((file) => file.endsWith("pom.xml")) ? "available" : "missing_config",
         reason: scan.files.some((file) => file.endsWith("pom.xml")) ? "pom.xml was detected." : "pom.xml was not detected.",
         reasonZh: scan.files.some((file) => file.endsWith("pom.xml")) ? "已检测到 pom.xml。" : "未检测到 pom.xml。"
       };
+      return withCommandPolicy(check, options);
     }
     if (command === "./gradlew test") {
       const hasWrapper = scan.files.includes("gradlew") || scan.files.includes("gradlew.bat");
-      return {
+      check = {
         command,
         status: hasWrapper ? "available" : "missing_wrapper",
         reason: hasWrapper ? "Gradle wrapper was detected." : "build.gradle was detected, but gradlew wrapper was not detected.",
         reasonZh: hasWrapper ? "已检测到 Gradle wrapper。" : "已检测到 build.gradle，但未检测到 gradlew wrapper。"
       };
+      return withCommandPolicy(check, options);
     }
-    return {
+    check = {
       command,
       status: "unknown",
       reason: "The command was inferred but VibeGuard does not have a verifier for it yet.",
       reasonZh: "该命令来自推断，但 VibeGuard 暂未提供对应检查器。"
     };
+    return withCommandPolicy(check, options);
   });
 }
 
@@ -334,9 +363,9 @@ ${commandLines.join("\n")}
 \`\`\``;
 }
 
-export function buildOnboardingMarkdown(scan) {
+export function buildOnboardingMarkdown(scan, options = {}) {
   const firstTasks = recommendFirstTasks(scan);
-  const commandChecks = verifySuggestedCommands(scan);
+  const commandChecks = verifySuggestedCommands(scan, options);
   const coreModules = identifyCoreModules(scan);
   const dependencies = scan.dependencies || [];
   return `# Repository Onboarding / 仓库上手指南
@@ -433,14 +462,20 @@ export function analyzeRepository(options = {}) {
     auditLog: options.auditLog
   });
   const firstTasks = recommendFirstTasks(scan);
-  const commandChecks = verifySuggestedCommands(scan);
+  const commandChecks = verifySuggestedCommands(scan, {
+    engine: options.engine,
+    confirmed: Boolean(options.confirmed)
+  });
   const coreModules = identifyCoreModules(scan);
   return {
     scan,
     firstTasks,
     commandChecks,
     coreModules,
-    markdown: buildOnboardingMarkdown(scan),
+    markdown: buildOnboardingMarkdown(scan, {
+      engine: options.engine,
+      confirmed: Boolean(options.confirmed)
+    }),
     architecture: buildArchitectureMarkdown(scan)
   };
 }

@@ -139,9 +139,9 @@ Available tools:
 
 `fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。如果生成 patch 的恢复流程尝试 Django TemplateDoesNotExist fallback，源码读取也会经过 path policy，被跳过的文件会暴露为 `recovery.skippedSourceFiles`。
 
-`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured dependency lists, structured `coreModules`, repository-specific Mermaid diagrams, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
+`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured dependency lists, structured `coreModules`, repository-specific Mermaid diagrams, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness plus command-policy status.
 
-`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、结构化依赖清单、结构化 `coreModules`、仓库相关 Mermaid 图、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。
+`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、结构化依赖清单、结构化 `coreModules`、仓库相关 Mermaid 图、包含低风险命令和文件的新手任务 `firstTasks`，以及包含 command policy 状态的建议命令可用性说明 `commandChecks`。
 
 `review_pr` can accept pasted `diff`, a `diffFile` read through path policy, or `githubPr` fetched through the GitHub helper; it returns structured findings, can write the PR comment body through policy with `writeComment`, and can directly build or execute a policy-gated PR comment publish plan with `commentPr` or `publishComment`.
 

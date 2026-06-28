@@ -225,6 +225,10 @@ For trend checks, inspect `summary.fixtureOutcomeCounts` from `eval history` to 
 
 查看趋势时，应检查 `eval history` 的 `summary.fixtureOutcomeCounts`，定位具体哪个 fixture 在退化。
 
+For repository onboarding, Codex should inspect `commandChecks[].policyStatus` before recommending a startup or test command. A command marked `require_confirmation` or `deny` is documentation-only until the user changes policy or explicitly confirms it.
+
+做仓库 onboarding 时，Codex 应先检查 `commandChecks[].policyStatus`，再推荐启动或测试命令。标记为 `require_confirmation` 或 `deny` 的命令在用户调整 policy 或显式确认前只能作为文档信息。
+
 Run tests through command policy:
 
 通过 command policy 运行测试：
