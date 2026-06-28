@@ -68,10 +68,19 @@ test("policy-gated operations can append audit JSONL events", () => {
 `, engine, { checkOnly: true, auditLog });
 
   const events = fs.readFileSync(path.join(root, auditLog), "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
-  assert.deepEqual(events.map((event) => event.operation), ["write_file", "run_command", "check_patch", "check_patch_result"]);
+  assert.deepEqual(events.map((event) => event.operation), [
+    "write_file",
+    "run_command",
+    "check_patch",
+    "run_command",
+    "run_command_result",
+    "check_patch_result"
+  ]);
   assert.equal(events[0].policyStatus, "allow");
   assert.equal(events[1].dryRun, true);
   assert.deepEqual(events[2].files, ["src/app.js"]);
+  assert.equal(events[3].command, "git apply --check");
+  assert.equal(events[3].policyStatus, "allow");
 });
 
 test("writeSuggestedTests writes a real JavaScript smoke test through policy", () => {
@@ -630,7 +639,28 @@ test("applyPatchWithPolicy supports check-only patch validation", () => {
   const engine = engineFor(root);
   const result = applyPatchWithPolicy(root, patch, engine, { checkOnly: true });
   assert.equal(result.status, "checked");
+  assert.equal(result.applyCheckCommand.command, "git apply --check");
+  assert.equal(result.applyCheckCommand.policy.status, "allow");
   assert.equal(fs.readFileSync(path.join(root, "src", "app.js"), "utf8"), "old\n");
+});
+
+test("applyPatchWithPolicy checks git apply command policy", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "app.js"), "old\n", "utf8");
+  const patch = `diff --git a/src/app.js b/src/app.js
+--- a/src/app.js
++++ b/src/app.js
+@@ -1 +1 @@
+-old
++new
+`;
+  const engine = new PolicyEngine({
+    paths: { allow: ["src/**"], deny: [], require_confirmation: [] },
+    commands: { deny: ["git apply"], require_confirmation: [] }
+  }, { root });
+
+  assert.throws(() => applyPatchWithPolicy(root, patch, engine, { checkOnly: true }), /Command matches deny policy: git apply/);
 });
 
 test("runCommandWithPolicy checks command policy before execution", () => {

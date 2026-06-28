@@ -78,7 +78,8 @@ export function runArgvWithPolicy(root, argv, engine, options = {}) {
   const result = spawnSync(argv[0], argv.slice(1), {
     cwd: root,
     shell: false,
-    encoding: "utf8"
+    encoding: "utf8",
+    input: options.input
   });
 
   const resultBody = {

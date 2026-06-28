@@ -137,9 +137,9 @@ Available tools:
 
 `review_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回结构化 findings；传入 `writeComment` 时，会经过 policy 写出 PR 评论正文文件。
 
-`apply_patch_safely` validates a unified diff through patch validation, path policy, and `git apply --check` by default; it only applies when `apply` is true.
+`apply_patch_safely` validates a unified diff through patch validation, path policy, command policy for `git apply --check`, and then `git apply --check` by default; it only applies when `apply` is true, and `git apply` is command-policy gated too.
 
-`apply_patch_safely` 默认通过 patch validation、路径 policy 和 `git apply --check` 校验 unified diff；只有 `apply` 为 true 时才会真正应用。
+`apply_patch_safely` 默认通过 patch validation、路径 policy、`git apply --check` 的 command policy 和 `git apply --check` 校验 unified diff；只有 `apply` 为 true 时才会真正应用，而且 `git apply` 本身也会经过 command policy。
 
 CLI patch input files, including `policy check --patch`, `patch check/apply --file`, and `fix --patch <file>`, are read through path policy before their contents are parsed.
 
