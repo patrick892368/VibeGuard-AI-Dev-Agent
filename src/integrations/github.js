@@ -1,12 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { appendAuditEvent } from "../policy/audit.js";
 import { assertPolicyAllowed } from "../policy/safeWrite.js";
+import { runArgvWithPolicy } from "../runner/safeCommand.js";
 
 export const GITHUB_DETECT_COMMAND = "git remote get-url origin";
 export const GITHUB_CURRENT_BRANCH_COMMAND = "git branch --show-current";
-const EXEC_OPTIONS = { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] };
 
 export function parseGitHubRemote(remoteUrl) {
   const trimmed = remoteUrl.trim();
@@ -21,8 +20,8 @@ export function parseGitHubRemote(remoteUrl) {
 
 export function detectGitHubRepository(root = process.cwd(), options = {}) {
   requireExecutionPolicy(options, "GitHub detection");
-  checkOptionalCommandPolicy(root, GITHUB_DETECT_COMMAND, options, "github_detect");
-  const remote = execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, ...EXEC_OPTIONS }).trim();
+  const result = runProtectedArgv(root, ["git", "remote", "get-url", "origin"], options);
+  const remote = requirePassedStdout(result, "GitHub remote detection").trim();
   const parsed = parseGitHubRemote(remote);
   if (!parsed) {
     throw new Error(`origin is not a GitHub remote: ${remote}`);
@@ -103,8 +102,31 @@ function normalizeLimit(limit, total) {
   return Math.min(value, total);
 }
 
-function isMissingGh(error) {
-  return error?.code === "ENOENT" || /ENOENT|not recognized|not found/i.test(error?.message || "");
+function firstLine(...texts) {
+  for (const text of texts) {
+    const line = String(text || "").split(/\r?\n/).find(Boolean);
+    if (line) return line;
+  }
+  return null;
+}
+
+function isMissingGhResult(result) {
+  return /ENOENT|not recognized|not found/i.test(`${result?.error || ""}\n${result?.stderr || ""}`);
+}
+
+function runProtectedArgv(root, argv, options = {}) {
+  return runArgvWithPolicy(root, argv, options.engine, {
+    confirmed: options.confirmed,
+    auditLog: options.auditLog
+  });
+}
+
+function requirePassedStdout(result, operation) {
+  if (result.status === "passed") return result.stdout || "";
+  const detail = firstLine(result.stderr, result.error, result.stdout) || `exit code ${result.exitCode}`;
+  const error = new Error(`${operation} failed: ${detail}`);
+  error.result = result;
+  throw error;
 }
 
 function resolveToken(env = process.env) {
@@ -136,8 +158,8 @@ function requireExecutionPolicy(options = {}, operation = "GitHub execution") {
 }
 
 function currentBranch(root, options = {}) {
-  checkOptionalCommandPolicy(root, GITHUB_CURRENT_BRANCH_COMMAND, options, "github_current_branch");
-  return execFileSync("git", ["branch", "--show-current"], { cwd: root, ...EXEC_OPTIONS }).trim();
+  const result = runProtectedArgv(root, ["git", "branch", "--show-current"], options);
+  return requirePassedStdout(result, "GitHub current branch detection").trim();
 }
 
 function resolveInsideRoot(root, filePath) {
@@ -319,19 +341,22 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
     };
   }
   requireExecutionPolicy(options, "GitHub PR creation");
-  checkOptionalCommandPolicy(root, command, options, "github_pr");
-  if (options.useApi) return createPullRequestWithApi(root, options);
-  try {
-    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
+  if (options.useApi) {
+    checkOptionalCommandPolicy(root, command, options, "github_pr");
+    return createPullRequestWithApi(root, options);
+  }
+  const result = runProtectedArgv(root, ["gh", ...args], options);
+  if (result.status === "passed") {
     return {
       status: "created",
       method: "gh",
-      url: stdout.trim()
+      url: (result.stdout || "").trim()
     };
-  } catch (error) {
-    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+  }
+  if (isMissingGhResult(result) && resolveToken(options.env)) {
     return createPullRequestWithApi(root, options);
   }
+  requirePassedStdout(result, "GitHub PR creation");
 }
 
 export async function commentPullRequestWithGh(root = process.cwd(), options = {}) {
@@ -344,19 +369,22 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
     };
   }
   requireExecutionPolicy(options, "GitHub PR comment");
-  checkOptionalCommandPolicy(root, command, options, "github_comment");
-  if (options.useApi) return commentPullRequestWithApi(root, options);
-  try {
-    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
+  if (options.useApi) {
+    checkOptionalCommandPolicy(root, command, options, "github_comment");
+    return commentPullRequestWithApi(root, options);
+  }
+  const result = runProtectedArgv(root, ["gh", ...args], options);
+  if (result.status === "passed") {
     return {
       status: "commented",
       method: "gh",
-      output: stdout.trim()
+      output: (result.stdout || "").trim()
     };
-  } catch (error) {
-    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+  }
+  if (isMissingGhResult(result) && resolveToken(options.env)) {
     return commentPullRequestWithApi(root, options);
   }
+  requirePassedStdout(result, "GitHub PR comment");
 }
 
 export async function createReviewCommentWithGh(root = process.cwd(), options = {}) {
@@ -369,19 +397,22 @@ export async function createReviewCommentWithGh(root = process.cwd(), options = 
     };
   }
   requireExecutionPolicy(options, "GitHub PR review comment");
-  checkOptionalCommandPolicy(root, command, options, "github_review_comment");
-  if (options.useApi) return createReviewCommentWithApi(root, options);
-  try {
-    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
+  if (options.useApi) {
+    checkOptionalCommandPolicy(root, command, options, "github_review_comment");
+    return createReviewCommentWithApi(root, options);
+  }
+  const result = runProtectedArgv(root, ["gh", ...args], options);
+  if (result.status === "passed") {
     return {
       status: "review_commented",
       method: "gh",
-      output: stdout.trim()
+      output: (result.stdout || "").trim()
     };
-  } catch (error) {
-    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+  }
+  if (isMissingGhResult(result) && resolveToken(options.env)) {
     return createReviewCommentWithApi(root, options);
   }
+  requirePassedStdout(result, "GitHub PR review comment");
 }
 
 export async function createReviewCommentsWithGh(root = process.cwd(), options = {}) {
@@ -480,18 +511,21 @@ export async function listWorkflowRunsWithGh(root = process.cwd(), options = {})
     };
   }
   requireExecutionPolicy(options, "GitHub checks");
-  checkOptionalCommandPolicy(root, command, options, "github_checks");
-  if (options.useApi) return listWorkflowRunsWithApi(root, options);
+  if (options.useApi) {
+    checkOptionalCommandPolicy(root, command, options, "github_checks");
+    return listWorkflowRunsWithApi(root, options);
+  }
 
-  try {
-    const stdout = execFileSync("gh", args, { cwd: root, ...EXEC_OPTIONS });
+  const result = runProtectedArgv(root, ["gh", ...args], options);
+  if (result.status === "passed") {
     return {
       status: "completed",
       method: "gh",
-      runs: JSON.parse(stdout)
+      runs: JSON.parse(result.stdout || "[]")
     };
-  } catch (error) {
-    if (!isMissingGh(error) || !resolveToken(options.env)) throw error;
+  }
+  if (isMissingGhResult(result) && resolveToken(options.env)) {
     return listWorkflowRunsWithApi(root, options);
   }
+  requirePassedStdout(result, "GitHub checks");
 }

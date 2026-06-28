@@ -289,6 +289,10 @@ PR and comment body files are checked through path policy before dry-run or exec
 
 PR 和 comment 的正文文件会先经过 path policy 检查，然后才进入 dry-run 或执行；批量 review comment 的 diff 文件也会在分析前经过检查。REST fallback 读取 bodyFile 时会限制在仓库 root 内。CLI 和 MCP 路径会把 `PolicyEngine` 传给 GitHub helper；直接调用公开 helper 时，remote 检测和 `dryRun:false` 真实执行都必须传入 `PolicyEngine`，让真实 GitHub 操作、prerequisite 命令和正文文件读取使用 policy gate。不要传入 `.env` 等 denied 文件。
 
+Underlying GitHub helper subprocesses for `git` and `gh` use the shared policy runner instead of direct process execution.
+
+GitHub helper 底层的 `git` / `gh` 子进程会通过共享 policy runner 执行，不再直接执行进程。
+
 Read recent workflow run status:
 
 读取最近的 workflow run 状态：
