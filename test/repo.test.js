@@ -24,6 +24,11 @@ test("scanRepository detects JavaScript project metadata", () => {
   assert.ok(scan.frameworks.includes("Express"));
   assert.ok(scan.suggestedCommands.includes("npm test"));
   assert.ok(scan.entrypoints.includes("src/index.js"));
+  assert.ok(scan.dependencies.some((dependency) =>
+    dependency.name === "express" &&
+    dependency.version === "^1.0.0" &&
+    dependency.source === "package.json"
+  ));
 });
 
 test("scanRepository detects Django project commands", () => {
@@ -36,6 +41,11 @@ test("scanRepository detects Django project commands", () => {
   assert.ok(scan.entrypoints.includes("manage.py"));
   assert.ok(scan.suggestedCommands.includes("python manage.py check"));
   assert.ok(scan.suggestedCommands.includes("python manage.py test"));
+  assert.ok(scan.dependencies.some((dependency) =>
+    dependency.name === "Django" &&
+    dependency.version === "==5.0" &&
+    dependency.source === "requirements.txt"
+  ));
 });
 
 test("scanRepository detects Spring Boot from dependencies and annotation", () => {
@@ -55,6 +65,31 @@ public class DemoApplication {}
   assert.ok(scan.frameworks.includes("Maven"));
   assert.ok(scan.entrypoints.includes("src/main/java/com/example/DemoApplication.java"));
   assert.ok(scan.suggestedCommands.includes("mvn test"));
+  assert.ok(scan.dependencies.some((dependency) =>
+    dependency.name === "spring-boot-starter-web" &&
+    dependency.source === "pom.xml"
+  ));
+});
+
+test("scanRepository parses pyproject and Gradle dependencies", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "pyproject.toml"), `[project]
+dependencies = ["fastapi==0.110.0", "uvicorn>=0.29"]
+
+[tool.poetry.dependencies]
+requests = "^2.31.0"
+`, "utf8");
+  fs.writeFileSync(path.join(root, "build.gradle"), `dependencies {
+  implementation 'org.springframework.boot:spring-boot-starter-web:3.3.0'
+  testImplementation "org.junit.jupiter:junit-jupiter:5.10.0"
+}
+`, "utf8");
+
+  const scan = scanRepository(root);
+  assert.ok(scan.dependencies.some((dependency) => dependency.name === "fastapi" && dependency.version === "==0.110.0"));
+  assert.ok(scan.dependencies.some((dependency) => dependency.name === "requests" && dependency.version === "^2.31.0"));
+  assert.ok(scan.dependencies.some((dependency) => dependency.name === "org.springframework.boot:spring-boot-starter-web"));
+  assert.ok(scan.dependencies.some((dependency) => dependency.name === "org.junit.jupiter:junit-jupiter" && dependency.scope === "testImplementation"));
 });
 
 test("analyzeTestTargets finds source functions without likely tests", () => {
@@ -293,6 +328,8 @@ test("buildOnboardingMarkdown includes command and architecture sections", () =>
   assert.match(markdown, /建议命令/);
   assert.match(markdown, /Command Checks/);
   assert.match(markdown, /命令检查/);
+  assert.match(markdown, /Dependencies/);
+  assert.match(markdown, /依赖/);
   assert.match(markdown, /Core Modules/);
   assert.match(markdown, /核心模块/);
   assert.match(markdown, /mermaid/);

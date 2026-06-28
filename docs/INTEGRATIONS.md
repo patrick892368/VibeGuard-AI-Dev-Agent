@@ -119,9 +119,9 @@ Available tools:
 
 `fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。
 
-`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured `coreModules`, repository-specific Mermaid diagrams, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
+`onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured dependency lists, structured `coreModules`, repository-specific Mermaid diagrams, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
 
-`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、结构化 `coreModules`、仓库相关 Mermaid 图、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。
+`onboard_repo` 会返回中英双语 onboarding Markdown、architecture Markdown、结构化依赖清单、结构化 `coreModules`、仓库相关 Mermaid 图、包含低风险命令和文件的新手任务 `firstTasks`，以及建议命令可用性说明 `commandChecks`。
 
 `review_pr` can return structured findings and, when `writeComment` is provided, write the PR comment body through policy.
 

@@ -13,6 +13,14 @@ function commandCheckList(checks) {
   ).join("\n");
 }
 
+function dependencyList(dependencies) {
+  if (!dependencies || dependencies.length === 0) return "- Not detected / 未检测到";
+  return dependencies.slice(0, 30).map((dependency) => {
+    const version = dependency.version ? `@ ${dependency.version}` : "version unspecified / 未指定版本";
+    return `- **${dependency.name}** (${dependency.scope}, ${dependency.source}): ${version}`;
+  }).join("\n");
+}
+
 function isSourceFile(file) {
   return /\.(js|mjs|cjs|ts|tsx|py|java)$/.test(file) &&
     !/(^|\/)(test|tests|__tests__)\//.test(file) &&
@@ -317,6 +325,7 @@ export function buildOnboardingMarkdown(scan) {
   const firstTasks = recommendFirstTasks(scan);
   const commandChecks = verifySuggestedCommands(scan);
   const coreModules = identifyCoreModules(scan);
+  const dependencies = scan.dependencies || [];
   return `# Repository Onboarding / 仓库上手指南
 
 ## Overview / 概览
@@ -325,6 +334,11 @@ export function buildOnboardingMarkdown(scan) {
 - Languages / 语言: ${scan.languages.length ? scan.languages.join(", ") : "Not detected / 未检测到"}
 - Frameworks / 框架: ${scan.frameworks.length ? scan.frameworks.join(", ") : "Not detected / 未检测到"}
 - Package managers / 包管理器: ${scan.packageManagers.length ? scan.packageManagers.join(", ") : "Not detected / 未检测到"}
+- Dependencies detected / 已识别依赖数: ${dependencies.length}
+
+## Dependencies / 依赖
+
+${dependencyList(dependencies)}
 
 ## Entrypoints / 入口文件
 
@@ -358,6 +372,7 @@ ${taskList(firstTasks)}
 
 export function buildArchitectureMarkdown(scan) {
   const coreModules = identifyCoreModules(scan);
+  const dependencies = scan.dependencies || [];
   return `# Architecture / 架构
 
 ## Repository Shape / 仓库形态
@@ -365,6 +380,11 @@ export function buildArchitectureMarkdown(scan) {
 - Files scanned / 已扫描文件数: ${scan.fileCount}
 - Languages / 语言: ${scan.languages.length ? scan.languages.join(", ") : "Not detected / 未检测到"}
 - Frameworks / 框架: ${scan.frameworks.length ? scan.frameworks.join(", ") : "Not detected / 未检测到"}
+- Dependencies detected / 已识别依赖数: ${dependencies.length}
+
+## Dependencies / 依赖
+
+${dependencyList(dependencies)}
 
 ## Entrypoints / 入口文件
 

@@ -265,9 +265,9 @@ Generate bilingual onboarding and architecture docs:
 node ./bin/vibeguard.js onboard --write --json
 ```
 
-Codex should inspect `coreModules` and `firstTasks` after onboarding. `coreModules` ranks likely entrypoint, routing, service, data-model, UI, and framework-config areas with bilingual reasons and representative files; `firstTasks` are repository-specific low-risk starting points with optional commands and files.
+Codex should inspect `scan.dependencies`, `coreModules`, and `firstTasks` after onboarding. `scan.dependencies` lists package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle dependencies with source, scope, and version when available. `coreModules` ranks likely entrypoint, routing, service, data-model, UI, and framework-config areas with bilingual reasons and representative files; `firstTasks` are repository-specific low-risk starting points with optional commands and files.
 
-Codex 在 onboarding 后应检查 `coreModules` 和 `firstTasks`。`coreModules` 会按入口、路由、服务、数据模型、UI 和框架配置等维度排序核心模块，并给出中英双语原因和代表文件；`firstTasks` 是按仓库扫描结果生成的低风险新人任务，可包含建议命令和相关文件。
+Codex 在 onboarding 后应检查 `scan.dependencies`、`coreModules` 和 `firstTasks`。`scan.dependencies` 会列出 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 依赖，并尽量提供来源、scope 和版本。`coreModules` 会按入口、路由、服务、数据模型、UI 和框架配置等维度排序核心模块，并给出中英双语原因和代表文件；`firstTasks` 是按仓库扫描结果生成的低风险新人任务，可包含建议命令和相关文件。
 
 Codex should also inspect `commandChecks` before telling a user to run onboarding commands. A command can be `available`, `needs_dependency`, `missing_wrapper`, or another explicit status with a bilingual reason.
 
