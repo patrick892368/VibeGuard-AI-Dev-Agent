@@ -25,6 +25,12 @@ test("MCP tools expose input schemas", () => {
   }
   assert.ok(mcpInternals.tools.some((tool) => tool.name === "github_pr"));
   assert.ok(mcpInternals.tools.some((tool) => tool.name === "apply_patch_safely"));
+  const byName = new Map(mcpInternals.tools.map((tool) => [tool.name, tool]));
+  assert.equal(byName.get("fix_error").inputSchema.properties.githubUseApi.type, "boolean");
+  assert.equal(byName.get("github_pr").inputSchema.properties.useApi.type, "boolean");
+  assert.equal(byName.get("github_checks").inputSchema.properties.confirmed.type, "boolean");
+  assert.equal(byName.get("github_checks").inputSchema.properties.auditLog.type, "string");
+  assert.equal(byName.get("detect_github").inputSchema.properties.auditLog.type, "string");
 });
 
 test("MCP initialize returns server info and tool capabilities", async () => {

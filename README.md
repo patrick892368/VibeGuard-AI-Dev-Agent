@@ -30,7 +30,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff；`--file` 输入路径本身会先经过 read policy，底层 `git apply --check/apply` 也会经过 command policy。Checks or applies unified diffs through policy; `--file` input paths pass read policy first, and underlying `git apply --check/apply` commands also pass command policy.
 - `vibeguard hooks`: 打印或安装 Git hook 模板；安装时即使传入 `--allow-git-dir`，`.git/hooks/<hook>` 写入仍必须通过 path policy。Prints or installs Git hook templates; installation still checks `.git/hooks/<hook>` through path policy even when `--allow-git-dir` is supplied.
 - `vibeguard pr summary`: 从 diff 生成包含 review findings 和 actionItems 的 GitHub-ready PR body；默认读取 `git diff` 前会先过 command policy，可用 `--write-body` 经过 policy 写出 PR body 文件。Builds a GitHub-ready PR body with review findings and actionItems from a diff; default `git diff` reads pass command policy first, and `--write-body` can write the PR body file through policy.
-- `vibeguard github`: 检测 GitHub remote、创建 PR、发布普通评论/单条或批量文件行级 review comment、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，`--body-file` 和批量 diff 输入会先经过 path policy，detect、PR fallback prerequisite 和 `checks --execute` 也会先经过 command policy；CLI/MCP 会传入 PolicyEngine，公共 JS helper 在检测 remote 或 `dryRun:false` 真实执行时缺少 PolicyEngine 会拒绝执行；底层 `git` / `gh` 子进程统一通过 policy runner 执行。Detects GitHub remotes, creates PRs, posts general comments and single or batched file-line review comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, `--body-file` plus batched diff inputs are checked by path policy first, and detect, PR fallback prerequisites, and `checks --execute` are gated by command policy; CLI/MCP pass a PolicyEngine, public JS helpers reject remote detection or `dryRun:false` execution without one, and underlying `git` / `gh` subprocesses run through the policy runner.
+- `vibeguard github`: 检测 GitHub remote、创建 PR、发布普通评论/单条或批量文件行级 review comment、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，可用 `--github-api` 显式强制走 REST API；`--body-file` 和批量 diff 输入会先经过 path policy，detect、PR fallback prerequisite 和 `checks --execute` 也会先经过 command policy；CLI/MCP 会传入 PolicyEngine，公共 JS helper 在检测 remote 或 `dryRun:false` 真实执行时缺少 PolicyEngine 会拒绝执行；底层 `git` / `gh` 子进程统一通过 policy runner 执行。Detects GitHub remotes, creates PRs, posts general comments and single or batched file-line review comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, `--github-api` can explicitly force the REST API path, `--body-file` plus batched diff inputs are checked by path policy first, and detect, PR fallback prerequisites, and `checks --execute` are gated by command policy; CLI/MCP pass a PolicyEngine, public JS helpers reject remote detection or `dryRun:false` execution without one, and underlying `git` / `gh` subprocesses run through the policy runner.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary` / `audit report`: 汇总 JSONL 审计日志，或写出 Markdown 审计报告。Summarizes JSONL audit logs or writes a Markdown audit report.
@@ -94,6 +94,7 @@ vibeguard hooks print pre-commit
 vibeguard pr summary --diff reports/change.diff --write-body reports/pr-body.md
 vibeguard github detect
 vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft
+vibeguard github pr --title "Fix bug" --body-file pr-body.md --draft --execute --confirm --github-api
 vibeguard github comment --pr 12 --body-file review.md
 vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
@@ -231,6 +232,7 @@ Remote push / PR actions sit behind the same explicit execution gate:
 
 ```bash
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --json
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --github-api --json
 ```
 
 默认策略要求 `git switch -c`、`git commit`、`git push`、`gh pr create`、`gh pr comment`、`gh api` 人工确认。远端 PR / comment 还要求 GitHub remote 和已认证的 `gh`，或可用的 GitHub token fallback。
@@ -247,9 +249,9 @@ Git plan PR body files are checked through `read_pr_body` path policy before any
 
 Git plan 中的 PR body 文件也会在受保护的 branch / commit / push / PR 执行前经过 `read_pr_body` path policy。Fix dry-run 也会返回 `gitPolicy`，方便 Codex 在执行前审查 command 和 body-file policy。
 
-When a Fix Git plan is executed, its `create_pr` step uses the same GitHub helper path as `vibeguard github pr`; it can create the draft PR through authenticated `gh` or through the `GITHUB_TOKEN` / `GH_TOKEN` REST fallback after policy confirmation.
+When a Fix Git plan is executed, its `create_pr` step uses the same GitHub helper path as `vibeguard github pr`; it can create the draft PR through authenticated `gh` or through the `GITHUB_TOKEN` / `GH_TOKEN` REST fallback after policy confirmation. Pass `--github-api` to force the REST API path from the CLI.
 
-Fix Git plan 执行时，`create_pr` 步骤会复用 `vibeguard github pr` 的 GitHub helper 路径；通过 policy 确认后，可以用已认证的 `gh` 创建 draft PR，也可以在存在 `GITHUB_TOKEN` / `GH_TOKEN` 时走 REST fallback。
+Fix Git plan 执行时，`create_pr` 步骤会复用 `vibeguard github pr` 的 GitHub helper 路径；通过 policy 确认后，可以用已认证的 `gh` 创建 draft PR，也可以在存在 `GITHUB_TOKEN` / `GH_TOKEN` 时走 REST fallback。CLI 可传 `--github-api` 显式强制走 REST API。
 
 ## Policy-as-Code / Policy-as-Code
 
@@ -328,7 +330,7 @@ The test suite covers:
 - Onboarding command checks，用于标注建议命令的依据、缺失 wrapper 或需要确认的依赖。Onboarding command checks for suggested command evidence, missing wrappers, or dependencies that need confirmation.
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
 - 本地 branch / commit / push / PR plan 的受保护执行，并检查 PR body-file path policy。Confirmed protected local branch / commit / push / PR plan flows, including PR body-file path policy.
-- PR 创建调度、Fix Git plan REST PR 创建、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper GitHub command/path policy、policy confirmation 和 REST fallback。PR creation dispatch, Fix Git plan REST PR creation, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper GitHub command/path policy, policy confirmation, and REST fallback.
+- PR 创建调度、`--github-api` 显式 REST fallback、Fix Git plan REST PR 创建、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper GitHub command/path policy、policy confirmation 和 REST fallback。PR creation dispatch, explicit `--github-api` REST fallback, Fix Git plan REST PR creation, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper GitHub command/path policy, policy confirmation, and REST fallback.
 - Public JS API exports for GitHub helpers, sync/async Git plan policy/execution, and Test Writer write/coverage helpers. / Public JS API 已导出 GitHub helper、同步/异步 Git plan policy/execution，以及 Test Writer 写测试和 coverage helper。
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.

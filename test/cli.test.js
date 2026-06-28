@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 const bin = path.resolve("bin/vibeguard.js");
 
@@ -24,6 +24,54 @@ commands:
   deny:${denyBlock}
   require_confirmation:${confirmBlock}
 `, "utf8");
+}
+
+async function startFakeGitHubApi() {
+  const script = `
+const http = require("node:http");
+const server = http.createServer((request, response) => {
+  let body = "";
+  request.on("data", (chunk) => { body += chunk; });
+  request.on("end", () => {
+    response.writeHead(201, { "content-type": "application/json" });
+    response.end(JSON.stringify({ html_url: "https://github.com/owner/repo/pull/7", number: 7, request_body: body }));
+  });
+});
+server.listen(0, "127.0.0.1", () => {
+  console.log(server.address().port);
+});
+process.on("SIGTERM", () => server.close(() => process.exit(0)));
+`;
+  const child = spawn(process.execPath, ["-e", script], {
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  const port = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`Timed out waiting for fake GitHub API: ${stderr}`));
+    }, 5000);
+    child.stdout.once("data", (chunk) => {
+      clearTimeout(timer);
+      resolve(String(chunk).trim());
+    });
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`Fake GitHub API exited early with code ${code}: ${stderr}`));
+    });
+  });
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close() {
+      child.kill();
+    }
+  };
 }
 
 test("CLI policy check prints JSON result", () => {
@@ -676,6 +724,52 @@ commands:
   assert.equal(parsed.status, "require_confirmation");
   assert.equal(parsed.stage, "github_pr_prerequisite_policy");
   assert.equal(parsed.command, "git branch --show-current");
+});
+
+test("CLI GitHub PR can force REST API fallback with --github-api", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-api-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  writeCommandPolicy(root, { requireConfirmation: ["gh pr create"] });
+  const api = await startFakeGitHubApi();
+
+  let parsed;
+  try {
+    const output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "github",
+      "pr",
+      "--title",
+      "Fix bug",
+      "--body",
+      "body",
+      "--head",
+      "codex/fix-bug",
+      "--draft",
+      "--execute",
+      "--confirm",
+      "--github-api",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: "token",
+        GITHUB_API_URL: api.url
+      }
+    });
+    parsed = JSON.parse(output);
+  } finally {
+    api.close();
+  }
+
+  assert.equal(parsed.status, "created");
+  assert.equal(parsed.method, "api");
+  assert.equal(parsed.url, "https://github.com/owner/repo/pull/7");
+  assert.equal(parsed.number, 7);
 });
 
 test("CLI pr summary can write a policy-gated body file", () => {

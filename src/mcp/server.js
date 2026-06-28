@@ -70,6 +70,7 @@ const tools = [
       prDryRun: booleanSchema,
       createPr: booleanSchema,
       executeGitPlan: booleanSchema,
+      githubUseApi: booleanSchema,
       prBodyFile: stringSchema,
       dryRun: booleanSchema,
       apply: booleanSchema,
@@ -146,12 +147,13 @@ const tools = [
     name: "detect_github",
     description: "Detect the GitHub origin repository for the current repo.",
     inputSchema: objectSchema({
-      confirmed: booleanSchema
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
     name: "github_pr",
-    description: "Create a GitHub PR through gh pr create. Dry-run by default.",
+    description: "Create a GitHub PR through gh pr create or the REST API fallback. Dry-run by default.",
     inputSchema: objectSchema({
       title: stringSchema,
       bodyFile: stringSchema,
@@ -159,34 +161,41 @@ const tools = [
       base: stringSchema,
       head: stringSchema,
       draft: booleanSchema,
+      useApi: booleanSchema,
       execute: booleanSchema,
-      confirmed: booleanSchema
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
     name: "github_checks",
-    description: "Read recent GitHub Actions workflow run status through gh run list.",
+    description: "Read recent GitHub Actions workflow run status through gh run list or the REST API fallback.",
     inputSchema: objectSchema({
       branch: stringSchema,
       workflow: stringSchema,
       limit: numberSchema,
-      execute: booleanSchema
+      useApi: booleanSchema,
+      execute: booleanSchema,
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
     name: "github_comment",
-    description: "Create a GitHub PR comment through gh pr comment. Dry-run by default.",
+    description: "Create a GitHub PR comment through gh pr comment or the REST API fallback. Dry-run by default.",
     inputSchema: objectSchema({
       pr: stringSchema,
       bodyFile: stringSchema,
       body: stringSchema,
+      useApi: booleanSchema,
       execute: booleanSchema,
-      confirmed: booleanSchema
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
     name: "github_review_comment",
-    description: "Create a GitHub PR review comment on a specific file line. Dry-run by default.",
+    description: "Create a GitHub PR review comment on a specific file line through gh api or the REST API fallback. Dry-run by default.",
     inputSchema: objectSchema({
       pr: stringSchema,
       bodyFile: stringSchema,
@@ -198,19 +207,22 @@ const tools = [
       startLine: numberSchema,
       startSide: stringSchema,
       subjectType: stringSchema,
+      useApi: booleanSchema,
       execute: booleanSchema,
-      confirmed: booleanSchema
+      confirmed: booleanSchema,
+      auditLog: stringSchema
     })
   },
   {
     name: "github_review_comments",
-    description: "Analyze a diff and publish generated file-line GitHub PR review comments. Dry-run by default.",
+    description: "Analyze a diff and publish generated file-line GitHub PR review comments through gh api or the REST API fallback. Dry-run by default.",
     inputSchema: objectSchema({
       pr: stringSchema,
       commitId: stringSchema,
       diff: stringSchema,
       diffFile: stringSchema,
       limit: numberSchema,
+      useApi: booleanSchema,
       execute: booleanSchema,
       confirmed: booleanSchema,
       auditLog: stringSchema
@@ -467,7 +479,8 @@ async function callTool(name, args, root) {
       apply: Boolean(args.apply),
       confirmed: Boolean(args.confirmed),
       auditLog: args.auditLog,
-      env: loadRuntimeEnv(root)
+      env: loadRuntimeEnv(root),
+      githubUseApi: Boolean(args.githubUseApi)
     });
   }
   if (name === "onboard_repo") return analyzeRepository({ root });
@@ -575,6 +588,7 @@ async function callTool(name, args, root) {
       base: args.base,
       head: args.head,
       draft: Boolean(args.draft),
+      useApi: Boolean(args.useApi),
       env,
       dryRun: true
     });
@@ -606,6 +620,7 @@ async function callTool(name, args, root) {
       base: args.base,
       head: args.head,
       draft: Boolean(args.draft),
+      useApi: Boolean(args.useApi),
       env,
       dryRun: args.execute !== true,
       ...executionPolicyOptions
@@ -619,6 +634,7 @@ async function callTool(name, args, root) {
       pr: args.pr,
       bodyFile: args.bodyFile,
       body: args.body,
+      useApi: Boolean(args.useApi),
       env,
       dryRun: true
     });
@@ -645,6 +661,7 @@ async function callTool(name, args, root) {
       pr: args.pr,
       bodyFile: args.bodyFile,
       body: args.body,
+      useApi: Boolean(args.useApi),
       env,
       dryRun: args.execute !== true,
       ...executionPolicyOptions
@@ -665,6 +682,7 @@ async function callTool(name, args, root) {
       startLine: args.startLine,
       startSide: args.startSide,
       subjectType: args.subjectType,
+      useApi: Boolean(args.useApi),
       env
     };
     const dryRun = await createReviewCommentWithGh(root, {
@@ -712,6 +730,7 @@ async function callTool(name, args, root) {
       commitId: args.commitId,
       comments: review.reviewComments,
       limit: args.limit,
+      useApi: Boolean(args.useApi),
       env,
       dryRun: true
     });
@@ -742,6 +761,7 @@ async function callTool(name, args, root) {
         commitId: args.commitId,
         comments: review.reviewComments,
         limit: args.limit,
+        useApi: Boolean(args.useApi),
         env,
         dryRun: false,
         engine,
@@ -761,6 +781,7 @@ async function callTool(name, args, root) {
       branch: args.branch,
       workflow: args.workflow,
       limit: args.limit,
+      useApi: Boolean(args.useApi),
       env: loadRuntimeEnv(root),
       dryRun: true
     };

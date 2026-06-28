@@ -27,7 +27,7 @@ function printHelp() {
 Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file> [--ai-patch] [--output-patch <file>]
-  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan]
+  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--github-api]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
   vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
   vibeguard review [--diff <file>] [--write-comment <file>]
@@ -39,11 +39,11 @@ Usage:
   vibeguard hooks install <hook> --allow-git-dir
   vibeguard pr summary [--diff <file>] [--write-body <file>]
   vibeguard github detect
-  vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm]
-  vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm]
-  vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm]
-  vibeguard github review-comments --pr <number> --commit <sha> [--diff <file>] [--limit <n>] [--execute] [--confirm]
-  vibeguard github checks [--branch <branch>] [--limit <n>] [--execute]
+  vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
+  vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
+  vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
+  vibeguard github review-comments --pr <number> --commit <sha> [--diff <file>] [--limit <n>] [--execute] [--confirm] [--github-api]
+  vibeguard github checks [--branch <branch>] [--limit <n>] [--execute] [--github-api]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
@@ -230,7 +230,8 @@ async function fixCommand(parsed, root) {
     apply: Boolean(parsed.apply),
     confirmed: Boolean(parsed.confirm),
     auditLog: parsed["audit-log"],
-    env: loadRuntimeEnv(root)
+    env: loadRuntimeEnv(root),
+    githubUseApi: Boolean(parsed["github-api"])
   });
 }
 
@@ -438,7 +439,8 @@ async function githubCommand(parsed, root, subcommand) {
       body: parsed.body,
       base: parsed.base,
       head: parsed.head,
-      draft: Boolean(parsed.draft)
+      draft: Boolean(parsed.draft),
+      useApi: Boolean(parsed["github-api"])
     };
     const bodyFileBlocked = githubBodyFilePolicy(root, options.bodyFile, "github_pr_body_file_policy", Boolean(parsed.confirm));
     if (bodyFileBlocked) return bodyFileBlocked;
@@ -466,7 +468,8 @@ async function githubCommand(parsed, root, subcommand) {
     const options = {
       pr: parsed.pr,
       bodyFile: parsed["body-file"],
-      body: parsed.body
+      body: parsed.body,
+      useApi: Boolean(parsed["github-api"])
     };
     const bodyFileBlocked = githubBodyFilePolicy(root, options.bodyFile, "github_comment_body_file_policy", Boolean(parsed.confirm));
     if (bodyFileBlocked) return bodyFileBlocked;
@@ -499,7 +502,8 @@ async function githubCommand(parsed, root, subcommand) {
       side: parsed.side,
       startLine: parsed["start-line"] ? Number(parsed["start-line"]) : undefined,
       startSide: parsed["start-side"],
-      subjectType: parsed["subject-type"]
+      subjectType: parsed["subject-type"],
+      useApi: Boolean(parsed["github-api"])
     };
     const bodyFileBlocked = githubBodyFilePolicy(root, options.bodyFile, "github_review_comment_body_file_policy", Boolean(parsed.confirm));
     if (bodyFileBlocked) return bodyFileBlocked;
@@ -531,6 +535,7 @@ async function githubCommand(parsed, root, subcommand) {
       comments: review.reviewComments,
       limit: parsed.limit,
       env,
+      useApi: Boolean(parsed["github-api"]),
       dryRun: true
     });
     const { config } = loadConfig(root);
@@ -563,6 +568,7 @@ async function githubCommand(parsed, root, subcommand) {
         comments: review.reviewComments,
         limit: parsed.limit,
         env,
+        useApi: Boolean(parsed["github-api"]),
         dryRun: false,
         ...executionPolicyOptions
       })
@@ -580,6 +586,7 @@ async function githubCommand(parsed, root, subcommand) {
       workflow: parsed.workflow,
       limit: parsed.limit,
       env,
+      useApi: Boolean(parsed["github-api"]),
       dryRun: true
     };
     const dryRun = await listWorkflowRunsWithGh(root, options);

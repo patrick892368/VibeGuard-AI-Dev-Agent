@@ -144,6 +144,7 @@ Include remote push and draft PR creation only when GitHub remote and `gh` auth 
 
 ```bash
 node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --json
+node ./bin/vibeguard.js fix --log error.log --test "npm test" --create-branch --commit --push --create-pr --pr-body-file patches/pr-body.md --execute-git-plan --confirm --apply --github-api --json
 ```
 
 GitHub detect and PR fallback prerequisites are command-policy gated. If repository policy requires confirmation for `git remote get-url origin` or `git branch --show-current`, Codex must stop at the returned policy result until confirmation is present.
@@ -154,9 +155,9 @@ CLI and MCP GitHub paths pass the repository `PolicyEngine` into the helpers. Di
 
 CLI 和 MCP 的 GitHub 路径会把仓库 `PolicyEngine` 传给 helper。直接调用公开 GitHub helper 时，remote 检测和 `dryRun:false` 真实执行都必须传入 `PolicyEngine`；否则 VibeGuard 会在调用 `git`、`gh` 或 REST API fallback 前拒绝 GitHub 操作。
 
-For Fix workflows, executed Git plans route `create_pr` through the same helper as `github pr`, so Codex can use `githubUseApi` / `GITHUB_TOKEN` when `gh` is unavailable while keeping policy confirmation in front of the operation.
+For Fix workflows, executed Git plans route `create_pr` through the same helper as `github pr`, so Codex can use CLI `--github-api` or MCP `githubUseApi` / `GITHUB_TOKEN` when `gh` is unavailable while keeping policy confirmation in front of the operation.
 
-对于 Fix workflow，执行型 Git plan 的 `create_pr` 会走和 `github pr` 相同的 helper；当本机没有 `gh` 时，Codex 可以用 `githubUseApi` / `GITHUB_TOKEN`，同时仍然把 policy confirmation 放在操作前。
+对于 Fix workflow，执行型 Git plan 的 `create_pr` 会走和 `github pr` 相同的 helper；当本机没有 `gh` 时，Codex 可以用 CLI `--github-api` 或 MCP `githubUseApi` / `GITHUB_TOKEN`，同时仍然把 policy confirmation 放在操作前。
 
 Run deterministic fixture demos:
 
@@ -328,23 +329,24 @@ Post a PR summary or review note:
 ```bash
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --json
 node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --json
+node ./bin/vibeguard.js github comment --pr 12 --body-file review.md --execute --confirm --github-api --json
 node ./bin/vibeguard.js github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --json
 node ./bin/vibeguard.js github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --execute --confirm --json
 node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff reports/change.diff --json
 node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff reports/change.diff --execute --confirm --json
 ```
 
-The MCP-style server exposes the same GitHub PR path as `github_pr`, which returns a dry-run `gh pr create` command unless `execute` is true and policy confirmation is present.
+The MCP-style server exposes the same GitHub PR path as `github_pr`, which returns a dry-run `gh pr create` command unless `execute` is true and policy confirmation is present. Pass `useApi` on GitHub MCP tools to force token REST fallback.
 
-MCP-style server 也通过 `github_pr` 暴露同一条 GitHub PR 路径；默认返回 dry-run 的 `gh pr create` 命令，只有 `execute` 为 true 且通过 policy 确认时才执行。
+MCP-style server 也通过 `github_pr` 暴露同一条 GitHub PR 路径；默认返回 dry-run 的 `gh pr create` 命令，只有 `execute` 为 true 且通过 policy 确认时才执行。GitHub MCP 工具可传 `useApi` 强制使用 token REST fallback。
 
 For one file-line PR review comment, use `github review-comment` or MCP `github_review_comment` with the PR head commit SHA, file path, and diff line. For all generated diff findings, use `github review-comments` or MCP `github_review_comments`; each generated `gh api` command is checked by command policy before execution.
 
 对于单条文件行级 PR review comment，使用 `github review-comment` 或 MCP `github_review_comment`，并传入 PR head commit SHA、文件路径和 diff line。对于 diff 中生成的全部 findings，使用 `github review-comments` 或 MCP `github_review_comments`；每条生成的 `gh api` 命令都会在执行前经过 command policy。
 
-When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` through the GitHub REST API fallback. Policy confirmation is still required for PR creation and PR comments.
+When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` through the GitHub REST API fallback; `--github-api` / `useApi` can also force that path even if `gh` exists. Policy confirmation is still required for PR creation and PR comments.
 
-当本机没有 `gh` 时，execute 模式可以使用 `GITHUB_TOKEN` 或 `GH_TOKEN` 通过 GitHub REST API fallback 执行。创建 PR 和发布 PR comment 仍然需要 policy 确认。
+当本机没有 `gh` 时，execute 模式可以使用 `GITHUB_TOKEN` 或 `GH_TOKEN` 通过 GitHub REST API fallback 执行；即使存在 `gh`，也可以用 `--github-api` / `useApi` 强制走这条路径。创建 PR 和发布 PR comment 仍然需要 policy 确认。
 
 For CLI and MCP-style GitHub PR/comment flows, `--body-file` / `bodyFile` is checked through path policy before dry-run or execution, so denied files such as `.env` cannot be reused as PR or comment bodies. For generated Git plans, PR body files are also checked through `read_pr_body` path policy before any protected branch/commit/push/PR execution.
 
