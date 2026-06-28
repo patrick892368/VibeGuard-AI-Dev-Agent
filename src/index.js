@@ -14,6 +14,17 @@ export { applyPatchWithPolicy } from "./patch/safeApply.js";
 export { validateUnifiedDiff } from "./patch/validatePatch.js";
 export { generateDebugPatch } from "./llm/provider.js";
 export { runCommandWithPolicy } from "./runner/safeCommand.js";
-export { parseGitHubRemote, detectGitHubRepository, createPullRequestWithGh, commentPullRequestWithGh, createReviewCommentWithGh, listWorkflowRunsWithGh } from "./integrations/github.js";
+export {
+  GITHUB_CURRENT_BRANCH_COMMAND,
+  GITHUB_DETECT_COMMAND,
+  checkGitHubCommandsPolicy,
+  parseGitHubRemote,
+  detectGitHubRepository,
+  createPullRequestWithGh,
+  commentPullRequestWithGh,
+  createReviewCommentWithGh,
+  createReviewCommentsWithGh,
+  listWorkflowRunsWithGh
+} from "./integrations/github.js";
 export { buildFixGitPlan } from "./integrations/gitPlan.js";
 export { evaluateFixFixtures } from "./eval/fixtures.js";

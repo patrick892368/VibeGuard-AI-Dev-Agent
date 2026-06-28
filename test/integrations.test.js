@@ -25,6 +25,15 @@ test("hook templates include pre-commit policy check", () => {
   assert.match(hookTemplate("pre-commit"), /policy check/);
 });
 
+test("public API exports GitHub batch review helpers", async () => {
+  const api = await import("../src/index.js");
+
+  assert.equal(typeof api.createReviewCommentsWithGh, "function");
+  assert.equal(typeof api.checkGitHubCommandsPolicy, "function");
+  assert.equal(api.GITHUB_DETECT_COMMAND, "git remote get-url origin");
+  assert.equal(api.GITHUB_CURRENT_BRANCH_COMMAND, "git branch --show-current");
+});
+
 test("buildPrSummary returns GitHub-ready body", () => {
   const diff = `diff --git a/src/app.js b/src/app.js
 --- a/src/app.js
