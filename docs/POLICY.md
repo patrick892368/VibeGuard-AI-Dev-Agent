@@ -92,6 +92,7 @@ All agents must call the Policy Engine before:
 
 - Writing files. / 写文件。
 - Reading debug context snippets. / 读取 debug context 片段。
+- Reading coverage, diff, log, patch, PR body, or audit input files. / 读取 coverage、diff、log、patch、PR body 或 audit 输入文件。
 - Applying patches. / 应用 patch。
 - Running risky commands. / 执行风险命令。
 - Preparing Git hooks. / 准备 Git hooks。

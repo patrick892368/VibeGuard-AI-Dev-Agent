@@ -1,8 +1,8 @@
 export const defaultConfig = {
   version: 1,
   paths: {
-    allow: ["src/**", "bin/**", "test/**", "tests/**", "docs/**", "reports/**", "logs/**", "*.log", "README.md", "package.json", ".vibeguard.yaml", ".gitignore"],
-    deny: [".env", ".env.*", ".git/**", "node_modules/**", "dist/**", "build/**", "coverage/**", "vendor/**"],
+    allow: ["src/**", "bin/**", "test/**", "tests/**", "docs/**", "reports/**", "logs/**", "coverage/**", "*.log", "coverage*.json", "lcov.info", "README.md", "package.json", ".vibeguard.yaml", ".gitignore"],
+    deny: [".env", ".env.*", ".git/**", "node_modules/**", "dist/**", "build/**", "vendor/**"],
     require_confirmation: [
       ".github/workflows/**",
       "Dockerfile",

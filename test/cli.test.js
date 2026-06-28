@@ -212,6 +212,24 @@ test("CLI test command accepts coverage report", () => {
   assert.equal(parsed.coverageDelta.summary.missingLinesReduced, 1);
 });
 
+test("CLI test command blocks denied coverage input files", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-coverage-deny-"));
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+
+  assert.throws(() => execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "test",
+    "--coverage",
+    ".env",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }), /Path matches deny policy/);
+});
+
 test("CLI test --write can return a Git and PR dry-run plan", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-test-pr-"));
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

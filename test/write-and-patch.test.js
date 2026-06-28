@@ -18,7 +18,7 @@ function tempRepo() {
 function engineFor(root) {
   return new PolicyEngine({
     paths: {
-      allow: ["src/**", "test/**", "tests/**", "docs/**", "reports/**", "README.md"],
+      allow: ["src/**", "test/**", "tests/**", "docs/**", "reports/**", "coverage*.json", "coverage/**", "README.md"],
       deny: [".env", ".git/**"],
       require_confirmation: ["package-lock.json"]
     },

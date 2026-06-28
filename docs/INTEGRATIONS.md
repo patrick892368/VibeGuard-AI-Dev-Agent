@@ -40,9 +40,9 @@ vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。
 
-`test` reports uncovered functions, classes, and interfaces from coverage.py JSON or LCOV. `test --write` can generate runtime tests for functions and classes, while TypeScript interface-only files stay as prioritization candidates instead of producing empty runtime tests.
+`test` reads coverage.py JSON or LCOV input files through path policy, then reports uncovered functions, classes, and interfaces. `test --write` can generate runtime tests for functions and classes, while TypeScript interface-only files stay as prioritization candidates instead of producing empty runtime tests.
 
-`test` 会从 coverage.py JSON 或 LCOV 报告中输出未覆盖函数、类和接口。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
+`test` 会先通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
 
 `review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, and `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`.
 
@@ -143,9 +143,9 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 
 `github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。`bodyFile` / `--body-file` 输入会先经过 path policy 检查，然后才进入 dry-run 或执行。
 
-`write_tests` can analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests including CommonJS bracket exports, write stdlib `unittest` Python tests with simple behavior, object-property/dictionary-field fallback, and exception assertions, optionally run them through command policy, return `failureAnalysis.repairPlan` for failed runs, run one safe test-only repair retry with `repair`, prepare a Git/PR dry-run plan, and execute a confirmed local branch/commit plan only after final generated tests pass.
+`write_tests` can read coverage files through path policy, analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests including CommonJS bracket exports, write stdlib `unittest` Python tests with simple behavior, object-property/dictionary-field fallback, and exception assertions, optionally run them through command policy, return `failureAnalysis.repairPlan` for failed runs, run one safe test-only repair retry with `repair`, prepare a Git/PR dry-run plan, and execute a confirmed local branch/commit plan only after final generated tests pass.
 
-`write_tests` 可以分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的 JavaScript 生成测试（包含 CommonJS bracket export）和 stdlib `unittest` Python 测试，并包含简单行为、对象属性/字典字段 fallback 和异常断言；也可以通过 command policy 执行这些测试、为失败运行返回 `failureAnalysis.repairPlan`、通过 `repair` 做一轮安全的 test-only 修复重试、准备 Git/PR dry-run plan，并且只会在最终生成测试通过后执行已确认的本地 branch/commit plan。
+`write_tests` 可以先通过 path policy 读取 coverage 文件，再分析 coverage、比较 before/after coverage、写入识别 ESM/CommonJS 的 JavaScript 生成测试（包含 CommonJS bracket export）和 stdlib `unittest` Python 测试，并包含简单行为、对象属性/字典字段 fallback 和异常断言；也可以通过 command policy 执行这些测试、为失败运行返回 `failureAnalysis.repairPlan`、通过 `repair` 做一轮安全的 test-only 修复重试、准备 Git/PR dry-run plan，并且只会在最终生成测试通过后执行已确认的本地 branch/commit plan。
 
 The MCP `write_tests` tool exposes the same `repair` boolean as the CLI.
 

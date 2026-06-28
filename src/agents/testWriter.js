@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { listRepoFiles, readTextIfExists } from "../repo/files.js";
 import { scanRepository } from "../repo/scan.js";
-import { writeFileWithPolicy } from "../policy/safeWrite.js";
+import { readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../runner/safeCommand.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
 
@@ -622,6 +622,13 @@ export function parseCoverageReport(text, options = {}) {
 function loadCoverageInput(options, root, fileKey, textKey) {
   if (options[textKey]) return parseCoverageReport(options[textKey], { root });
   if (!options[fileKey]) return null;
+  if (options.engine) {
+    const read = readFileWithPolicy(root, options[fileKey], options.engine, {
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog
+    });
+    return parseCoverageReport(read.content, { root });
+  }
   const coverageFile = path.isAbsolute(options[fileKey]) ? options[fileKey] : path.join(root, options[fileKey]);
   return parseCoverageReport(fs.readFileSync(coverageFile, "utf8"), { root });
 }
@@ -1211,10 +1218,13 @@ export function analyzeTestTargets(options = {}) {
 export function writeSuggestedTests(root, engine, options = {}) {
   const analysis = analyzeTestTargets({
     root,
+    engine,
     coverageFile: options.coverageFile,
     coverageText: options.coverageText,
     coverageAfterFile: options.coverageAfterFile,
-    coverageAfterText: options.coverageAfterText
+    coverageAfterText: options.coverageAfterText,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
   });
   const limit = Number(options.limit || 1);
   const writable = analysis.candidates

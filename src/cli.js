@@ -507,9 +507,9 @@ async function dispatch(parsed) {
   if (command === "debug") return debugCommand(parsed, root);
   if (command === "fix") return fixCommand(parsed, root);
   if (command === "test") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
     if (parsed.write) {
-      const { config } = loadConfig(root);
-      const engine = new PolicyEngine(config, { root });
       return writeSuggestedTests(root, engine, {
         limit: parsed.limit || 1,
         coverageFile: parsed.coverage,
@@ -532,7 +532,14 @@ async function dispatch(parsed) {
         auditLog: parsed["audit-log"]
       });
     }
-    return analyzeTestTargets({ root, coverageFile: parsed.coverage, coverageAfterFile: parsed["coverage-after"] });
+    return analyzeTestTargets({
+      root,
+      engine,
+      coverageFile: parsed.coverage,
+      coverageAfterFile: parsed["coverage-after"],
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
   }
   if (command === "review") return reviewCommand(parsed, root);
   if (command === "onboard") {

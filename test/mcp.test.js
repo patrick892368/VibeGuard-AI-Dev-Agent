@@ -342,6 +342,26 @@ def greeting():
   assert.equal(result.testRuns[0].repaired, true);
 });
 
+test("MCP write_tests blocks denied coverage files before analysis", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 11,
+    method: "tools/call",
+    params: {
+      name: "write_tests",
+      arguments: {
+        coverageFile: ".env"
+      }
+    }
+  }, root);
+
+  assert.equal(response.result.isError, true);
+  assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
+});
+
 test("MCP apply_patch_safely checks a patch without modifying files", async () => {
   const root = tempGitRepo();
   const patch = `diff --git a/src/app.js b/src/app.js

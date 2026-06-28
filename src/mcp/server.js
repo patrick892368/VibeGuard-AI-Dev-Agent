@@ -444,9 +444,9 @@ async function callTool(name, args, root) {
   }
   if (name === "onboard_repo") return analyzeRepository({ root });
   if (name === "write_tests") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
     if (args.write) {
-      const { config } = loadConfig(root);
-      const engine = new PolicyEngine(config, { root });
       return writeSuggestedTests(root, engine, {
         limit: args.limit || 1,
         coverageFile: args.coverageFile,
@@ -473,10 +473,13 @@ async function callTool(name, args, root) {
     }
     return analyzeTestTargets({
       root,
+      engine,
       coverageFile: args.coverageFile,
       coverageText: args.coverageText,
       coverageAfterFile: args.coverageAfterFile,
-      coverageAfterText: args.coverageAfterText
+      coverageAfterText: args.coverageAfterText,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
     });
   }
   if (name === "review_pr") {
