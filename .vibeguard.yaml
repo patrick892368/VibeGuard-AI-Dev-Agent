@@ -15,6 +15,10 @@ paths:
     - "lcov.info"
     - "README.md"
     - "package.json"
+    - "pyproject.toml"
+    - "pom.xml"
+    - "build.gradle"
+    - "build.gradle.kts"
     - ".vibeguard.yaml"
     - ".gitignore"
 

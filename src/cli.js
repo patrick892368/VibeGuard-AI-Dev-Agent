@@ -31,7 +31,7 @@ Usage:
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
   vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--github-api]
   vibeguard review [--diff <file>] [--github-pr <number>] [--write-comment <file>] [--publish-comment|--comment-pr <number>] [--execute] [--confirm] [--github-api]
-  vibeguard onboard [--write]
+  vibeguard onboard [--write] [--confirm]
   vibeguard patch check --file <patch>
   vibeguard patch apply --file <patch> [--confirm]
   vibeguard hooks list
@@ -176,7 +176,12 @@ async function debugCommand(parsed, root) {
     }).content
     : readStdinIfAvailable();
   if (!logText.trim()) throw new Error("debug requires --log <file> or error text on stdin");
-  const result = analyzeDebugLog(logText, { root, engine });
+  const result = analyzeDebugLog(logText, {
+    root,
+    engine,
+    confirmed: Boolean(parsed.confirm),
+    auditLog: parsed["audit-log"]
+  });
   if (parsed["ai-patch"]) {
     const ai = await generateDebugPatch({ ...result, log: logText }, loadRuntimeEnv(root));
     result.aiPatch = ai;
@@ -796,12 +801,17 @@ async function dispatch(parsed) {
   }
   if (command === "review") return await reviewCommand(parsed, root);
   if (command === "onboard") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
     if (parsed.write) {
-      const { config } = loadConfig(root);
-      const engine = new PolicyEngine(config, { root });
       return writeOnboardingDocs(root, engine, { confirmed: Boolean(parsed.confirm), auditLog: parsed["audit-log"] });
     }
-    return analyzeRepository({ root });
+    return analyzeRepository({
+      root,
+      engine,
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
   }
   if (command === "patch") return patchCommand(parsed, root, subcommand);
   if (command === "hooks") return hooksCommand(parsed, root, subcommand);

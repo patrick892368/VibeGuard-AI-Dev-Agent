@@ -93,6 +93,40 @@ requests = "^2.31.0"
   assert.ok(scan.dependencies.some((dependency) => dependency.name === "org.junit.jupiter:junit-jupiter" && dependency.scope === "testImplementation"));
 });
 
+test("scanRepository skips denied metadata reads", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "requirements.txt"), "Django==5.0\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: ["requirements.txt"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const scan = scanRepository(root, { engine });
+
+  assert.equal(scan.metadataReadPolicy.status, "deny");
+  assert.equal(scan.metadataReadPolicy.skipped, 1);
+  assert.equal(scan.skippedMetadataFiles[0].file, "requirements.txt");
+  assert.equal(scan.dependencies.some((dependency) => dependency.name === "Django"), false);
+  assert.equal(scan.frameworks.includes("Django"), false);
+});
+
+test("analyzeRepository can confirm protected metadata reads", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "requirements.txt"), "Django==5.0\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [], require_confirmation: ["requirements.txt"] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const blocked = analyzeRepository({ root, engine });
+  const confirmed = analyzeRepository({ root, engine, confirmed: true });
+
+  assert.equal(blocked.scan.metadataReadPolicy.status, "require_confirmation");
+  assert.equal(blocked.scan.dependencies.some((dependency) => dependency.name === "Django"), false);
+  assert.equal(confirmed.scan.metadataReadPolicy.status, "allow");
+  assert.equal(confirmed.scan.dependencies.some((dependency) => dependency.name === "Django"), true);
+});
+
 test("analyzeTestTargets finds source functions without likely tests", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

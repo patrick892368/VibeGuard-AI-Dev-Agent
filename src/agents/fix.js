@@ -171,11 +171,17 @@ function pythonModuleName(file) {
   return file.replace(/\.py$/, "").replace(/\//g, ".");
 }
 
-function testCommandForFile(root, repo, testFile) {
+function policyAllowed(result, options = {}) {
+  return result.status === "allow" || (result.status === "require_confirmation" && options.confirmed);
+}
+
+function testCommandForFile(root, repo, testFile, options = {}) {
   const extension = path.posix.extname(testFile);
   if (extension === ".py") {
     const absolute = path.join(root, testFile);
-    const text = fs.existsSync(absolute) ? fs.readFileSync(absolute, "utf8") : "";
+    const readPolicy = options.engine?.checkPath(testFile, "read_auto_test_file");
+    const canRead = !readPolicy || policyAllowed(readPolicy, options);
+    const text = canRead && fs.existsSync(absolute) ? fs.readFileSync(absolute, "utf8") : "";
     if (/unittest/.test(text)) return `python -m unittest ${quoteCommandPart(testFile)}`;
     if (repo.frameworks.includes("Django") && repo.files.includes("manage.py")) {
       return `python manage.py test ${pythonModuleName(testFile)}`;
@@ -211,11 +217,15 @@ function scoreTestFileForSource(testFile, sourceFile) {
   return 0;
 }
 
-function selectAutoTestCommand(debug, root) {
-  const repo = scanRepository(root);
+function selectAutoTestCommand(debug, root, options = {}) {
+  const repo = scanRepository(root, {
+    engine: options.engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
   const frameTest = debug.frames.find((frame) => isTestFile(frame.file));
   if (frameTest) {
-    const command = testCommandForFile(root, repo, frameTest.file);
+    const command = testCommandForFile(root, repo, frameTest.file, options);
     if (command) return command;
   }
 
@@ -231,7 +241,7 @@ function selectAutoTestCommand(debug, root) {
     }
   }
   if (best) {
-    const command = testCommandForFile(root, repo, best.file);
+    const command = testCommandForFile(root, repo, best.file, options);
     if (command) return command;
   }
 
@@ -281,8 +291,17 @@ export async function runFixWorkflow(options = {}) {
     throw new Error("fix requires --log <file> or logText");
   }
 
-  const debug = analyzeDebugLog(logText, { root, engine });
-  const selectedTestCommand = options.testCommand || (options.autoTest ? selectAutoTestCommand(debug, root) : null);
+  const debug = analyzeDebugLog(logText, {
+    root,
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
+  const selectedTestCommand = options.testCommand || (options.autoTest ? selectAutoTestCommand(debug, root, {
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  }) : null);
   const providedPatch = patchFromOptions(options, engine);
   let patchSource = providedPatch || await generateDebugPatch({ ...debug, log: logText }, options.env || process.env);
 

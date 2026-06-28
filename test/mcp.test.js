@@ -36,6 +36,7 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("github_checks").inputSchema.properties.confirmed.type, "boolean");
   assert.equal(byName.get("github_checks").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("detect_github").inputSchema.properties.auditLog.type, "string");
+  assert.equal(byName.get("onboard_repo").inputSchema.properties.confirmed.type, "boolean");
 });
 
 test("MCP initialize returns server info and tool capabilities", async () => {
@@ -191,6 +192,36 @@ test("MCP notifications do not produce error responses", async () => {
 
   assert.equal(cancelled, null);
   assert.equal(unknown, null);
+});
+
+test("MCP onboard_repo gates protected metadata reads", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "requirements.txt"), "Django==5.0\n", "utf8");
+
+  const blocked = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 8,
+    method: "tools/call",
+    params: {
+      name: "onboard_repo",
+      arguments: {}
+    }
+  }, root);
+  const confirmed = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 9,
+    method: "tools/call",
+    params: {
+      name: "onboard_repo",
+      arguments: { confirmed: true }
+    }
+  }, root);
+
+  assert.equal(blocked.result.structuredContent.scan.metadataReadPolicy.status, "require_confirmation");
+  assert.equal(blocked.result.structuredContent.scan.skippedMetadataFiles[0].file, "requirements.txt");
+  assert.equal(blocked.result.structuredContent.scan.dependencies.some((dependency) => dependency.name === "Django"), false);
+  assert.equal(confirmed.result.structuredContent.scan.metadataReadPolicy.status, "allow");
+  assert.equal(confirmed.result.structuredContent.scan.dependencies.some((dependency) => dependency.name === "Django"), true);
 });
 
 test("MCP review_pr reads diff files through path policy", async () => {

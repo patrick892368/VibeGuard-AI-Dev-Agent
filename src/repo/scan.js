@@ -1,5 +1,7 @@
+import fs from "node:fs";
 import path from "node:path";
 import { listRepoFiles, readTextIfExists } from "./files.js";
+import { appendAuditEvent } from "../policy/audit.js";
 
 function unique(values) {
   return [...new Set(values)].sort();
@@ -9,8 +11,92 @@ function hasFile(files, name) {
   return files.includes(name);
 }
 
-function packageJsonScripts(root) {
-  const text = readTextIfExists(root, "package.json");
+function policyAllowed(result, options = {}) {
+  return result.status === "allow" || (result.status === "require_confirmation" && options.confirmed);
+}
+
+function createMetadataReader(root, options = {}) {
+  const cache = new Map();
+  const results = [];
+
+  function read(file) {
+    if (cache.has(file)) return cache.get(file);
+    const absolute = path.join(root, file);
+    if (!fsExists(absolute)) {
+      cache.set(file, "");
+      return "";
+    }
+
+    if (!options.engine) {
+      const text = readTextIfExists(root, file) || "";
+      cache.set(file, text);
+      return text;
+    }
+
+    const policy = options.engine.checkPath(file, "read_repo_metadata");
+    const allowed = policyAllowed(policy, options);
+    const auditLog = appendAuditEvent(root, options.engine, options.auditLog, {
+      operation: "read_repo_metadata",
+      target: file,
+      policyStatus: policy.status,
+      outcome: allowed ? "allowed" : "blocked",
+      reason: policy.reason
+    }, options);
+    const result = {
+      file,
+      status: policy.status,
+      outcome: allowed ? "allowed" : "blocked",
+      reason: policy.reason,
+      policy,
+      auditLog
+    };
+    results.push(result);
+    const text = allowed ? readTextIfExists(root, file) || "" : "";
+    cache.set(file, text);
+    return text;
+  }
+
+  return {
+    read,
+    summary() {
+      if (!options.engine) {
+        return {
+          status: "not_checked",
+          total: 0,
+          allowed: 0,
+          skipped: 0,
+          results: []
+        };
+      }
+      const skipped = results.filter((result) => result.outcome === "blocked");
+      const status = skipped.some((result) => result.status === "deny")
+        ? "deny"
+        : skipped.length > 0
+          ? "require_confirmation"
+          : "allow";
+      return {
+        status,
+        total: results.length,
+        allowed: results.length - skipped.length,
+        skipped: skipped.length,
+        results: results.filter((result) => result.status !== "allow")
+      };
+    },
+    skippedFiles() {
+      return results.filter((result) => result.outcome === "blocked");
+    }
+  };
+}
+
+function fsExists(file) {
+  try {
+    return fs.existsSync(file);
+  } catch {
+    return false;
+  }
+}
+
+function packageJsonScripts(text) {
   if (!text) return {};
   try {
     return JSON.parse(text).scripts || {};
@@ -141,8 +227,9 @@ function uniqueDependencies(dependencies) {
   );
 }
 
-export function scanRepository(root = process.cwd()) {
+export function scanRepository(root = process.cwd(), options = {}) {
   const files = listRepoFiles(root);
+  const metadata = createMetadataReader(root, options);
   const extensions = files.map((file) => path.extname(file)).filter(Boolean);
   const languages = [];
 
@@ -151,27 +238,24 @@ export function scanRepository(root = process.cwd()) {
   if (extensions.includes(".py")) languages.push("Python");
   if (extensions.includes(".java")) languages.push("Java");
 
-  const scripts = packageJsonScripts(root);
+  const packageJson = metadata.read("package.json");
+  const pyproject = metadata.read("pyproject.toml");
+  const requirements = metadata.read("requirements.txt");
+  const pomFiles = files.filter((file) => file.endsWith("pom.xml"));
+  const gradleFiles = files.filter((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"));
+  const scripts = packageJsonScripts(packageJson);
   const frameworks = [];
-  const packageJson = readTextIfExists(root, "package.json") || "";
-  const pyproject = readTextIfExists(root, "pyproject.toml") || "";
-  const requirements = readTextIfExists(root, "requirements.txt") || "";
-  const pomText = files.filter((file) => file.endsWith("pom.xml")).map((file) => readTextIfExists(root, file)).join("\n");
-  const gradleText = files
-    .filter((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"))
-    .map((file) => readTextIfExists(root, file))
-    .join("\n");
+  const pomText = pomFiles.map((file) => metadata.read(file)).join("\n");
+  const gradleText = gradleFiles.map((file) => metadata.read(file)).join("\n");
   const dependencies = [
     ...packageJsonDependencies(packageJson),
     ...requirementsDependencies(requirements),
     ...pyprojectDependencies(pyproject),
-    ...files.filter((file) => file.endsWith("pom.xml")).flatMap((file) => pomDependencies(readTextIfExists(root, file) || "", file)),
-    ...files
-      .filter((file) => file.endsWith("build.gradle") || file.endsWith("build.gradle.kts"))
-      .flatMap((file) => gradleDependencies(readTextIfExists(root, file) || "", file))
+    ...pomFiles.flatMap((file) => pomDependencies(metadata.read(file), file)),
+    ...gradleFiles.flatMap((file) => gradleDependencies(metadata.read(file), file))
   ];
   const springBootEntrypoints = files.filter((file) =>
-    file.endsWith(".java") && /@SpringBootApplication/.test(readTextIfExists(root, file) || "")
+    file.endsWith(".java") && /@SpringBootApplication/.test(metadata.read(file))
   );
   const isDjango = /django/i.test(pyproject + requirements) || files.includes("manage.py");
   const isSpringBoot = /spring-boot/i.test(pomText + gradleText) || springBootEntrypoints.length > 0;
@@ -226,6 +310,8 @@ export function scanRepository(root = process.cwd()) {
     dependencies: uniqueDependencies(dependencies),
     entrypoints: unique(entrypoints),
     testFiles: unique(testFiles),
-    suggestedCommands: unique(suggestedCommands)
+    suggestedCommands: unique(suggestedCommands),
+    metadataReadPolicy: metadata.summary(),
+    skippedMetadataFiles: metadata.skippedFiles()
   };
 }

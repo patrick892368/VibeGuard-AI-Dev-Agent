@@ -21,6 +21,19 @@ function dependencyList(dependencies) {
   }).join("\n");
 }
 
+function policyReadList(scan) {
+  const policy = scan.metadataReadPolicy;
+  if (!policy || policy.status === "not_checked") {
+    return "- Metadata read policy was not provided / 未提供元数据读取策略";
+  }
+  const skipped = scan.skippedMetadataFiles || [];
+  const summary = `- Status / 状态: ${policy.status}; checked / 已检查: ${policy.total}; skipped / 已跳过: ${policy.skipped}`;
+  if (skipped.length === 0) return `${summary}\n- No metadata files were skipped / 没有元数据文件被跳过`;
+  return `${summary}\n${skipped.slice(0, 20).map((item) =>
+    `- \`${item.file}\`: ${item.status}. ${item.reason} / ${item.reason === "Path requires human confirmation" ? "路径需要人工确认" : "路径未被允许读取"}`
+  ).join("\n")}`;
+}
+
 function isSourceFile(file) {
   return /\.(js|mjs|cjs|ts|tsx|py|java)$/.test(file) &&
     !/(^|\/)(test|tests|__tests__)\//.test(file) &&
@@ -340,6 +353,10 @@ export function buildOnboardingMarkdown(scan) {
 
 ${dependencyList(dependencies)}
 
+## Policy Notes / 策略说明
+
+${policyReadList(scan)}
+
 ## Entrypoints / 入口文件
 
 ${bulletList(scan.entrypoints)}
@@ -386,6 +403,10 @@ export function buildArchitectureMarkdown(scan) {
 
 ${dependencyList(dependencies)}
 
+## Policy Notes / 策略说明
+
+${policyReadList(scan)}
+
 ## Entrypoints / 入口文件
 
 ${bulletList(scan.entrypoints)}
@@ -406,7 +427,11 @@ ${architectureDiagram(scan, coreModules)}
 
 export function analyzeRepository(options = {}) {
   const root = options.root || process.cwd();
-  const scan = scanRepository(root);
+  const scan = scanRepository(root, {
+    engine: options.engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
   const firstTasks = recommendFirstTasks(scan);
   const commandChecks = verifySuggestedCommands(scan);
   const coreModules = identifyCoreModules(scan);
@@ -422,7 +447,12 @@ export function analyzeRepository(options = {}) {
 
 export function writeOnboardingDocs(root = process.cwd(), engine, options = {}) {
   if (!engine) throw new Error("writeOnboardingDocs requires a PolicyEngine");
-  const result = analyzeRepository({ root });
+  const result = analyzeRepository({
+    root,
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
   const written = [
     writeFileWithPolicy(root, "docs/ONBOARDING.md", result.markdown, engine, options),
     writeFileWithPolicy(root, "docs/ARCHITECTURE.md", result.architecture, engine, options)

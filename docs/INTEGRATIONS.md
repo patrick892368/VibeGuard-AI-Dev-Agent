@@ -47,6 +47,10 @@ When `debug --ai-patch` or `fix` calls a provider, the patch source includes `re
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。
 
+Repository metadata reads used by `debug`, `fix`, `test`, and `onboard` pass path policy when those agents receive a `PolicyEngine`. The result exposes `metadataReadPolicy` and `skippedMetadataFiles`, so Codex/MCP callers can see which dependency manifests or framework metadata files were not read.
+
+当 `debug`、`fix`、`test` 和 `onboard` 收到 `PolicyEngine` 时，它们使用的仓库元数据读取会先经过 path policy。结果会暴露 `metadataReadPolicy` 和 `skippedMetadataFiles`，让 Codex/MCP 调用方知道哪些依赖 manifest 或框架元数据文件没有被读取。
+
 `test` checks candidate source-file reads through path policy, reads coverage.py JSON or LCOV input files through path policy, then reports uncovered functions, classes, and interfaces. It returns `sourceReadPolicy`, `skippedSourceFiles`, and `coverageDeltaStatus` so callers can tell whether source reads were skipped and whether before/after coverage was compared. `test --write` can generate runtime tests for functions and classes, while TypeScript interface-only files stay as prioritization candidates instead of producing empty runtime tests.
 
 `test` 会先通过 path policy 检查候选源码文件读取，也会通过 path policy 读取 coverage.py JSON 或 LCOV 输入文件，然后输出未覆盖函数、类和接口。它会返回 `sourceReadPolicy`、`skippedSourceFiles` 和 `coverageDeltaStatus`，让调用方知道是否有源码读取被跳过，以及 before/after coverage 是否已比较。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。

@@ -253,6 +253,27 @@ test("CLI debug blocks denied log input files", () => {
   }), /Path matches deny policy/);
 });
 
+test("CLI onboard gates protected metadata reads", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-onboard-policy-"));
+  fs.writeFileSync(path.join(root, "requirements.txt"), "Django==5.0\n", "utf8");
+
+  const blocked = JSON.parse(execFileSync(process.execPath, [bin, "--root", root, "onboard", "--json"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }));
+  const confirmed = JSON.parse(execFileSync(process.execPath, [bin, "--root", root, "onboard", "--confirm", "--json"], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  }));
+
+  assert.equal(blocked.scan.metadataReadPolicy.status, "require_confirmation");
+  assert.equal(blocked.scan.skippedMetadataFiles[0].file, "requirements.txt");
+  assert.equal(blocked.scan.dependencies.some((dependency) => dependency.name === "Django"), false);
+  assert.equal(confirmed.scan.metadataReadPolicy.status, "allow");
+  assert.equal(confirmed.scan.dependencies.some((dependency) => dependency.name === "Django"), true);
+  assert.equal(confirmed.scan.frameworks.includes("Django"), true);
+});
+
 test("CLI test command accepts coverage report", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-coverage-"));
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

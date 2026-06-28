@@ -1249,7 +1249,11 @@ export function analyzeTestTargets(options = {}) {
   const root = options.root || process.cwd();
   const engine = options.engine || new PolicyEngine(loadConfig(root).config, { root });
   const files = listRepoFiles(root);
-  const repo = scanRepository(root);
+  const repo = scanRepository(root, {
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
   const coverage = loadCoverage(options, root);
   const coverageAfter = loadCoverageAfter(options, root);
   const coverageDelta = compareCoverageReports(coverage, coverageAfter);
@@ -1317,6 +1321,8 @@ export function analyzeTestTargets(options = {}) {
     coverageDelta,
     coverageDeltaStatus: describeCoverageDelta(coverage, coverageAfter, coverageDelta),
     coverageTargets: coverageTargets(sortedCandidates),
+    metadataReadPolicy: repo.metadataReadPolicy,
+    skippedMetadataFiles: repo.skippedMetadataFiles,
     sourceReadPolicy: summarizeSourceReadPolicy(sourceReadResults),
     skippedSourceFiles: sourceReadResults.filter((result) => result.outcome === "blocked"),
     candidates: sortedCandidates

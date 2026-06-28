@@ -307,13 +307,17 @@ function buildErrorExplanation(summary, frames, frameworkContexts) {
   };
 }
 
-function canReadContextFile(engine, file) {
-  if (!engine) return true;
-  return engine.checkPath(file, "read_debug_context").status === "allow";
+function policyAllowed(result, options = {}) {
+  return result.status === "allow" || (result.status === "require_confirmation" && options.confirmed);
 }
 
-function sourceSnippet(root, file, line, radius = 3, engine = null) {
-  if (!canReadContextFile(engine, file)) return null;
+function canReadContextFile(engine, file, options = {}) {
+  if (!engine) return true;
+  return policyAllowed(engine.checkPath(file, "read_debug_context"), options);
+}
+
+function sourceSnippet(root, file, line, radius = 3, engine = null, options = {}) {
+  if (!canReadContextFile(engine, file, options)) return null;
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute)) return null;
   const lines = fs.readFileSync(absolute, "utf8").split(/\r?\n/);
@@ -327,8 +331,8 @@ function sourceSnippet(root, file, line, radius = 3, engine = null) {
   };
 }
 
-function sourcePreview(root, file, limit = 40, engine = null) {
-  if (!canReadContextFile(engine, file)) return null;
+function sourcePreview(root, file, limit = 40, engine = null, options = {}) {
+  if (!canReadContextFile(engine, file, options)) return null;
   const absolute = path.join(root, file);
   if (!fs.existsSync(absolute)) return null;
   const lines = fs.readFileSync(absolute, "utf8").split(/\r?\n/);
@@ -344,7 +348,11 @@ function sourcePreview(root, file, limit = 40, engine = null) {
 export function analyzeDebugLog(logText, options = {}) {
   const root = options.root || process.cwd();
   const engine = options.engine || null;
-  const repo = scanRepository(root);
+  const repo = scanRepository(root, {
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
   const pythonFrames = parsePythonTraceback(logText, root);
   const nodeFrames = parseNodeStack(logText, root);
   const javaFrames = parseJavaStack(logText, root, repo.files);
@@ -357,14 +365,14 @@ export function analyzeDebugLog(logText, options = {}) {
   const snippets = [];
   const snippetFiles = new Set();
   for (const frame of frames.slice(0, 5)) {
-    const snippet = sourceSnippet(root, frame.file, frame.line, 3, engine);
+    const snippet = sourceSnippet(root, frame.file, frame.line, 3, engine, options);
     if (!snippet) continue;
     snippets.push(snippet);
     snippetFiles.add(frame.file);
   }
   for (const file of uniqueFiles) {
     if (snippets.length >= 8 || snippetFiles.has(file)) continue;
-    const snippet = sourcePreview(root, file, 40, engine);
+    const snippet = sourcePreview(root, file, 40, engine, options);
     if (!snippet) continue;
     snippets.push(snippet);
     snippetFiles.add(file);
@@ -376,6 +384,8 @@ export function analyzeDebugLog(logText, options = {}) {
     frames,
     likelyFiles: uniqueFiles,
     snippets,
+    metadataReadPolicy: repo.metadataReadPolicy,
+    skippedMetadataFiles: repo.skippedMetadataFiles,
     hints: [...likelyFixHints(summary), ...frameworkContexts.flatMap((context) => context.hints)],
     suggestedTestCommands: [...new Set([...repo.suggestedCommands, ...frameworkContexts.flatMap((context) => context.suggestedCommands)])],
     frameworkContext: frameworkContexts[0] || null,

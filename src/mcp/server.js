@@ -81,7 +81,10 @@ const tools = [
   {
     name: "onboard_repo",
     description: "Scan the repository and return onboarding documentation.",
-    inputSchema: objectSchema()
+    inputSchema: objectSchema({
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    })
   },
   {
     name: "write_tests",
@@ -477,7 +480,12 @@ async function callTool(name, args, root) {
       })
       : null;
     const logText = logFile?.content || args.log || "";
-    const result = analyzeDebugLog(logText, { root, engine });
+    const result = analyzeDebugLog(logText, {
+      root,
+      engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
     if (logFile) {
       result.logFileRead = {
         path: logFile.path,
@@ -543,7 +551,16 @@ async function callTool(name, args, root) {
       githubUseApi: Boolean(args.githubUseApi)
     });
   }
-  if (name === "onboard_repo") return analyzeRepository({ root });
+  if (name === "onboard_repo") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    return analyzeRepository({
+      root,
+      engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
+  }
   if (name === "write_tests") {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
