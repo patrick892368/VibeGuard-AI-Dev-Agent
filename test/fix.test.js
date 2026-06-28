@@ -423,6 +423,55 @@ test("fix CLI executes confirmed push plan against local bare remote", () => {
   assert.match(pushedRef, /refs\/heads\/codex\/fix-referenceerror/);
 });
 
+test("fix workflow can create PRs through the GitHub REST fallback", async () => {
+  const root = copyFixture("node-bug");
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root, encoding: "utf8" });
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["git switch -c", "git commit", "gh pr create"]
+    }
+  }, { root });
+  let request;
+
+  const result = await runFixWorkflow({
+    root,
+    engine,
+    logFile: "error.log",
+    patchFile: "fixes/reference-error.patch",
+    testCommand: "npm test",
+    apply: true,
+    createBranch: true,
+    commit: true,
+    createPr: true,
+    executeGitPlan: true,
+    confirmed: true,
+    env: { GITHUB_TOKEN: "token" },
+    githubUseApi: true,
+    async githubFetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/1", number: 1 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "passed");
+  assert.equal(result.gitExecution.status, "executed");
+  assert.equal(result.gitExecution.results.at(-1).step, "create_pr");
+  assert.equal(result.gitExecution.results.at(-1).method, "api");
+  assert.equal(result.gitExecution.results.at(-1).url, "https://github.com/owner/repo/pull/1");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(request.body.head, "codex/fix-referenceerror");
+});
+
 test("fix CLI applies Node fixture patch and runs tests", () => {
   const root = copyFixture("node-bug");
   const result = runCli([

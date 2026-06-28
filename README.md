@@ -247,6 +247,10 @@ Git plan PR body files are checked through `read_pr_body` path policy before any
 
 Git plan 中的 PR body 文件也会在受保护的 branch / commit / push / PR 执行前经过 `read_pr_body` path policy。Fix dry-run 也会返回 `gitPolicy`，方便 Codex 在执行前审查 command 和 body-file policy。
 
+When a Fix Git plan is executed, its `create_pr` step uses the same GitHub helper path as `vibeguard github pr`; it can create the draft PR through authenticated `gh` or through the `GITHUB_TOKEN` / `GH_TOKEN` REST fallback after policy confirmation.
+
+Fix Git plan 执行时，`create_pr` 步骤会复用 `vibeguard github pr` 的 GitHub helper 路径；通过 policy 确认后，可以用已认证的 `gh` 创建 draft PR，也可以在存在 `GITHUB_TOKEN` / `GH_TOKEN` 时走 REST fallback。
+
 ## Policy-as-Code / Policy-as-Code
 
 `.vibeguard.yaml` 定义仓库安全边界：
@@ -324,8 +328,8 @@ The test suite covers:
 - Onboarding command checks，用于标注建议命令的依据、缺失 wrapper 或需要确认的依赖。Onboarding command checks for suggested command evidence, missing wrappers, or dependencies that need confirmation.
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
 - 本地 branch / commit / push / PR plan 的受保护执行，并检查 PR body-file path policy。Confirmed protected local branch / commit / push / PR plan flows, including PR body-file path policy.
-- PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper GitHub command/path policy、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper GitHub command/path policy, policy confirmation, and REST fallback.
-- Public JS API exports for GitHub helpers, Git plan policy/execution, and Test Writer write/coverage helpers. / Public JS API 已导出 GitHub helper、Git plan policy/execution，以及 Test Writer 写测试和 coverage helper。
+- PR 创建调度、Fix Git plan REST PR 创建、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper GitHub command/path policy、policy confirmation 和 REST fallback。PR creation dispatch, Fix Git plan REST PR creation, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper GitHub command/path policy, policy confirmation, and REST fallback.
+- Public JS API exports for GitHub helpers, sync/async Git plan policy/execution, and Test Writer write/coverage helpers. / Public JS API 已导出 GitHub helper、同步/异步 Git plan policy/execution，以及 Test Writer 写测试和 coverage helper。
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.

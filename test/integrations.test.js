@@ -6,7 +6,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { hookTemplate, installHook, listHooks } from "../src/integrations/hooks.js";
 import { buildGhPrArgs, buildGhPrCommentArgs, buildGhPrReviewCommentArgs, buildGhRunListArgs, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh, parseGitHubRemote } from "../src/integrations/github.js";
-import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../src/integrations/gitPlan.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "../src/integrations/gitPlan.js";
 import { buildPrSummary, writePrSummaryBody } from "../src/agents/pr.js";
 import { buildDebugRepairPlan, generateDebugPatch } from "../src/llm/provider.js";
 import { PolicyEngine } from "../src/policy/engine.js";
@@ -77,6 +77,7 @@ test("public API exports GitHub batch review helpers", async () => {
   assert.equal(typeof api.checkGitHubCommandsPolicy, "function");
   assert.equal(typeof api.checkGitPlanPolicy, "function");
   assert.equal(typeof api.executeGitPlan, "function");
+  assert.equal(typeof api.executeGitPlanAsync, "function");
   assert.equal(typeof api.writeSuggestedTests, "function");
   assert.equal(typeof api.compareCoverageReports, "function");
   assert.equal(api.GITHUB_DETECT_COMMAND, "git remote get-url origin");
@@ -847,6 +848,43 @@ test("executeGitPlan dispatches create_pr through the protected command runner",
   assert.equal(calls[0].argv[0], "gh");
   assert.deepEqual(calls[0].argv.slice(0, 3), ["gh", "pr", "create"]);
   assert.equal(calls[0].confirmed, true);
+});
+
+test("executeGitPlanAsync can create PRs through the REST fallback", async () => {
+  const root = tempGitHubRepo();
+  const engine = permissivePolicyEngine(root);
+  const plan = buildFixGitPlan({
+    changedFiles: ["src/app.js"],
+    branch: "codex/fix-error",
+    commitMessage: "fix: error",
+    title: "Fix error",
+    body: "body",
+    prDryRun: true
+  });
+  let request;
+
+  const result = await executeGitPlanAsync(root, plan, engine, {
+    confirmed: true,
+    useApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/1", number: 1 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.status, "executed");
+  assert.equal(result.results[0].step, "create_pr");
+  assert.equal(result.results[0].method, "api");
+  assert.equal(result.results[0].url, "https://github.com/owner/repo/pull/1");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(request.body.head, "codex/fix-error");
 });
 
 test("executeGitPlan blocks denied PR body files before running commands", () => {

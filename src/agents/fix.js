@@ -7,7 +7,7 @@ import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
 import { readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 import { runCommandWithPolicy } from "../runner/safeCommand.js";
-import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlanAsync } from "../integrations/gitPlan.js";
 import { scanRepository } from "../repo/scan.js";
 import { generateFallbackPatch } from "./fallbackPatch.js";
 
@@ -521,8 +521,12 @@ export async function runFixWorkflow(options = {}) {
   let status = tests && tests.status !== "passed" ? "failed" : "passed";
   let gitExecution = null;
   if (status === "passed" && options.executeGitPlan && gitPlan) {
-    gitExecution = executeGitPlan(root, gitPlan, engine, {
-      confirmed: Boolean(options.confirmed)
+    gitExecution = await executeGitPlanAsync(root, gitPlan, engine, {
+      confirmed: Boolean(options.confirmed),
+      auditLog: options.auditLog,
+      env: options.env,
+      fetch: options.githubFetch,
+      useApi: Boolean(options.githubUseApi)
     });
     if (gitExecution.status !== "executed") {
       status = gitExecution.status === "deny" || gitExecution.status === "require_confirmation"
