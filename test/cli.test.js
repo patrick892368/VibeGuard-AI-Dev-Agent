@@ -1058,6 +1058,10 @@ test("CLI pr summary can write a policy-gated body file", () => {
 
   assert.equal(parsed.writtenBody.path, "reports/pr-body.md");
   assert.equal(parsed.writtenBody.policy.status, "allow");
+  assert.equal(parsed.title, "Add coverage for app");
+  assert.equal(parsed.branch, "codex/add-tests-app");
+  assert.equal(parsed.commitMessage, "test: add coverage for app");
+  assert.deepEqual(parsed.automation.changedFiles, ["src/app.js"]);
   assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
 });
 

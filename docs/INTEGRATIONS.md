@@ -64,9 +64,9 @@ Repository metadata reads used by `debug`, `fix`, `test`, and `onboard` pass pat
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。它会检查 Python mutable default、JavaScript/TypeScript 条件里的疑似赋值、吞掉异常等 bug-prone 新增代码，同时覆盖 secret、SQL/HTML/deserialization、SSRF、TLS 校验关闭、弱 hash、安全敏感随机数、动态执行、shell injection、Java `Runtime.exec` / `ProcessBuilder`、Java URL/URI SSRF、一般进程执行、performance、deployment、database、maintainability 和 testing 规则。未传 `--diff` 时，默认 `git diff` 读取会先经过 command policy；`--diff` 输入文件会经过路径 policy 读取；`--github-pr` 会通过 policy 检查后的 `gh pr diff` 或 REST fallback 读取远端 PR diff，公开仓库只读 GET 可无 token；`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown；`--comment-pr` 或 `--publish-comment` 可以把生成的 Markdown 直接、受 policy 保护地发布为 GitHub PR comment；`github review-comments` 可以把生成的文件行级评论批量、受 policy 保护地发布。
 
-`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, and validation checkboxes. Without an explicit diff file, PR number, or stdin diff, the default `git diff` read is command-policy gated. `githubPr` / `--github-pr` can pull remote PR diffs through the same GitHub helper path. `writeBody` writes that body through policy for GitHub PR creation.
+`summarize_pr` builds a GitHub-ready PR body that includes changed files, review findings, severity counts, actionItems, validation checkboxes, and machine-readable PR automation metadata: title, branch name, and commit message. Without an explicit diff file, PR number, or stdin diff, the default `git diff` read is command-policy gated. `githubPr` / `--github-pr` can pull remote PR diffs through the same GitHub helper path. `writeBody` writes that body through policy for GitHub PR creation.
 
-`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems 和验证 checklist。未传显式 diff 文件、PR 编号或 stdin diff 时，默认 `git diff` 读取会先经过 command policy。`githubPr` / `--github-pr` 可以复用同一 GitHub helper 路径拉取远端 PR diff。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
+`summarize_pr` 会生成 GitHub-ready PR body，包含变更文件、review findings、严重度统计、actionItems、验证 checklist，以及机器可读的 PR 自动化元数据：title、branch name 和 commit message。未传显式 diff 文件、PR 编号或 stdin diff 时，默认 `git diff` 读取会先经过 command policy。`githubPr` / `--github-pr` 可以复用同一 GitHub helper 路径拉取远端 PR diff。`writeBody` 会经过 policy 写出正文文件，供 GitHub PR 创建使用。
 
 ## Git Hooks / Git Hooks
 
@@ -156,9 +156,9 @@ CLI patch input files, including `policy check --patch`, `patch check/apply --fi
 
 CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --file` 和 `fix --patch <file>`，都会先经过路径 policy 读取，然后才解析内容。
 
-`summarize_pr` can accept pasted `diff` or a `diffFile` read through path policy, return a GitHub-ready PR body, and, when `writeBody` is provided, write that body through policy.
+`summarize_pr` can accept pasted `diff` or a `diffFile` read through path policy, return a GitHub-ready PR body plus automatic title, branch, and commit-message metadata, and, when `writeBody` is provided, write that body through policy.
 
-`summarize_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回 GitHub-ready PR body；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
+`summarize_pr` 可以接收粘贴的 `diff`，也可以通过 path policy 读取 `diffFile`，返回 GitHub-ready PR body 以及自动 title、branch、commit message 元数据；传入 `writeBody` 时，会经过 policy 写出 PR body 文件。
 
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 

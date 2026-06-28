@@ -105,7 +105,28 @@ test("buildPrSummary returns GitHub-ready body", () => {
   assert.match(result.body, /Review Action Items/);
   assert.match(result.body, /Findings by severity/);
   assert.match(result.body, /Add or update a focused test/);
+  assert.equal(result.title, "Add coverage for app");
+  assert.equal(result.branch, "codex/add-tests-app");
+  assert.equal(result.commitMessage, "test: add coverage for app");
+  assert.deepEqual(result.automation.changedFiles, ["src/app.js"]);
   assert.equal(result.review.files[0], "src/app.js");
+});
+
+test("buildPrSummary prioritizes security findings for PR automation metadata", () => {
+  const diff = `diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function query(id) {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`;
+
+  const result = buildPrSummary(diff);
+
+  assert.equal(result.title, "Address security findings in db");
+  assert.equal(result.branch, "codex/address-security-db");
+  assert.equal(result.commitMessage, "fix: address security findings in db");
+  assert.equal(result.automation.title, result.title);
 });
 
 test("writePrSummaryBody writes a GitHub-ready body through policy", () => {
@@ -126,6 +147,8 @@ test("writePrSummaryBody writes a GitHub-ready body through policy", () => {
 
   assert.equal(result.writtenBody.path, "reports/pr-body.md");
   assert.equal(result.writtenBody.policy.status, "allow");
+  assert.equal(result.branch, "codex/add-tests-app");
+  assert.equal(result.commitMessage, "test: add coverage for app");
   assert.match(fs.readFileSync(path.join(root, "reports", "pr-body.md"), "utf8"), /Review Action Items/);
 });
 

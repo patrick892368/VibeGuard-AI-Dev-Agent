@@ -391,6 +391,9 @@ test("MCP summarize_pr reads diff files through path policy", async () => {
 
   const result = response.result.structuredContent;
   assert.match(result.body, /src\/app\.js/);
+  assert.equal(result.branch, "codex/add-tests-app");
+  assert.equal(result.commitMessage, "test: add coverage for app");
+  assert.deepEqual(result.automation.changedFiles, ["src/app.js"]);
   assert.ok(result.review.findings.some((finding) => finding.category === "maintainability"));
 });
 

@@ -1,8 +1,71 @@
 import { analyzeReviewDiff } from "./review.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 
+function basename(file) {
+  return String(file || "change").split("/").filter(Boolean).pop() || "change";
+}
+
+function labelForFile(file) {
+  return basename(file).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]+/g, " ").trim() || "change";
+}
+
+function slug(value) {
+  return String(value || "change")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "change";
+}
+
+function primarySourceFile(files) {
+  return files.find((file) => /\.(js|ts|py|java|mjs|cjs)$/.test(file) && !/(^|\/)(test|tests|__tests__)\//.test(file) && !/\.(test|spec)\./.test(file)) ||
+    files[0] ||
+    "change";
+}
+
+function prIntent(review) {
+  const categories = new Set(review.findings.map((finding) => finding.category));
+  const files = review.files || [];
+  const primary = primarySourceFile(files);
+  const label = labelForFile(primary);
+  if (categories.has("security")) {
+    return {
+      title: `Address security findings in ${label}`,
+      branch: `codex/address-security-${slug(label)}`,
+      commitMessage: `fix: address security findings in ${label}`
+    };
+  }
+  if (categories.has("bug")) {
+    return {
+      title: `Fix ${label} behavior`,
+      branch: `codex/fix-${slug(label)}`,
+      commitMessage: `fix: update ${label} behavior`
+    };
+  }
+  if (categories.has("testing")) {
+    return {
+      title: `Add coverage for ${label}`,
+      branch: `codex/add-tests-${slug(label)}`,
+      commitMessage: `test: add coverage for ${label}`
+    };
+  }
+  if (files.every((file) => /\.(md|mdx|txt|rst)$/i.test(file))) {
+    return {
+      title: `Update ${label} docs`,
+      branch: `codex/update-docs-${slug(label)}`,
+      commitMessage: `docs: update ${label}`
+    };
+  }
+  return {
+    title: files.length > 1 ? `Update ${files.length} files` : `Update ${label}`,
+    branch: `codex/update-${slug(label)}`,
+    commitMessage: `chore: update ${label}`
+  };
+}
+
 export function buildPrSummary(diffText) {
   const review = analyzeReviewDiff(diffText);
+  const intent = prIntent(review);
   const files = review.files.map((file) => `- ${file}`).join("\n") || "- No files detected";
   const findings = review.findings
     .map((finding) => {
@@ -18,7 +81,15 @@ export function buildPrSummary(diffText) {
     .join("\n") || "- No action items";
 
   return {
-    title: "VibeGuard generated change",
+    title: intent.title,
+    branch: intent.branch,
+    commitMessage: intent.commitMessage,
+    automation: {
+      title: intent.title,
+      branch: intent.branch,
+      commitMessage: intent.commitMessage,
+      changedFiles: review.files
+    },
     body: `## Summary
 
 This PR was prepared with VibeGuard.
