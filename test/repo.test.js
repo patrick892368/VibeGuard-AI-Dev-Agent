@@ -192,6 +192,16 @@ test("analyzeTestTargets prioritizes uncovered coverage files", () => {
   assert.equal(result.candidates[0].coverage.missingLineCount, 1);
 });
 
+test("analyzeTestTargets rejects coverage files outside the repository root", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  const outside = path.join(os.tmpdir(), `vibeguard-outside-coverage-${Date.now()}.json`);
+  fs.writeFileSync(outside, JSON.stringify({ files: {} }), "utf8");
+
+  assert.throws(() => analyzeTestTargets({ root, coverageFile: outside }), /Path escapes repository root/);
+});
+
 test("analyzeTestTargets includes coverage delta when before and after reports are provided", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"), { recursive: true });

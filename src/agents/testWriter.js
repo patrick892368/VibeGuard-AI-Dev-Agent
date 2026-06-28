@@ -458,6 +458,16 @@ function normalizeCoveragePath(root, filePath) {
   return path.relative(root, filePath).replace(/\\/g, "/");
 }
 
+function resolveInsideRoot(root, filePath) {
+  const absoluteRoot = path.resolve(root);
+  const absolute = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(absoluteRoot, filePath);
+  const relative = path.relative(absoluteRoot, absolute);
+  if (relative && (relative.startsWith("..") || path.isAbsolute(relative))) {
+    throw new Error(`Path escapes repository root: ${filePath}`);
+  }
+  return absolute;
+}
+
 function parseCoverageJson(text, root) {
   const data = JSON.parse(text);
   if (!data.files || typeof data.files !== "object") {
@@ -629,7 +639,7 @@ function loadCoverageInput(options, root, fileKey, textKey) {
     });
     return parseCoverageReport(read.content, { root });
   }
-  const coverageFile = path.isAbsolute(options[fileKey]) ? options[fileKey] : path.join(root, options[fileKey]);
+  const coverageFile = resolveInsideRoot(root, options[fileKey]);
   return parseCoverageReport(fs.readFileSync(coverageFile, "utf8"), { root });
 }
 
