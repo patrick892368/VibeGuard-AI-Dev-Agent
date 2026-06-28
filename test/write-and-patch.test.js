@@ -300,7 +300,10 @@ fs.writeFileSync("coverage.json", JSON.stringify({
     limit: 1,
     coverageFile: "coverage.json",
     coverageCommand: "node coverage-script.cjs",
-    runTests: true
+    runTests: true,
+    createBranch: true,
+    commit: true,
+    prDryRun: true
   });
 
   assert.deepEqual(result.coverageRuns.map((run) => [run.phase, run.status]), [["before", "passed"], ["after", "passed"]]);
@@ -309,6 +312,8 @@ fs.writeFileSync("coverage.json", JSON.stringify({
   assert.equal(result.coverageDeltaStatus.status, "compared");
   assert.equal(result.coverageDelta.summary.missingLinesReduced, 1);
   assert.equal(result.coverageDelta.files[0].status, "improved");
+  assert.match(result.gitPlan.commands.at(-1).github.body, /## Coverage/);
+  assert.match(result.gitPlan.commands.at(-1).github.body, /missing lines reduced by 1/);
 });
 
 test("writeSuggestedTests writes simple Python behavior assertions", () => {

@@ -1383,11 +1383,26 @@ function coverageTargets(candidates) {
     }));
 }
 
-function buildTestWriterPrBody(written, testRuns) {
+function buildCoverageValidation(coverageDeltaStatus, coverageDelta) {
+  if (!coverageDeltaStatus || coverageDeltaStatus.status === "not_requested") {
+    return "- [ ] Coverage delta was not requested";
+  }
+  if (coverageDeltaStatus.status !== "compared") {
+    return `- [ ] Coverage delta was not compared: ${coverageDeltaStatus.reason || "unknown"}`;
+  }
+  const summary = coverageDelta?.summary || {};
+  const averagePercentDelta = summary.averagePercentDelta === null || summary.averagePercentDelta === undefined
+    ? "n/a"
+    : `${summary.averagePercentDelta}`;
+  return `- [x] Coverage delta compared: missing lines reduced by ${summary.missingLinesReduced ?? 0}; average percent delta ${averagePercentDelta}`;
+}
+
+function buildTestWriterPrBody(written, testRuns, coverageDeltaStatus = null, coverageDelta = null) {
   const files = written.map((item) => `- ${item.path}`).join("\n") || "- No generated tests";
   const validation = testRuns.length === 0
     ? "- [ ] Generated tests were not run"
     : testRuns.map((run) => `- [${run.status === "passed" ? "x" : " "}] ${run.command || run.testFile}: ${run.status}`).join("\n");
+  const coverageValidation = buildCoverageValidation(coverageDeltaStatus, coverageDelta);
 
   return `## Summary
 
@@ -1400,6 +1415,10 @@ ${files}
 ## Validation
 
 ${validation}
+
+## Coverage
+
+${coverageValidation}
 
 ## Policy
 
@@ -1442,7 +1461,7 @@ function buildTestWriterGitPlan(written, testRuns, options = {}) {
     branch: options.branch || defaults.branch,
     commitMessage: options.commitMessage || defaults.commitMessage,
     title: options.prTitle || defaults.title,
-    body: options.prBody || buildTestWriterPrBody(written, testRuns),
+    body: options.prBody || buildTestWriterPrBody(written, testRuns, options.coverageDeltaStatus, options.coverageDelta),
     bodyFile: options.prBodyFile,
     createBranch: Boolean(options.createBranch),
     commit: Boolean(options.commit),
@@ -1665,7 +1684,11 @@ function buildSuggestedTestsState(root, engine, options = {}) {
     : initialTestRuns;
   const coverageAfterRun = runCoverageCommand(root, engine, options, "after");
   const analysisWithCoverage = applyCoverageAfterRun(root, analysis, coverageAfterRun, engine, options);
-  const gitPlan = buildTestWriterGitPlan(written, testRuns, options);
+  const gitPlan = buildTestWriterGitPlan(written, testRuns, {
+    ...options,
+    coverageDeltaStatus: analysisWithCoverage.coverageDeltaStatus,
+    coverageDelta: analysisWithCoverage.coverageDelta
+  });
   const gitPolicy = gitPlan
     ? checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) })
     : null;
