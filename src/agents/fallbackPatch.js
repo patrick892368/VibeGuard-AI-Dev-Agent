@@ -44,20 +44,42 @@ function unique(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
-function findSourceFileContaining(root, debug, needle, files) {
-  const candidates = unique([
+function policyAllows(result, options = {}) {
+  return result.status === "allow" || (result.status === "require_confirmation" && options.confirmed);
+}
+
+function fallbackReadPolicy(file, options = {}) {
+  if (!options.engine) return null;
+  return options.engine.checkPath(file, "read_fallback_patch_source");
+}
+
+function candidateSourceFiles(debug, files) {
+  const hinted = unique([
     ...(debug.frames || []).map((frame) => frame.file),
-    ...(debug.likelyFiles || []),
-    ...files.filter((file) => file.endsWith(".py"))
+    ...(debug.likelyFiles || [])
   ]).filter((file) => file.endsWith(".py") && !/(^|\/)(test|tests)\//.test(file));
+  const broad = files
+    .filter((file) => file.endsWith(".py") && !/(^|\/)(test|tests)\//.test(file))
+    .filter((file) => !hinted.includes(file));
+  return [...hinted, ...broad];
+}
+
+function findSourceFileContaining(root, debug, needle, files, options = {}) {
+  const candidates = candidateSourceFiles(debug, files);
+  const skippedSourceFiles = [];
 
   for (const file of candidates) {
+    const policy = fallbackReadPolicy(file, options);
+    if (policy && !policyAllows(policy, options)) {
+      skippedSourceFiles.push({ file, policy });
+      continue;
+    }
     const absolute = path.join(root, file);
     if (!fs.existsSync(absolute)) continue;
     const text = fs.readFileSync(absolute, "utf8");
-    if (text.includes(needle)) return { file, text };
+    if (text.includes(needle)) return { source: { file, text }, skippedSourceFiles };
   }
-  return null;
+  return { source: null, skippedSourceFiles };
 }
 
 function buildSingleLineReplacementPatch(file, beforeText, afterText, changedLineIndex, contextRadius = 3) {
@@ -105,7 +127,7 @@ function replaceFirstLine(text, needle, replacement) {
   return null;
 }
 
-function generateDjangoTemplatePatch(debug, root) {
+function generateDjangoTemplatePatch(debug, root, options = {}) {
   if (!/TemplateDoesNotExist/.test(debug.summary?.type || "")) return null;
 
   const missingTemplate = firstToken(debug.summary?.message);
@@ -113,8 +135,17 @@ function generateDjangoTemplatePatch(debug, root) {
   const replacementTemplate = findReplacementTemplate(missingTemplate, files);
   if (!replacementTemplate) return null;
 
-  const source = findSourceFileContaining(root, debug, missingTemplate, files);
-  if (!source) return null;
+  const sourceResult = findSourceFileContaining(root, debug, missingTemplate, files, options);
+  const source = sourceResult.source;
+  if (!source) {
+    return {
+      status: "unavailable",
+      reason: sourceResult.skippedSourceFiles.length > 0
+        ? "No policy-allowed source file containing the missing template path was available for deterministic recovery."
+        : "No source file containing the missing template path was available for deterministic recovery.",
+      skippedSourceFiles: sourceResult.skippedSourceFiles
+    };
+  }
 
   const replaced = replaceFirstLine(source.text, missingTemplate, replacementTemplate);
   if (!replaced) return null;
@@ -129,7 +160,7 @@ function generateDjangoTemplatePatch(debug, root) {
 
 export function generateFallbackPatch(debug, options = {}) {
   const root = options.root || process.cwd();
-  return generateDjangoTemplatePatch(debug, root);
+  return generateDjangoTemplatePatch(debug, root, options);
 }
 
 export const fallbackPatchInternals = {

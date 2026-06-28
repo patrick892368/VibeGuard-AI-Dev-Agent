@@ -93,11 +93,17 @@ function canRecoverPatchCheck(patchSource) {
 }
 
 function attemptPatchCheckRecovery(root, debug, engine, options = {}) {
-  const fallback = generateFallbackPatch(debug, { root });
+  const fallback = generateFallbackPatch(debug, {
+    root,
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
   if (!fallback?.patch) {
     return {
-      status: "unavailable",
-      reason: "No deterministic fallback patch matched this error."
+      status: fallback?.status || "unavailable",
+      reason: fallback?.reason || "No deterministic fallback patch matched this error.",
+      skippedSourceFiles: fallback?.skippedSourceFiles || []
     };
   }
 

@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { PolicyEngine } from "../src/policy/engine.js";
 import { runFixWorkflow } from "../src/agents/fix.js";
+import { generateFallbackPatch } from "../src/agents/fallbackPatch.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../src/patch/validatePatch.js";
 
 const bin = path.resolve("bin/vibeguard.js");
@@ -134,6 +135,35 @@ test("fix workflow blocks sensitive patch files before apply", async () => {
 
   assert.equal(result.status, "deny");
   assert.equal(result.stage, "policy");
+});
+
+test("fallback patch recovery skips denied source files", () => {
+  const root = tempDir("vibeguard-fallback-policy-");
+  fs.mkdirSync(path.join(root, "secret"), { recursive: true });
+  fs.mkdirSync(path.join(root, "templates", "accounts"), { recursive: true });
+  fs.writeFileSync(path.join(root, "secret", "views.py"), "PROFILE_TEMPLATE = \"profiles/detail.html\"\n", "utf8");
+  fs.writeFileSync(path.join(root, "templates", "accounts", "detail.html"), "<h1>profile</h1>\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: ["secret/**"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  const result = generateFallbackPatch({
+    summary: {
+      type: "django.template.exceptions.TemplateDoesNotExist",
+      message: "profiles/detail.html"
+    },
+    frames: [{ file: "secret/views.py", line: 1 }],
+    likelyFiles: ["secret/views.py"]
+  }, {
+    root,
+    engine
+  });
+
+  assert.equal(result.status, "unavailable");
+  assert.equal(result.patch, undefined);
+  assert.equal(result.skippedSourceFiles[0].file, "secret/views.py");
+  assert.equal(result.skippedSourceFiles[0].policy.status, "deny");
 });
 
 test("fix CLI applies Python fixture patch and runs tests", () => {

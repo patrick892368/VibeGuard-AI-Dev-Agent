@@ -98,9 +98,9 @@ node ./bin/vibeguard.js fix --log error.log --auto-test --apply --json
 
 `fix` 会在 policy 和 `git apply --check` 前规范化 fenced diff、plain unified diff、非标准 `diff a/file b/file` header 和错误的 hunk count。
 
-When an AI/provider-generated patch fails `git apply --check`, Codex should inspect `patchDiagnostics` and `recovery`. VibeGuard can recover a clear Django `TemplateDoesNotExist` case by replacing a missing template string with the single matching existing template path; the fallback patch still goes through validation, policy, and apply check. User-provided patches are not silently replaced.
+When an AI/provider-generated patch fails `git apply --check`, Codex should inspect `patchDiagnostics`, `recovery`, and `recovery.skippedSourceFiles`. VibeGuard can recover a clear Django `TemplateDoesNotExist` case by replacing a missing template string with the single matching existing template path, but recovery source reads pass path policy first; the fallback patch still goes through validation, policy, and apply check. User-provided patches are not silently replaced.
 
-当 AI/provider 生成的 patch 在 `git apply --check` 失败时，Codex 应检查 `patchDiagnostics` 和 `recovery`。VibeGuard 可以恢复明确的 Django `TemplateDoesNotExist` 场景：把缺失模板字符串替换为仓库中唯一匹配的现有模板路径；fallback patch 仍会经过 validation、policy 和 apply check。用户手动提供的 patch 不会被静默替换。
+当 AI/provider 生成的 patch 在 `git apply --check` 失败时，Codex 应检查 `patchDiagnostics`、`recovery` 和 `recovery.skippedSourceFiles`。VibeGuard 可以恢复明确的 Django `TemplateDoesNotExist` 场景：把缺失模板字符串替换为仓库中唯一匹配的现有模板路径，但 recovery 源码读取会先经过 path policy；fallback patch 仍会经过 validation、policy 和 apply check。用户手动提供的 patch 不会被静默替换。
 
 Write generated patch artifacts after validation and policy checks:
 

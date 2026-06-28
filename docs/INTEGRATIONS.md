@@ -135,9 +135,9 @@ Available tools:
 
 `debug_error` 可以解析粘贴的日志，也可以通过 path policy 读取 `logFile`；当 `aiPatch` 为 true 时，会调用配置的 provider，规范化并校验生成的 diff，执行 patch policy 检查，并可通过 `outputPatch` 写出 patch artifact。
 
-`fix_error` accepts pasted `log` / `patch` text or `logFile` / `patchFile` inputs; file inputs are read through path policy before debug analysis or patch parsing.
+`fix_error` accepts pasted `log` / `patch` text or `logFile` / `patchFile` inputs; file inputs are read through path policy before debug analysis or patch parsing. If generated-patch recovery tries the Django TemplateDoesNotExist fallback, source reads are also path-policy gated and skipped files are surfaced as `recovery.skippedSourceFiles`.
 
-`fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。
+`fix_error` 支持粘贴的 `log` / `patch` 文本，也支持 `logFile` / `patchFile` 输入；文件输入会先经过 path policy 读取，然后才进入 debug 分析或 patch 解析。如果生成 patch 的恢复流程尝试 Django TemplateDoesNotExist fallback，源码读取也会经过 path policy，被跳过的文件会暴露为 `recovery.skippedSourceFiles`。
 
 `onboard_repo` returns bilingual onboarding Markdown, architecture Markdown, structured dependency lists, structured `coreModules`, repository-specific Mermaid diagrams, structured `firstTasks` with low-risk commands and files for newcomers, and `commandChecks` for suggested command readiness.
 
