@@ -18,6 +18,7 @@ test("runDoctor reports readiness without exposing provider secrets", () => {
   assert.equal(result.provider.provider, "grok");
   assert.equal(result.provider.hasGrokKey, true);
   assert.equal(result.provider.model, "grok-test");
+  assert.equal(result.provider.ready, true);
   assert.equal(result.githubAuth.hasToken, true);
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
   assert.equal(JSON.stringify(result).includes("github-secret"), false);
@@ -34,4 +35,22 @@ test("runDoctor reports the Grok default model when no model is configured", () 
   assert.equal(result.provider.provider, "grok");
   assert.equal(result.provider.model, "grok-4.3");
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
+});
+
+test("runDoctor returns next actions for missing provider and GitHub execution auth", () => {
+  const result = runDoctor({
+    root: process.cwd(),
+    env: {},
+    toolStatus: {
+      git: { available: true, detail: "git version test" },
+      gh: { available: false, detail: "missing" }
+    }
+  });
+
+  assert.equal(result.provider.ready, false);
+  assert.deepEqual(result.nextActions.map((action) => action.id), [
+    "configure_ai_provider",
+    "enable_github_execution"
+  ]);
+  assert.match(result.nextActions[0].command, /XAI_API_KEY|GROK_API_KEY/);
 });

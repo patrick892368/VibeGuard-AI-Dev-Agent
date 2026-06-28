@@ -146,9 +146,9 @@ The MCP `write_tests` tool exposes the same `repair` boolean as the CLI.
 
 MCP `write_tests` tool 暴露与 CLI 相同的 `repair` 布尔参数。
 
-`doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets.
+`doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets, and returns `nextActions` for missing provider or GitHub execution prerequisites.
 
-`doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥。
+`doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥；如果缺少 provider 或 GitHub 执行前置条件，会返回 `nextActions`。
 
 `--audit-log reports/audit.jsonl` can be used from CLI or MCP-style workflows to append policy-gated JSONL audit events.
 

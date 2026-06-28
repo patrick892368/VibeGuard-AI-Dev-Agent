@@ -22,11 +22,30 @@ function providerStatus(env) {
   const model = provider === "grok" || provider === "xai"
     ? env.VIBEGUARD_MODEL || env.XAI_MODEL || env.GROK_MODEL || "grok-4.3"
     : env.VIBEGUARD_MODEL || null;
+  const hasGrokKey = Boolean(env.XAI_API_KEY || env.GROK_API_KEY);
+  const hasOpenAIKey = Boolean(env.OPENAI_API_KEY);
+  let ready = false;
+  let reason = null;
+  if (provider === "unset") {
+    reason = "No LLM provider is configured.";
+  } else if (provider === "grok" || provider === "xai") {
+    ready = hasGrokKey;
+    reason = ready ? null : "XAI_API_KEY or GROK_API_KEY is required for Grok.";
+  } else if (provider === "openai-compatible") {
+    ready = hasOpenAIKey && Boolean(env.VIBEGUARD_MODEL);
+    reason = ready ? null : "OPENAI_API_KEY and VIBEGUARD_MODEL are required for openai-compatible providers.";
+  } else if (provider === "fixture") {
+    ready = true;
+  } else {
+    reason = `Unsupported LLM provider: ${provider}`;
+  }
   return {
     provider,
     model,
-    hasGrokKey: Boolean(env.XAI_API_KEY || env.GROK_API_KEY),
-    hasOpenAIKey: Boolean(env.OPENAI_API_KEY)
+    hasGrokKey,
+    hasOpenAIKey,
+    ready,
+    reason
   };
 }
 
@@ -36,6 +55,42 @@ function gitConfigValue(root, key) {
   } catch {
     return null;
   }
+}
+
+function buildNextActions({ policy, github, githubAuth, provider, tools }) {
+  const actions = [];
+  if (policy.status !== "loaded") {
+    actions.push({
+      id: "fix_policy_config",
+      reason: "Policy config did not load.",
+      command: "Inspect .vibeguard.yaml"
+    });
+  }
+  if (!provider.ready) {
+    const command = provider.provider === "grok" || provider.provider === "xai" || provider.provider === "unset"
+      ? "Set XAI_API_KEY or GROK_API_KEY and VIBEGUARD_LLM_PROVIDER=grok"
+      : "Set OPENAI_API_KEY and VIBEGUARD_MODEL";
+    actions.push({
+      id: "configure_ai_provider",
+      reason: provider.reason,
+      command
+    });
+  }
+  if (github.status !== "detected") {
+    actions.push({
+      id: "configure_github_remote",
+      reason: "origin is not a detected GitHub remote.",
+      command: "git remote add origin https://github.com/<owner>/<repo>.git"
+    });
+  }
+  if (!tools.gh.available && !githubAuth.hasToken) {
+    actions.push({
+      id: "enable_github_execution",
+      reason: "Neither gh CLI nor GITHUB_TOKEN/GH_TOKEN is available for real GitHub PR/comment/check execution.",
+      command: "Install and authenticate gh, or set GITHUB_TOKEN/GH_TOKEN"
+    });
+  }
+  return actions;
 }
 
 export function runDoctor(options = {}) {
@@ -68,24 +123,31 @@ export function runDoctor(options = {}) {
     };
   }
 
-  return {
+  const tools = options.toolStatus || {
+    git: commandAvailable("git", ["--version"]),
+    gh: commandAvailable("gh", ["--version"])
+  };
+  const githubAuth = {
+    hasToken: Boolean(env.GITHUB_TOKEN || env.GH_TOKEN)
+  };
+  const provider = providerStatus(env);
+  const result = {
     status: "completed",
     root,
     policy,
-    tools: {
-      git: commandAvailable("git", ["--version"]),
-      gh: commandAvailable("gh", ["--version"])
-    },
+    tools,
     github,
-    githubAuth: {
-      hasToken: Boolean(env.GITHUB_TOKEN || env.GH_TOKEN)
-    },
-    provider: providerStatus(env),
+    githubAuth,
+    provider,
     proxy: {
       https: env.VIBEGUARD_HTTPS_PROXY || env.HTTPS_PROXY || env.https_proxy || null,
       http: env.HTTP_PROXY || env.http_proxy || null,
       gitHttp: gitConfigValue(root, "http.proxy"),
       gitHttps: gitConfigValue(root, "https.proxy")
     }
+  };
+  return {
+    ...result,
+    nextActions: buildNextActions(result)
   };
 }
