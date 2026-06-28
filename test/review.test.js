@@ -74,6 +74,30 @@ test("analyzeReviewDiff flags secret literals, html sinks, and sync filesystem c
   assert.ok(result.actionItems.some((item) => /HTML sink/.test(item.action)));
 });
 
+test("analyzeReviewDiff flags shell injection risks", () => {
+  const diff = `diff --git a/src/tasks.js b/src/tasks.js
+--- a/src/tasks.js
++++ b/src/tasks.js
+@@ -1 +1,3 @@
+ export function run(name) {}
++execSync("deploy " + name)
++spawn("sh", ["-c", command], { shell: true })
+diff --git a/src/jobs.py b/src/jobs.py
+--- a/src/jobs.py
++++ b/src/jobs.py
+@@ -1 +1,2 @@
++subprocess.run(command, shell=True)
++os.system(command)
+`;
+
+  const result = analyzeReviewDiff(diff);
+  const shellFindings = result.findings.filter((finding) => finding.message.includes("Shell injection risk"));
+
+  assert.equal(shellFindings.length, 4);
+  assert.ok(shellFindings.every((finding) => finding.severity === "high"));
+  assert.ok(result.actionItems.some((item) => /policy-gated runner/.test(item.action)));
+});
+
 test("analyzeReviewDiff flags bug-prone additions", () => {
   const diff = `diff --git a/src/cache.py b/src/cache.py
 --- a/src/cache.py

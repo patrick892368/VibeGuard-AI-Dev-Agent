@@ -41,6 +41,7 @@ function changedEntries(diffText) {
 function recommendationFor(category, message) {
   if (message.includes("Secret-looking")) return "Remove the literal and load it from a secret manager or environment variable.";
   if (message.includes("Dynamic code execution")) return "Replace dynamic execution with explicit dispatch or a sandboxed interpreter with strict input validation.";
+  if (message.includes("Shell injection risk")) return "Avoid shell execution for dynamic input; pass argv arrays through a policy-gated runner and validate each argument.";
   if (message.includes("Shell/process execution")) return "Route commands through a policy-gated runner and validate every user-controlled argument.";
   if (message.includes("SQL string concatenation")) return "Use parameterized queries or the framework query builder for every dynamic value.";
   if (message.includes("HTML injection")) return "Render text safely or sanitize trusted markup before assigning it to an HTML sink.";
@@ -148,7 +149,14 @@ export function analyzeReviewDiff(diffText, options = {}) {
     if (/\beval\s*\(|new Function\s*\(/.test(value)) {
       findings.push(finding("high", addition.file, "security", "Dynamic code execution introduced. Avoid eval/new Function unless strictly sandboxed.", addition));
     }
-    if (/\bexec\s*\(|child_process|subprocess\./.test(value)) {
+    const shellInjectionRisk =
+      /\b(exec|execSync)\s*\([^)]*(?:`|\+|\$\{)/.test(value) ||
+      /\bspawn\s*\([^)]*\{[^}]*shell\s*:\s*true/.test(value) ||
+      /\bsubprocess\.(?:run|Popen|call|check_call|check_output)\s*\([^)]*shell\s*=\s*True/.test(value) ||
+      /\bos\.system\s*\(/.test(value);
+    if (shellInjectionRisk) {
+      findings.push(finding("high", addition.file, "security", "Shell injection risk introduced. Avoid shell=True, os.system, or shell exec with dynamic strings.", addition));
+    } else if (/\bexec(?:Sync|File|FileSync)?\s*\(|child_process|subprocess\./.test(value)) {
       findings.push(finding("medium", addition.file, "security", "Shell/process execution introduced. Validate inputs and enforce command policy.", addition));
     }
     if (/TODO|FIXME/.test(value)) {
