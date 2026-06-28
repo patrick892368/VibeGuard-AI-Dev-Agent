@@ -251,6 +251,37 @@ test("CLI GitHub PR comment execute requires command confirmation", () => {
   assert.match(result.command, /gh pr comment 12/);
 });
 
+test("CLI GitHub PR blocks denied body files before dry-run", () => {
+  const root = tempGitHubRepo();
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+
+  let output;
+  try {
+    output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "github",
+      "pr",
+      "--title",
+      "Fix bug",
+      "--body-file",
+      ".env",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8"
+    });
+  } catch (error) {
+    output = error.stdout;
+  }
+  const result = JSON.parse(output);
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "github_pr_body_file_policy");
+  assert.equal(result.policy.path, ".env");
+});
+
 test("GitHub checks are dry-run by default", async () => {
   assert.deepEqual(buildGhRunListArgs({ branch: "codex/fix-bug", limit: 5 }), [
     "run",

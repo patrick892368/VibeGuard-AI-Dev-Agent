@@ -29,7 +29,7 @@ The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS 
 - `vibeguard patch`: 通过 policy 检查或应用 unified diff；`--file` 输入路径本身也会先经过 read policy。Checks or applies unified diffs through policy; `--file` input paths also pass read policy first.
 - `vibeguard hooks`: 打印或安装 Git hook 模板。Prints or installs Git hook templates.
 - `vibeguard pr summary`: 从 diff 生成包含 review findings 和 actionItems 的 GitHub-ready PR body；可用 `--write-body` 经过 policy 写出 PR body 文件。Builds a GitHub-ready PR body with review findings and actionItems from a diff; `--write-body` can write the PR body file through policy.
-- `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback。Detects GitHub remotes, creates PRs/comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback.
+- `vibeguard github`: 检测 GitHub remote、创建 PR/评论、读取 Actions 状态；执行时支持 `gh`，也支持 `GITHUB_TOKEN` / `GH_TOKEN` REST fallback，`--body-file` 会先经过 path policy。Detects GitHub remotes, creates PRs/comments, and reads Actions status; execution supports `gh` or a `GITHUB_TOKEN` / `GH_TOKEN` REST fallback, and `--body-file` is checked by path policy first.
 - `vibeguard run`: 经过 command policy 后执行命令。Runs commands only after command policy checks.
 - `--audit-log reports/audit.jsonl`: 为 policy 检查、写文件、patch 和命令执行追加 JSONL 审计事件。Appends JSONL audit events for policy checks, writes, patches, and command execution.
 - `vibeguard audit summary` / `audit report`: 汇总 JSONL 审计日志，或写出 Markdown 审计报告。Summarizes JSONL audit logs or writes a Markdown audit report.

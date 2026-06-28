@@ -313,6 +313,10 @@ When `gh` is unavailable, execute mode can use `GITHUB_TOKEN` or `GH_TOKEN` thro
 
 当本机没有 `gh` 时，execute 模式可以使用 `GITHUB_TOKEN` 或 `GH_TOKEN` 通过 GitHub REST API fallback 执行。创建 PR 和发布 PR comment 仍然需要 policy 确认。
 
+For CLI and MCP-style GitHub PR/comment flows, `--body-file` / `bodyFile` is checked through path policy before dry-run or execution, so denied files such as `.env` cannot be reused as PR or comment bodies.
+
+对于 CLI 和 MCP-style 的 GitHub PR/comment 流程，`--body-file` / `bodyFile` 会先经过 path policy 检查，然后才进入 dry-run 或执行，因此 `.env` 等 denied 文件不能被当作 PR 或 comment 正文复用。
+
 ## Operating Rules / 操作规则
 
 - Do not bypass `.vibeguard.yaml`. / 不要绕过 `.vibeguard.yaml`。

@@ -324,6 +324,22 @@ function initializeResult(params = {}) {
   };
 }
 
+function githubBodyFilePolicy(root, bodyFile, stage, confirmed) {
+  if (!bodyFile) return null;
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const policy = engine.checkPath(bodyFile, "read_github_body");
+  if (policy.status !== "allow" && !(policy.status === "require_confirmation" && confirmed)) {
+    return {
+      status: policy.status,
+      stage,
+      path: bodyFile,
+      policy
+    };
+  }
+  return null;
+}
+
 async function callTool(name, args, root) {
   if (name === "check_policy") {
     const { config } = loadConfig(root);
@@ -479,6 +495,8 @@ async function callTool(name, args, root) {
   if (name === "detect_github") return detectGitHubRepository(root);
   if (name === "github_pr") {
     const env = loadRuntimeEnv(root);
+    const bodyFileBlocked = githubBodyFilePolicy(root, args.bodyFile, "github_pr_body_file_policy", Boolean(args.confirmed));
+    if (bodyFileBlocked) return bodyFileBlocked;
     const dryRun = await createPullRequestWithGh(root, {
       title: args.title,
       bodyFile: args.bodyFile,
@@ -515,6 +533,8 @@ async function callTool(name, args, root) {
   }
   if (name === "github_comment") {
     const env = loadRuntimeEnv(root);
+    const bodyFileBlocked = githubBodyFilePolicy(root, args.bodyFile, "github_comment_body_file_policy", Boolean(args.confirmed));
+    if (bodyFileBlocked) return bodyFileBlocked;
     const dryRun = await commentPullRequestWithGh(root, {
       pr: args.pr,
       bodyFile: args.bodyFile,

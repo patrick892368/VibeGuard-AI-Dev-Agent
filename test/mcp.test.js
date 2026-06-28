@@ -143,6 +143,29 @@ test("MCP github_pr returns a dry-run PR command", async () => {
   assert.match(response.result.structuredContent.command, /--draft/);
 });
 
+test("MCP github_comment blocks denied body files before dry-run", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 13,
+    method: "tools/call",
+    params: {
+      name: "github_comment",
+      arguments: {
+        pr: "12",
+        bodyFile: ".env"
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "deny");
+  assert.equal(result.stage, "github_comment_body_file_policy");
+  assert.equal(result.policy.path, ".env");
+});
+
 test("MCP debug_error reads log files through path policy", async () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined\n", "utf8");

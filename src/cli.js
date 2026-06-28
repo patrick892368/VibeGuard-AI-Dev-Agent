@@ -329,6 +329,22 @@ function githubMutationPolicy(root, command, stage, confirmed) {
   return null;
 }
 
+function githubBodyFilePolicy(root, bodyFile, stage, confirmed) {
+  if (!bodyFile) return null;
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const policy = engine.checkPath(bodyFile, "read_github_body");
+  if (policy.status !== "allow" && !(policy.status === "require_confirmation" && confirmed)) {
+    return {
+      status: policy.status,
+      stage,
+      path: bodyFile,
+      policy
+    };
+  }
+  return null;
+}
+
 async function githubCommand(parsed, root, subcommand) {
   const env = loadRuntimeEnv(root);
   if (subcommand === "detect") return detectGitHubRepository(root);
@@ -341,6 +357,8 @@ async function githubCommand(parsed, root, subcommand) {
       head: parsed.head,
       draft: Boolean(parsed.draft)
     };
+    const bodyFileBlocked = githubBodyFilePolicy(root, options.bodyFile, "github_pr_body_file_policy", Boolean(parsed.confirm));
+    if (bodyFileBlocked) return bodyFileBlocked;
     const dryRun = await createPullRequestWithGh(root, {
       ...options,
       env,
@@ -362,6 +380,8 @@ async function githubCommand(parsed, root, subcommand) {
       bodyFile: parsed["body-file"],
       body: parsed.body
     };
+    const bodyFileBlocked = githubBodyFilePolicy(root, options.bodyFile, "github_comment_body_file_policy", Boolean(parsed.confirm));
+    if (bodyFileBlocked) return bodyFileBlocked;
     const dryRun = await commentPullRequestWithGh(root, {
       ...options,
       env,
