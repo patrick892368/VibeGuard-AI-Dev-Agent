@@ -199,16 +199,41 @@ test("buildPrPlanWorkflow can execute branch commit and REST PR creation after c
     paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
     commands: { deny: [], require_confirmation: ["git switch -c", "git commit", "gh pr create"] }
   }, { root });
-  let request;
+  const requests = [];
 
   const result = await buildPrPlanWorkflow(root, diff, engine, {
     writeBody: "reports/pr-body.md",
     executeGitPlan: true,
+    checkCi: true,
+    ciLimit: 3,
     confirmed: true,
     githubUseApi: true,
     env: { GITHUB_TOKEN: "token" },
     async fetch(url, options) {
-      request = { url, options, body: JSON.parse(options.body) };
+      const request = { url, options, body: options.body ? JSON.parse(options.body) : null };
+      requests.push(request);
+      if (url.includes("/actions/runs?")) {
+        return {
+          ok: true,
+          status: 200,
+          async json() {
+            return {
+              workflow_runs: [{
+                id: 123,
+                status: "completed",
+                conclusion: "success",
+                name: "CI",
+                head_branch: "codex/add-tests-app",
+                event: "pull_request",
+                workflow_name: "CI",
+                html_url: "https://github.com/owner/repo/actions/runs/123",
+                created_at: "2026-06-28T00:00:00Z",
+                updated_at: "2026-06-28T00:01:00Z"
+              }]
+            };
+          }
+        };
+      }
       return {
         ok: true,
         status: 201,
@@ -230,11 +255,16 @@ test("buildPrPlanWorkflow can execute branch commit and REST PR creation after c
   ]);
   assert.equal(result.gitExecution.results[3].method, "api");
   assert.equal(result.gitExecution.results[3].url, "https://github.com/owner/repo/pull/9");
-  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
-  assert.equal(request.body.title, result.title);
-  assert.equal(request.body.head, result.branch);
-  assert.equal(request.body.draft, true);
-  assert.match(request.body.body, /Review Action Items/);
+  assert.equal(requests[0].url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(requests[0].body.title, result.title);
+  assert.equal(requests[0].body.head, result.branch);
+  assert.equal(requests[0].body.draft, true);
+  assert.match(requests[0].body.body, /Review Action Items/);
+  assert.match(requests[1].url, /\/actions\/runs\?per_page=3&branch=codex%2Fadd-tests-app$/);
+  assert.equal(result.ciStatus.status, "completed");
+  assert.equal(result.ciStatus.method, "api");
+  assert.equal(result.ciStatus.summary.gate, "pass");
+  assert.equal(result.ciStatus.summary.counts.success, 1);
 });
 
 test("generateDebugPatch is unavailable without provider env", async () => {

@@ -38,7 +38,7 @@ Usage:
   vibeguard hooks print <pre-commit|pre-push|commit-msg>
   vibeguard hooks install <hook> --allow-git-dir
   vibeguard pr summary [--diff <file>] [--github-pr <number>] [--write-body <file>] [--github-api]
-  vibeguard pr plan [--diff <file>] [--github-pr <number>] [--write-body <file>|--body-file <file>] [--branch <name>] [--commit-message <msg>] [--title <title>] [--push] [--no-branch] [--no-commit] [--no-pr] [--execute-git-plan] [--confirm] [--github-api]
+  vibeguard pr plan [--diff <file>] [--github-pr <number>] [--write-body <file>|--body-file <file>] [--branch <name>] [--commit-message <msg>] [--title <title>] [--push] [--no-branch] [--no-commit] [--no-pr] [--execute-git-plan] [--check-ci] [--confirm] [--github-api]
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
@@ -905,6 +905,9 @@ async function dispatch(parsed) {
       push: Boolean(parsed.push),
       prDryRun: !parsed["no-pr"],
       executeGitPlan: Boolean(parsed["execute-git-plan"]),
+      checkCi: Boolean(parsed["check-ci"]),
+      workflow: parsed.workflow,
+      ciLimit: parsed["ci-limit"] ? Number(parsed["ci-limit"]) : undefined,
       confirmed: Boolean(parsed.confirm),
       auditLog: parsed["audit-log"],
       env: loadRuntimeEnv(root),

@@ -1092,6 +1092,9 @@ test("CLI pr summary can write a policy-gated body file", () => {
     "reports/change.diff",
     "--write-body",
     "reports/pr-body.md",
+    "--check-ci",
+    "--ci-limit",
+    "3",
     "--json"
   ], {
     cwd: process.cwd(),
@@ -1130,6 +1133,9 @@ test("CLI pr plan returns a policy-gated branch commit and PR dry-run plan", () 
     "reports/change.diff",
     "--write-body",
     "reports/pr-body.md",
+    "--check-ci",
+    "--ci-limit",
+    "3",
     "--json"
   ], {
     cwd: process.cwd(),
@@ -1148,6 +1154,9 @@ test("CLI pr plan returns a policy-gated branch commit and PR dry-run plan", () 
   ]);
   assert.equal(parsed.gitPolicy.status, "require_confirmation");
   assert.equal(parsed.gitExecution, null);
+  assert.equal(parsed.ciStatus.status, "dry_run");
+  assert.match(parsed.ciStatus.command, /gh run list --limit 3/);
+  assert.match(parsed.ciStatus.command, /--branch codex\/add-tests-app/);
 });
 
 test("CLI pr summary checks git diff command policy before default diff reads", () => {

@@ -1,6 +1,7 @@
 import { analyzeReviewDiff } from "./review.js";
 import { writeFileWithPolicy } from "../policy/safeWrite.js";
 import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlanAsync } from "../integrations/gitPlan.js";
+import { listWorkflowRunsWithGh } from "../integrations/github.js";
 
 function basename(file) {
   return String(file || "change").split("/").filter(Boolean).pop() || "change";
@@ -127,6 +128,30 @@ export function writePrSummaryBody(root, diffText, outputPath, engine, options =
   };
 }
 
+async function buildPrPlanCiStatus(root, branch, gitExecution, engine, options = {}) {
+  if (!options.checkCi) return null;
+  if (options.executeGitPlan && gitExecution?.status !== "executed") {
+    return {
+      status: "skipped",
+      stage: "git_plan_execution",
+      reason: "CI status is read only after the Git/PR plan executes successfully.",
+      gitExecutionStatus: gitExecution?.status || null
+    };
+  }
+  return await listWorkflowRunsWithGh(root, {
+    branch,
+    workflow: options.workflow,
+    limit: options.ciLimit || 10,
+    env: options.env,
+    fetch: options.fetch,
+    useApi: Boolean(options.githubUseApi),
+    dryRun: !options.executeGitPlan,
+    engine,
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
+}
+
 export async function buildPrPlanWorkflow(root, diffText, engine, options = {}) {
   if (!engine) throw new Error("buildPrPlanWorkflow requires a PolicyEngine");
   const summary = buildPrSummary(diffText);
@@ -165,6 +190,7 @@ export async function buildPrPlanWorkflow(root, diffText, engine, options = {}) 
       dryRun: Boolean(options.dryRun)
     })
     : null;
+  const ciStatus = await buildPrPlanCiStatus(root, branch, gitExecution, engine, options);
 
   return {
     ...summary,
@@ -180,6 +206,7 @@ export async function buildPrPlanWorkflow(root, diffText, engine, options = {}) 
     writtenBody,
     gitPlan,
     gitPolicy,
-    gitExecution
+    gitExecution,
+    ciStatus
   };
 }

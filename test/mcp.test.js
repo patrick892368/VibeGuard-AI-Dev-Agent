@@ -97,6 +97,8 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("review_pr").inputSchema.properties.commentPr.type, "string");
   assert.equal(byName.get("summarize_pr").inputSchema.properties.githubPr.type, "string");
   assert.equal(byName.get("plan_pr").inputSchema.properties.executeGitPlan.type, "boolean");
+  assert.equal(byName.get("plan_pr").inputSchema.properties.checkCi.type, "boolean");
+  assert.equal(byName.get("plan_pr").inputSchema.properties.ciLimit.type, "number");
   assert.equal(byName.get("plan_pr").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("github_pr").inputSchema.properties.useApi.type, "boolean");
   assert.equal(byName.get("github_checks").inputSchema.properties.confirmed.type, "boolean");
@@ -419,7 +421,9 @@ test("MCP plan_pr prepares a policy-gated Git and PR plan", async () => {
       name: "plan_pr",
       arguments: {
         diffFile: "reports/change.diff",
-        writeBody: "reports/pr-body.md"
+        writeBody: "reports/pr-body.md",
+        checkCi: true,
+        ciLimit: 2
       }
     }
   }, root);
@@ -438,6 +442,9 @@ test("MCP plan_pr prepares a policy-gated Git and PR plan", async () => {
   assert.equal(result.gitPlan.commands.find((command) => command.step === "create_pr").bodyFile, "reports/pr-body.md");
   assert.equal(result.gitPolicy.status, "require_confirmation");
   assert.equal(result.gitExecution, null);
+  assert.equal(result.ciStatus.status, "dry_run");
+  assert.match(result.ciStatus.command, /gh run list --limit 2/);
+  assert.match(result.ciStatus.command, /--branch codex\/add-tests-app/);
 });
 
 test("MCP github_pr returns a dry-run PR command", async () => {
