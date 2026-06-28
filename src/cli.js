@@ -472,13 +472,37 @@ async function githubCommand(parsed, root, subcommand) {
     };
   }
   if (subcommand === "checks") {
-    return listWorkflowRunsWithGh(root, {
+    const options = {
       branch: parsed.branch,
       workflow: parsed.workflow,
       limit: parsed.limit,
       env,
-      dryRun: !parsed.execute
-    });
+      dryRun: true
+    };
+    const dryRun = await listWorkflowRunsWithGh(root, options);
+    if (parsed.execute) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      const commandPolicy = checkGitHubCommandsPolicy([{ index: 1, command: dryRun.command }], engine, {
+        confirmed: Boolean(parsed.confirm),
+        stage: "github_checks_policy"
+      });
+      if (commandPolicy.status !== "allow") {
+        return {
+          ...commandPolicy,
+          dryRun
+        };
+      }
+      const result = await listWorkflowRunsWithGh(root, {
+        ...options,
+        dryRun: false
+      });
+      return {
+        ...result,
+        commandPolicy
+      };
+    }
+    return dryRun;
   }
   throw new Error(`Unknown github command: ${subcommand || ""}`);
 }

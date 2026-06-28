@@ -699,13 +699,37 @@ async function callTool(name, args, root) {
     };
   }
   if (name === "github_checks") {
-    return listWorkflowRunsWithGh(root, {
+    const options = {
       branch: args.branch,
       workflow: args.workflow,
       limit: args.limit,
       env: loadRuntimeEnv(root),
-      dryRun: args.execute !== true
-    });
+      dryRun: true
+    };
+    const dryRun = await listWorkflowRunsWithGh(root, options);
+    if (args.execute === true) {
+      const { config } = loadConfig(root);
+      const engine = new PolicyEngine(config, { root });
+      const commandPolicy = checkGitHubCommandsPolicy([{ index: 1, command: dryRun.command }], engine, {
+        confirmed: Boolean(args.confirmed),
+        stage: "github_checks_policy"
+      });
+      if (commandPolicy.status !== "allow") {
+        return {
+          ...commandPolicy,
+          dryRun
+        };
+      }
+      const result = await listWorkflowRunsWithGh(root, {
+        ...options,
+        dryRun: false
+      });
+      return {
+        ...result,
+        commandPolicy
+      };
+    }
+    return dryRun;
   }
   if (name === "eval_fixtures") {
     return evaluateFixFixtures({

@@ -278,6 +278,10 @@ vibeguard github checks --branch codex/fix-bug --limit 5
 vibeguard github checks --branch codex/fix-bug --limit 5 --execute
 ```
 
+`checks --execute` checks the generated `gh run list` command against command policy before it calls GitHub or the REST fallback.
+
+`checks --execute` 会先把生成的 `gh run list` 命令交给 command policy 检查，然后才调用 GitHub 或 REST fallback。
+
 `gh pr create` and `gh pr comment` require policy confirmation. Execution uses authenticated `gh` when available, or `GITHUB_TOKEN` / `GH_TOKEN` through the REST API fallback when `gh` is missing.
 
 `gh pr create` 和 `gh pr comment` 需要 policy 确认。执行时优先使用已认证的 `gh`；如果本机缺少 `gh`，可使用 `GITHUB_TOKEN` / `GH_TOKEN` 通过 REST API fallback 执行。

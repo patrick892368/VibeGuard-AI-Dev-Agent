@@ -301,6 +301,10 @@ node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --json
 node ./bin/vibeguard.js github checks --branch codex/fix-bug --limit 5 --execute --json
 ```
 
+`github checks --execute` first builds the `gh run list` dry-run command and checks it against command policy before reading remote CI state.
+
+`github checks --execute` 会先生成 `gh run list` dry-run 命令，并在读取远端 CI 状态前经过 command policy 检查。
+
 Post a PR summary or review note:
 
 发布 PR summary 或 review note：

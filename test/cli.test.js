@@ -496,6 +496,42 @@ test("CLI GitHub review-comments builds a policy-gated batch dry-run from a diff
   assert.equal(execute.publish.count, 1);
 });
 
+test("CLI GitHub checks execute is gated by command policy", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-checks-policy-"));
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "gh run list"
+`, "utf8");
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "checks",
+    "--branch",
+    "main",
+    "--execute",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8"
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "require_confirmation");
+  assert.equal(parsed.stage, "github_checks_policy");
+  assert.match(parsed.command, /gh run list/);
+  assert.equal(parsed.dryRun.status, "dry_run");
+});
+
 test("CLI pr summary can write a policy-gated body file", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-body-"));
   fs.mkdirSync(path.join(root, "reports"), { recursive: true });

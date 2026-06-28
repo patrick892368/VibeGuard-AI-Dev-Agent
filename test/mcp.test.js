@@ -346,6 +346,40 @@ test("MCP github_review_comments blocks denied diff files before analysis", asyn
   assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
 });
 
+test("MCP github_checks execute is gated by command policy", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny: []
+  require_confirmation:
+    - "gh run list"
+`, "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 18,
+    method: "tools/call",
+    params: {
+      name: "github_checks",
+      arguments: {
+        branch: "main",
+        execute: true
+      }
+    }
+  }, root);
+  const result = response.result.structuredContent;
+
+  assert.equal(result.status, "require_confirmation");
+  assert.equal(result.stage, "github_checks_policy");
+  assert.match(result.command, /gh run list/);
+  assert.equal(result.dryRun.status, "dry_run");
+});
+
 test("MCP debug_error reads log files through path policy", async () => {
   const root = tempRepo();
   fs.writeFileSync(path.join(root, "error.log"), "ReferenceError: oldName is not defined\n", "utf8");
