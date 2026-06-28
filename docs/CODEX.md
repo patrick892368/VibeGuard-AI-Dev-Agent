@@ -15,9 +15,9 @@ The integration is CLI-first:
 3. VibeGuard checks `.vibeguard.yaml` before debug-context reads, writes, patches, and risky commands. / VibeGuard 在读取 debug context、写文件、patch 和风险命令前检查 `.vibeguard.yaml`。
 4. Codex reads JSON output and decides the next action. / Codex 根据 JSON 输出决定下一步。
 
-The optional MCP-style server supports `initialize`, `tools/list` with JSON schemas, schema-validated `tools/call`, text content, `structuredContent`, and tool-level `isError` responses. Codex should prefer `structuredContent` when available.
+The optional MCP-style server supports `initialize`, `ping`, `tools/list` with JSON schemas, empty compatible `resources/list`, `resources/templates/list`, and `prompts/list` responses, schema-validated `tools/call`, text content, `structuredContent`, and tool-level `isError` responses. Codex should prefer `structuredContent` when available.
 
-可选的 MCP-style server 支持 `initialize`、带 JSON schema 的 `tools/list`、经过 schema 校验的 `tools/call`、text content、`structuredContent` 和工具级 `isError` 响应。Codex 可用时应优先读取 `structuredContent`。
+可选的 MCP-style server 支持 `initialize`、`ping`、带 JSON schema 的 `tools/list`、空兼容 `resources/list`、`resources/templates/list` 和 `prompts/list` 响应、经过 schema 校验的 `tools/call`、text content、`structuredContent` 和工具级 `isError` 响应。Codex 可用时应优先读取 `structuredContent`。
 
 ## Project Constraints / 项目约束
 

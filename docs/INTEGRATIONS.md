@@ -87,9 +87,9 @@ Hook 安装会写入 `.git/hooks/<hook>`，所以 `--allow-git-dir` 只是显式
 vibeguard mcp
 ```
 
-The MCP-style server supports `initialize`, `tools/list` with `inputSchema`, schema-validated `tools/call`, text content, `structuredContent`, and tool-level `isError` responses.
+The MCP-style server supports `initialize`, `ping`, `tools/list` with `inputSchema`, empty compatible `resources/list`, `resources/templates/list`, and `prompts/list` responses, schema-validated `tools/call`, text content, `structuredContent`, and tool-level `isError` responses.
 
-MCP-style server 支持 `initialize`、带 `inputSchema` 的 `tools/list`、经过 schema 校验的 `tools/call`、text content、`structuredContent` 和工具级 `isError` 响应。
+MCP-style server 支持 `initialize`、`ping`、带 `inputSchema` 的 `tools/list`、空兼容 `resources/list`、`resources/templates/list` 和 `prompts/list` 响应、经过 schema 校验的 `tools/call`、text content、`structuredContent` 和工具级 `isError` 响应。
 
 Available tools:
 

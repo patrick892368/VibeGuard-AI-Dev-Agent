@@ -49,6 +49,50 @@ test("MCP initialize returns server info and tool capabilities", async () => {
   assert.equal(response.result.protocolVersion, "2024-11-05");
   assert.equal(response.result.serverInfo.name, "vibeguard-ai-dev-agent");
   assert.ok(response.result.capabilities.tools);
+  assert.ok(response.result.capabilities.resources);
+  assert.ok(response.result.capabilities.prompts);
+});
+
+test("MCP list and utility methods return protocol-compatible results", async () => {
+  const root = tempRepo();
+  const tools = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 20,
+    method: "tools/list"
+  }, root);
+  const resources = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 21,
+    method: "resources/list"
+  }, root);
+  const resourceTemplates = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 22,
+    method: "resources/templates/list"
+  }, root);
+  const prompts = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 23,
+    method: "prompts/list"
+  }, root);
+  const ping = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 24,
+    method: "ping"
+  }, root);
+  const logging = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 25,
+    method: "logging/setLevel",
+    params: { level: "warning" }
+  }, root);
+
+  assert.ok(tools.result.tools.some((tool) => tool.name === "check_policy"));
+  assert.deepEqual(resources.result.resources, []);
+  assert.deepEqual(resourceTemplates.result.resourceTemplates, []);
+  assert.deepEqual(prompts.result.prompts, []);
+  assert.deepEqual(ping.result, {});
+  assert.deepEqual(logging.result, {});
 });
 
 test("MCP tools/call returns text content and structured content", async () => {
@@ -132,6 +176,21 @@ test("MCP initialized notification does not produce a response", async () => {
   }, tempRepo());
 
   assert.equal(response, null);
+});
+
+test("MCP notifications do not produce error responses", async () => {
+  const cancelled = await handleMcpRequest({
+    jsonrpc: "2.0",
+    method: "notifications/cancelled",
+    params: { requestId: 12 }
+  }, tempRepo());
+  const unknown = await handleMcpRequest({
+    jsonrpc: "2.0",
+    method: "notifications/custom"
+  }, tempRepo());
+
+  assert.equal(cancelled, null);
+  assert.equal(unknown, null);
 });
 
 test("MCP review_pr reads diff files through path policy", async () => {

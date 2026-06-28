@@ -372,7 +372,10 @@ function initializeResult(params = {}) {
   return {
     protocolVersion: params.protocolVersion || "2024-11-05",
     capabilities: {
-      tools: {}
+      tools: {},
+      resources: {},
+      prompts: {},
+      logging: {}
     },
     serverInfo: {
       name: "vibeguard-ai-dev-agent",
@@ -948,9 +951,17 @@ async function callTool(name, args, root) {
 }
 
 export async function handleMcpRequest(request, root = process.cwd()) {
+  const isNotification = request.id === undefined || request.id === null;
   if (request.method === "notifications/initialized") return null;
+  if (request.method === "notifications/cancelled") return null;
+  if (isNotification && String(request.method || "").startsWith("notifications/")) return null;
+  if (request.method === "ping") return ok(request.id, {});
   if (request.method === "initialize") return ok(request.id, initializeResult(request.params || {}));
   if (request.method === "tools/list") return ok(request.id, { tools });
+  if (request.method === "resources/list") return ok(request.id, { resources: [] });
+  if (request.method === "resources/templates/list") return ok(request.id, { resourceTemplates: [] });
+  if (request.method === "prompts/list") return ok(request.id, { prompts: [] });
+  if (request.method === "logging/setLevel") return ok(request.id, {});
   if (request.method === "tools/call") {
     try {
       const name = request.params?.name;
