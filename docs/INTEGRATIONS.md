@@ -27,6 +27,7 @@ vibeguard review
 vibeguard review --diff reports/change.diff --write-comment reports/review.md
 vibeguard review --diff reports/change.diff --comment-pr 12 --execute --confirm --github-api
 vibeguard review --github-pr 12 --publish-comment --execute --confirm --github-api
+vibeguard github review-comments --pr 12 --github-pr 12 --github-api
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
 vibeguard onboard --write
 vibeguard policy check --path src/index.js
@@ -163,9 +164,9 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 
 `github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。`bodyFile` / `--body-file` 输入会先经过 path policy 检查，然后才进入 dry-run 或执行。
 
-`github_review_comments` accepts pasted `diff` or a `diffFile` read through path policy, analyzes review findings, and builds a batch of file-line review comment commands. Dry-run is the default; execute mode requires command policy confirmation for every generated `gh api` command.
+`github_review_comments` accepts pasted `diff`, a `diffFile` read through path policy, or a remote `githubPr`, analyzes review findings, and builds a batch of file-line review comment commands. When `githubPr` is provided and `commitId` / `--commit` is omitted, it reads the PR head SHA through policy-checked `gh pr view` or REST fallback. Dry-run is the default; execute mode requires command policy confirmation for every generated `gh api` command.
 
-`github_review_comments` 支持粘贴 `diff` 或通过 path policy 读取 `diffFile`，先分析 review findings，再生成一批文件行级 review comment 命令。默认 dry-run；execute 模式会要求每条生成的 `gh api` 命令都通过 command policy 确认。
+`github_review_comments` 支持粘贴 `diff`、通过 path policy 读取 `diffFile`，或读取远端 `githubPr`，先分析 review findings，再生成一批文件行级 review comment 命令。当提供 `githubPr` 且省略 `commitId` / `--commit` 时，会通过 policy 检查后的 `gh pr view` 或 REST fallback 读取 PR head SHA。默认 dry-run；execute 模式会要求每条生成的 `gh api` 命令都通过 command policy 确认。
 
 `write_tests` can read coverage files through path policy, analyze coverage, compare before/after coverage, write generated ESM/CommonJS-aware JavaScript tests including CommonJS bracket exports, write stdlib `unittest` Python tests with simple behavior, collection map/filter returns, Promise.resolve returns, object-property/dictionary-field fallback, and exception assertions, optionally run them through command policy, return `failureAnalysis.repairPlan` for failed runs, run one safe test-only repair retry with `repair`, prepare a target-derived Git/PR dry-run plan with branch name, commit message, and PR title, and execute a confirmed branch/commit/PR plan only after final generated tests pass. CLI `test --write` accepts `--github-api`; MCP `write_tests` accepts `githubUseApi` for token REST fallback PR creation.
 
@@ -296,6 +297,7 @@ Post a file-line PR review comment when a finding has a concrete diff line. It r
 ```bash
 vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md
 vibeguard github review-comment --pr 12 --commit abc123 --path src/app.js --line 10 --body-file review.md --execute --confirm
+vibeguard github review-comments --pr 12 --github-pr 12 --github-api
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff
 vibeguard github review-comments --pr 12 --commit abc123 --diff reports/change.diff --execute --confirm
 ```

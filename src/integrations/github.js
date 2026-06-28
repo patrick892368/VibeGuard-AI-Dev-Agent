@@ -6,6 +6,7 @@ import { runArgvWithPolicy } from "../runner/safeCommand.js";
 
 export const GITHUB_DETECT_COMMAND = "git remote get-url origin";
 export const GITHUB_CURRENT_BRANCH_COMMAND = "git branch --show-current";
+export const GITHUB_PR_HEAD_FIELDS = "headRefOid,headRefName";
 
 export function parseGitHubRemote(remoteUrl) {
   const trimmed = remoteUrl.trim();
@@ -46,6 +47,11 @@ export function buildGhPrArgs(options = {}) {
 export function buildGhPrDiffArgs(options = {}) {
   if (!options.pr) throw new Error("GitHub PR number is required");
   return ["pr", "diff", String(options.pr)];
+}
+
+export function buildGhPrViewArgs(options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  return ["pr", "view", String(options.pr), "--json", GITHUB_PR_HEAD_FIELDS];
 }
 
 export function buildGhPrCommentArgs(options = {}) {
@@ -323,6 +329,22 @@ async function getPullRequestDiffWithApi(root, options = {}) {
   };
 }
 
+async function getPullRequestHeadWithApi(root, options = {}) {
+  if (!options.pr) throw new Error("GitHub PR number is required");
+  const data = await githubApiRequest(root, {
+    ...options,
+    method: "GET",
+    path: `/pulls/${options.pr}`
+  });
+  return {
+    status: "fetched",
+    method: "api",
+    pr: Number(options.pr),
+    headSha: data.head?.sha || null,
+    headRef: data.head?.ref || null
+  };
+}
+
 async function createPullRequestWithApi(root, options = {}) {
   if (!options.title) throw new Error("GitHub PR title is required");
   const payload = {
@@ -489,6 +511,38 @@ export async function getPullRequestDiffWithGh(root = process.cwd(), options = {
     return getPullRequestDiffWithApi(root, options);
   }
   requirePassedStdout(result, "GitHub PR diff");
+}
+
+export async function getPullRequestHeadWithGh(root = process.cwd(), options = {}) {
+  const args = buildGhPrViewArgs(options);
+  const command = `gh ${args.join(" ")}`;
+  if (options.dryRun !== false) {
+    return {
+      status: "dry_run",
+      command
+    };
+  }
+  requireExecutionPolicy(options, "GitHub PR head");
+  if (options.useApi) {
+    checkOptionalCommandPolicy(root, command, options, "github_pr_head");
+    return getPullRequestHeadWithApi(root, options);
+  }
+  const result = runProtectedArgv(root, ["gh", ...args], options);
+  if (result.status === "passed") {
+    const data = JSON.parse(result.stdout || "{}");
+    return {
+      status: "fetched",
+      method: "gh",
+      pr: Number(options.pr),
+      headSha: data.headRefOid || null,
+      headRef: data.headRefName || null
+    };
+  }
+  if (result.status === "deny" || result.status === "require_confirmation") return result;
+  if (isMissingGhResult(result) && resolveToken(options.env)) {
+    return getPullRequestHeadWithApi(root, options);
+  }
+  requirePassedStdout(result, "GitHub PR head");
 }
 
 export async function commentPullRequestWithGh(root = process.cwd(), options = {}) {

@@ -11,7 +11,7 @@ import { analyzeRepository } from "../agents/onboard.js";
 import { analyzeTestTargets, writeSuggestedTestsAsync } from "../agents/testWriter.js";
 import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
-import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, getPullRequestHeadWithGh, listWorkflowRunsWithGh } from "../integrations/github.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
@@ -450,6 +450,44 @@ async function readGitHubPrDiff(root, args = {}, stage = "github_pr_diff_policy"
   }
 }
 
+async function readGitHubPrHead(root, args = {}, stage = "github_pr_head_policy") {
+  if (!args.githubPr) return null;
+  const command = `gh pr view ${args.githubPr} --json headRefOid,headRefName`;
+  const commandBlocked = githubPrerequisitePolicy(root, [command], stage, Boolean(args.confirmed));
+  if (commandBlocked) return commandBlocked;
+  if (args.useApi) {
+    const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], stage, Boolean(args.confirmed));
+    if (prerequisiteBlocked) return prerequisiteBlocked;
+  }
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  try {
+    const result = await getPullRequestHeadWithGh(root, {
+      pr: args.githubPr,
+      env: loadRuntimeEnv(root),
+      dryRun: false,
+      useApi: Boolean(args.useApi),
+      engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
+    if (result.status !== "fetched" || !result.headSha) {
+      return {
+        ...result,
+        status: result.status || "failed",
+        stage: result.stage || stage
+      };
+    }
+    return result;
+  } catch (error) {
+    return {
+      status: "failed",
+      stage,
+      error: error.message
+    };
+  }
+}
+
 async function diffTextFromArgs(root, args = {}, engine, stage = "github_pr_diff_policy") {
   if (args.githubPr) return readGitHubPrDiff(root, args, stage);
   if (args.diffFile) {
@@ -813,10 +851,17 @@ async function callTool(name, args, root) {
     const engine = new PolicyEngine(config, { root });
     const diffText = await diffTextFromArgs(root, args, engine, "github_review_comments_diff_policy");
     if (typeof diffText !== "string") return diffText;
+    let commitId = args.commitId;
+    let head = null;
+    if (!commitId && args.githubPr) {
+      head = await readGitHubPrHead(root, args, "github_review_comments_pr_head_policy");
+      if (!head || head.status !== "fetched") return head;
+      commitId = head.headSha;
+    }
     const review = analyzeReviewDiff(diffText);
     const dryRun = await createReviewCommentsWithGh(root, {
       pr: args.pr,
-      commitId: args.commitId,
+      commitId,
       comments: review.reviewComments,
       limit: args.limit,
       useApi: Boolean(args.useApi),
@@ -831,6 +876,7 @@ async function callTool(name, args, root) {
       return {
         ...commandPolicy,
         review,
+        head,
         publish: dryRun
       };
     }
@@ -840,6 +886,7 @@ async function callTool(name, args, root) {
         return {
           ...prerequisiteBlocked,
           review,
+          head,
           publish: dryRun
         };
       }
@@ -847,7 +894,7 @@ async function callTool(name, args, root) {
     const publish = args.execute === true
       ? await createReviewCommentsWithGh(root, {
         pr: args.pr,
-        commitId: args.commitId,
+        commitId,
         comments: review.reviewComments,
         limit: args.limit,
         useApi: Boolean(args.useApi),
@@ -860,6 +907,7 @@ async function callTool(name, args, root) {
       : dryRun;
     return {
       status: publish.status,
+      head,
       review,
       commandPolicy,
       publish

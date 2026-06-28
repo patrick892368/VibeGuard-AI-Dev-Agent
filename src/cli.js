@@ -15,7 +15,7 @@ import { normalizeUnifiedDiff, validateUnifiedDiff } from "./patch/validatePatch
 import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
-import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, getPullRequestHeadWithGh, listWorkflowRunsWithGh } from "./integrations/github.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -42,7 +42,7 @@ Usage:
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
   vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
-  vibeguard github review-comments --pr <number> --commit <sha> [--diff <file>] [--github-pr <number>] [--limit <n>] [--execute] [--confirm] [--github-api]
+  vibeguard github review-comments --pr <number> [--commit <sha>] [--diff <file>] [--github-pr <number>] [--limit <n>] [--execute] [--confirm] [--github-api]
   vibeguard github checks [--branch <branch>] [--limit <n>] [--execute] [--github-api]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
@@ -334,6 +334,44 @@ async function readGitHubPrDiffWithPolicy(parsed, root, options = {}) {
   }
 }
 
+async function readGitHubPrHeadWithPolicy(parsed, root, options = {}) {
+  if (!parsed["github-pr"]) return null;
+  const command = `gh pr view ${parsed["github-pr"]} --json headRefOid,headRefName`;
+  const blocked = githubMutationPolicy(root, command, options.stage || "github_pr_head_policy", Boolean(parsed.confirm));
+  if (blocked) return blocked;
+  if (parsed["github-api"]) {
+    const prerequisiteBlocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], options.stage || "github_pr_head_policy", Boolean(parsed.confirm));
+    if (prerequisiteBlocked) return prerequisiteBlocked;
+  }
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  try {
+    const result = await getPullRequestHeadWithGh(root, {
+      pr: parsed["github-pr"],
+      env: loadRuntimeEnv(root),
+      dryRun: false,
+      useApi: Boolean(parsed["github-api"]),
+      engine,
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
+    if (result.status !== "fetched" || !result.headSha) {
+      return {
+        ...result,
+        status: result.status || "failed",
+        stage: result.stage || options.stage || "github_pr_head"
+      };
+    }
+    return result;
+  } catch (error) {
+    return {
+      status: "failed",
+      stage: options.stage || "github_pr_head",
+      error: error.message
+    };
+  }
+}
+
 async function diffInputAsync(parsed, root, options = {}) {
   if (parsed["github-pr"]) return readGitHubPrDiffWithPolicy(parsed, root, options);
   if (parsed.diff) return readInputFileWithPolicy(root, parsed.diff, parsed);
@@ -598,12 +636,20 @@ async function githubCommand(parsed, root, subcommand) {
     });
   }
   if (subcommand === "review-comments") {
-    const commitId = parsed.commit || parsed["commit-id"];
+    let commitId = parsed.commit || parsed["commit-id"];
     const diffText = await diffInputAsync(parsed, root, {
       gitStage: "github_review_comments_git_diff_policy",
       stage: "github_review_comments_pr_diff_policy"
     });
     if (typeof diffText !== "string") return diffText;
+    let head = null;
+    if (!commitId && parsed["github-pr"]) {
+      head = await readGitHubPrHeadWithPolicy(parsed, root, {
+        stage: "github_review_comments_pr_head_policy"
+      });
+      if (!head || head.status !== "fetched") return head;
+      commitId = head.headSha;
+    }
     const review = analyzeReviewDiff(diffText);
     const dryRun = await createReviewCommentsWithGh(root, {
       pr: parsed.pr,
@@ -624,6 +670,7 @@ async function githubCommand(parsed, root, subcommand) {
       return {
         ...commandPolicy,
         review,
+        head,
         publish: dryRun
       };
     }
@@ -633,6 +680,7 @@ async function githubCommand(parsed, root, subcommand) {
         return {
           ...prerequisiteBlocked,
           review,
+          head,
           publish: dryRun
         };
       }
@@ -651,6 +699,7 @@ async function githubCommand(parsed, root, subcommand) {
       : dryRun;
     return {
       status: publish.status,
+      head,
       review,
       commandPolicy,
       publish

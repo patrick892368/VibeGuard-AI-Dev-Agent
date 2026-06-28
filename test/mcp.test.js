@@ -52,6 +52,35 @@ async function startFakeActionsApi() {
   };
 }
 
+async function startFakePullApi() {
+  const server = http.createServer((request, response) => {
+    if (request.headers.accept && request.headers.accept.includes("diff")) {
+      response.writeHead(200, { "content-type": "text/plain" });
+      response.end(`diff --git a/src/db.js b/src/db.js
+--- a/src/db.js
++++ b/src/db.js
+@@ -1 +1,2 @@
+ export function run() {}
++db.query("SELECT * FROM users WHERE id = " + id)
+`);
+      return;
+    }
+    if (request.method === "GET" && request.url.includes("/pulls/")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ head: { sha: "abc123", ref: "codex/review" } }));
+      return;
+    }
+    response.writeHead(404, { "content-type": "application/json" });
+    response.end(JSON.stringify({ message: "not found" }));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    close: () => new Promise((resolve) => server.close(resolve))
+  };
+}
+
 test("MCP tools expose input schemas", () => {
   for (const tool of mcpInternals.tools) {
     assert.equal(tool.inputSchema.type, "object");
@@ -510,6 +539,45 @@ test("MCP github_review_comments blocks denied diff files before analysis", asyn
 
   assert.equal(response.result.isError, true);
   assert.match(response.result.structuredContent.error, /Path matches deny policy: \.env/);
+});
+
+test("MCP github_review_comments can infer commit from PR head", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  const api = await startFakePullApi();
+  const oldToken = process.env.GITHUB_TOKEN;
+  const oldApiUrl = process.env.GITHUB_API_URL;
+
+  try {
+    process.env.GITHUB_TOKEN = "token";
+    process.env.GITHUB_API_URL = api.url;
+    const response = await handleMcpRequest({
+      jsonrpc: "2.0",
+      id: 18,
+      method: "tools/call",
+      params: {
+        name: "github_review_comments",
+        arguments: {
+          pr: "12",
+          githubPr: "12",
+          useApi: true
+        }
+      }
+    }, root);
+    const result = response.result.structuredContent;
+
+    assert.equal(result.status, "dry_run");
+    assert.equal(result.head.headSha, "abc123");
+    assert.equal(result.publish.count, 1);
+    assert.match(result.publish.comments[0].command, /commit_id=abc123/);
+  } finally {
+    if (oldToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = oldToken;
+    if (oldApiUrl === undefined) delete process.env.GITHUB_API_URL;
+    else process.env.GITHUB_API_URL = oldApiUrl;
+    await api.close();
+  }
 });
 
 test("MCP github_checks execute is gated by command policy", async () => {

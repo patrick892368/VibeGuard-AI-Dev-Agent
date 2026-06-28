@@ -38,6 +38,11 @@ const server = http.createServer((request, response) => {
       response.end("diff --git a/src/db.js b/src/db.js\\n--- a/src/db.js\\n+++ b/src/db.js\\n@@ -1 +1,2 @@\\n export function run() {}\\n+db.query(\\"SELECT * FROM users WHERE id = \\" + id)\\n");
       return;
     }
+    if (request.method === "GET" && request.url.includes("/pulls/")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ head: { sha: "abc123", ref: "codex/review" } }));
+      return;
+    }
     if (request.url.includes("/actions/runs")) {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(JSON.stringify({
@@ -782,6 +787,46 @@ test("CLI GitHub review-comments builds a policy-gated batch dry-run from a diff
   assert.equal(execute.status, "require_confirmation");
   assert.equal(execute.stage, "github_review_comments_policy");
   assert.equal(execute.publish.count, 1);
+});
+
+test("CLI GitHub review-comments can infer commit from PR head", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-review-head-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  const api = await startFakeGitHubApi();
+  let parsed;
+
+  try {
+    const output = execFileSync(process.execPath, [
+      bin,
+      "--root",
+      root,
+      "github",
+      "review-comments",
+      "--pr",
+      "12",
+      "--github-pr",
+      "12",
+      "--github-api",
+      "--json"
+    ], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_TOKEN: "token",
+        GITHUB_API_URL: api.url
+      }
+    });
+    parsed = JSON.parse(output);
+  } finally {
+    api.close();
+  }
+
+  assert.equal(parsed.status, "dry_run");
+  assert.equal(parsed.head.headSha, "abc123");
+  assert.equal(parsed.publish.count, 1);
+  assert.match(parsed.publish.comments[0].command, /commit_id=abc123/);
 });
 
 test("CLI GitHub checks execute is gated by command policy", () => {
