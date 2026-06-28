@@ -212,6 +212,38 @@ export function uncovered() {
   assert.deepEqual(result.candidates[0].functionRanges.map((range) => range.name), ["covered", "uncovered"]);
 });
 
+test("analyzeTestTargets maps missing coverage lines to classes and interfaces", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "shape.ts"), `export interface Shape {
+  draw(): string;
+}
+
+export class Circle {
+  area() {
+    return 3;
+  }
+}
+`, "utf8");
+  const coveragePath = path.join(root, "coverage.json");
+  fs.writeFileSync(coveragePath, JSON.stringify({
+    files: {
+      "src/shape.ts": {
+        missing_lines: [2, 7],
+        summary: { percent_covered: 40 }
+      }
+    }
+  }), "utf8");
+
+  const result = analyzeTestTargets({ root, coverageFile: coveragePath });
+  assert.deepEqual(result.candidates[0].classes, ["Circle"]);
+  assert.deepEqual(result.candidates[0].interfaces, ["Shape"]);
+  assert.deepEqual(result.candidates[0].uncoveredClasses, ["Circle"]);
+  assert.deepEqual(result.candidates[0].uncoveredInterfaces, ["Shape"]);
+  assert.deepEqual(result.coverageTargets[0].uncoveredClasses, ["Circle"]);
+  assert.deepEqual(result.coverageTargets[0].uncoveredInterfaces, ["Shape"]);
+});
+
 test("analyzeTestTargets finds Java methods and suggested JUnit path", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
@@ -229,6 +261,22 @@ public class Calculator {
   assert.equal(result.candidates[0].suggestedTestFile, "src/test/java/com/example/CalculatorTest.java");
   assert.deepEqual(result.candidates[0].functions, ["add"]);
   assert.equal(result.candidates[0].metadata.className, "Calculator");
+});
+
+test("analyzeTestTargets finds Java interfaces without concrete methods", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src", "main", "java", "com", "example"), { recursive: true });
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "UserRepository.java"), `package com.example;
+
+public interface UserRepository {
+}
+`, "utf8");
+
+  const result = analyzeTestTargets({ root });
+  assert.equal(result.candidates.length, 1);
+  assert.deepEqual(result.candidates[0].interfaces, ["UserRepository"]);
+  assert.equal(result.candidates[0].suggestedTestFile, "src/test/java/com/example/UserRepositoryTest.java");
+  assert.equal(result.candidates[0].metadata.className, "UserRepository");
 });
 
 test("buildOnboardingMarkdown includes command and architecture sections", () => {

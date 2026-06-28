@@ -88,6 +88,73 @@ test("writeSuggestedTests writes a real JavaScript smoke test through policy", (
   assert.match(generated, /assert\.equal\(mod\.add\(2, 3\), 5\)/);
 });
 
+test("writeSuggestedTests writes JavaScript class smoke assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.js"), `export class User {
+  constructor(name) {
+    this.name = name;
+  }
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "src", "user.test.js"), "utf8");
+  assert.deepEqual(result.candidates[0].classes, ["User"]);
+  assert.match(generated, /assert\.equal\(typeof mod\.User, "function"\)/);
+});
+
+test("writeSuggestedTests runs JavaScript default class smoke assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.mjs"), `export default class User {
+  constructor(name) {
+    this.name = name;
+  }
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "user.test.mjs"), "utf8");
+  assert.deepEqual(result.candidates[0].classes, ["User"]);
+  assert.match(generated, /typeof \(mod\.User \|\| mod\.default\)/);
+  assert.equal(result.testRuns[0].status, "passed");
+});
+
+test("writeSuggestedTests writes Python class smoke assertions", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "user.py"), `class User:
+    def __init__(self, name):
+        self.name = name
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  const generated = fs.readFileSync(path.join(root, "tests", "test_user.py"), "utf8");
+  assert.deepEqual(result.candidates[0].classes, ["User"]);
+  assert.match(generated, /self\.assertTrue\(hasattr\(module, "User"\)\)/);
+});
+
+test("writeSuggestedTests skips runtime writes for TypeScript interface-only files", () => {
+  const root = tempRepo();
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "types.ts"), `export interface User {
+  id: string;
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1 });
+  assert.equal(result.candidates.length, 1);
+  assert.deepEqual(result.candidates[0].interfaces, ["User"]);
+  assert.equal(result.written.length, 0);
+  assert.equal(fs.existsSync(path.join(root, "src", "types.test.ts")), false);
+});
+
 test("writeSuggestedTests focuses generated assertions on uncovered functions", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));

@@ -40,6 +40,10 @@ vibeguard audit report --file reports/audit.jsonl --output reports/audit.md
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志输入文件，然后才解析。
 
+`test` reports uncovered functions, classes, and interfaces from coverage.py JSON or LCOV. `test --write` can generate runtime tests for functions and classes, while TypeScript interface-only files stay as prioritization candidates instead of producing empty runtime tests.
+
+`test` 会从 coverage.py JSON 或 LCOV 报告中输出未覆盖函数、类和接口。`test --write` 可以为函数和类生成运行时测试；TypeScript interface-only 文件会保留为排序候选，而不会生成空的运行时测试。
+
 `review` returns line-level findings, recommendations, severity summaries, actionItems, publishable `reviewComments`, and PR-comment Markdown when the diff hunk contains line metadata. `--diff` input files are read through path policy, and `--write-comment` writes Markdown through Policy-as-Code so it can be passed to `github comment --body-file`.
 
 `review` 会在 diff hunk 提供行号时返回行号级 findings、recommendations、严重度汇总、actionItems、可发布的 `reviewComments` 和 PR 评论 Markdown。`--diff` 输入文件会经过路径 policy 读取，`--write-comment` 会经过 Policy-as-Code 写出这段 Markdown，方便继续传给 `github comment --body-file`。

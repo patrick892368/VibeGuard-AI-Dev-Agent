@@ -30,6 +30,40 @@ function extractJavaMethods(text) {
     .filter((name) => !["if", "for", "while", "switch", "catch"].includes(name));
 }
 
+function uniqueNames(names) {
+  return [...new Set(names.filter(Boolean))];
+}
+
+function extractPythonClasses(text) {
+  return uniqueNames([...text.matchAll(/^\s*class\s+([a-zA-Z_]\w*)\s*(?:\(|:)/gm)].map((match) => match[1]));
+}
+
+function extractJavaScriptClasses(text) {
+  const names = [];
+  const patterns = [
+    /(?:export\s+default\s+|export\s+)?class\s+([a-zA-Z_$][\w$]*)\b/g,
+    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*class\b/g,
+    /(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=\s*class\b/g,
+    /(?:exports|module\.exports)\[['"]([^'"]+)['"]\]\s*=\s*class\b/g
+  ];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) names.push(match[1]);
+  }
+  return uniqueNames(names);
+}
+
+function extractTypeScriptInterfaces(text) {
+  return uniqueNames([...text.matchAll(/(?:export\s+)?interface\s+([a-zA-Z_$][\w$]*)\b/g)].map((match) => match[1]));
+}
+
+function extractJavaClasses(text) {
+  return uniqueNames([...text.matchAll(/\b(?:class|record|enum)\s+([A-Z]\w*)\b/g)].map((match) => match[1]));
+}
+
+function extractJavaInterfaces(text) {
+  return uniqueNames([...text.matchAll(/\binterface\s+([A-Z]\w*)\b/g)].map((match) => match[1]));
+}
+
 function lineNumberAt(text, index) {
   return text.slice(0, index).split("\n").length;
 }
@@ -42,10 +76,42 @@ function rangeFromStarts(starts, totalLines) {
   }));
 }
 
+function startsForPatterns(text, patterns) {
+  const starts = [];
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      starts.push({ name: match[1], line: lineNumberAt(text, match.index) });
+    }
+  }
+  return [...new Map(starts.sort((a, b) => a.line - b.line).map((item) => [`${item.name}:${item.line}`, item])).values()];
+}
+
+function rangesFromPatterns(text, patterns, boundaryPatterns = patterns) {
+  const totalLines = text.split(/\r?\n/).length;
+  const ownStarts = startsForPatterns(text, patterns);
+  const boundaryStarts = startsForPatterns(text, boundaryPatterns);
+  return ownStarts.map((item) => {
+    const next = boundaryStarts.find((candidate) => candidate.line > item.line);
+    return {
+      name: item.name,
+      startLine: item.line,
+      endLine: (next?.line || totalLines + 1) - 1
+    };
+  });
+}
+
 function extractPythonFunctionRanges(text) {
   const starts = [...text.matchAll(/^\s*def\s+([a-zA-Z_]\w*)\s*\(/gm)]
     .map((match) => ({ name: match[1], line: lineNumberAt(text, match.index) }));
   return rangeFromStarts(starts, text.split(/\r?\n/).length);
+}
+
+function extractPythonClassRanges(text) {
+  return rangesFromPatterns(
+    text,
+    [/^\s*class\s+([a-zA-Z_]\w*)\s*(?:\(|:)/gm],
+    [/^(?:class|def)\s+([a-zA-Z_]\w*)\s*(?:\(|:)/gm]
+  );
 }
 
 function extractJavaScriptFunctionRanges(text) {
@@ -65,6 +131,35 @@ function extractJavaScriptFunctionRanges(text) {
   return rangeFromStarts(unique, text.split(/\r?\n/).length);
 }
 
+function extractJavaScriptClassRanges(text) {
+  const patterns = [
+    /(?:export\s+default\s+|export\s+)?class\s+([a-zA-Z_$][\w$]*)\b/g,
+    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*class\b/g,
+    /(?:exports|module\.exports)\.([a-zA-Z_$][\w$]*)\s*=\s*class\b/g,
+    /(?:exports|module\.exports)\[['"]([^'"]+)['"]\]\s*=\s*class\b/g
+  ];
+  const boundaries = [
+    ...patterns,
+    /(?:export\s+)?interface\s+([a-zA-Z_$][\w$]*)\b/g,
+    /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(/g,
+    /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g
+  ];
+  return rangesFromPatterns(text, patterns, boundaries);
+}
+
+function extractTypeScriptInterfaceRanges(text) {
+  return rangesFromPatterns(
+    text,
+    [/(?:export\s+)?interface\s+([a-zA-Z_$][\w$]*)\b/g],
+    [
+      /(?:export\s+)?interface\s+([a-zA-Z_$][\w$]*)\b/g,
+      /(?:export\s+default\s+|export\s+)?class\s+([a-zA-Z_$][\w$]*)\b/g,
+      /(?:export\s+)?function\s+([a-zA-Z_$][\w$]*)\s*\(/g,
+      /(?:const|let|var)\s+([a-zA-Z_$][\w$]*)\s*=\s*(?:async\s*)?\(/g
+    ]
+  );
+}
+
 function extractJavaMethodRanges(text) {
   const starts = [...text.matchAll(/(?:public|private|protected)\s+(?:static\s+)?[\w.<>\[\]]+\s+([a-zA-Z_]\w*)\s*\(/g)]
     .map((match) => ({ name: match[1], line: lineNumberAt(text, match.index) }))
@@ -72,15 +167,39 @@ function extractJavaMethodRanges(text) {
   return rangeFromStarts(starts, text.split(/\r?\n/).length);
 }
 
-function uncoveredFunctions(functionRanges, coverage) {
+function extractJavaClassRanges(text) {
+  return rangesFromPatterns(
+    text,
+    [/\b(?:class|record|enum)\s+([A-Z]\w*)\b/g],
+    [/\b(?:class|record|enum|interface)\s+([A-Z]\w*)\b/g]
+  );
+}
+
+function extractJavaInterfaceRanges(text) {
+  return rangesFromPatterns(
+    text,
+    [/\binterface\s+([A-Z]\w*)\b/g],
+    [/\b(?:class|record|enum|interface)\s+([A-Z]\w*)\b/g]
+  );
+}
+
+function uncoveredNames(namedRanges, coverage) {
   if (!coverage?.missingLines?.length) return [];
-  return functionRanges
+  return namedRanges
     .filter((range) => coverage.missingLines.some((line) => line >= range.startLine && line <= range.endLine))
     .map((range) => range.name);
 }
 
+function uncoveredFunctions(functionRanges, coverage) {
+  return uncoveredNames(functionRanges, coverage);
+}
+
 function testTargetFunctions(candidate) {
   return candidate.uncoveredFunctions?.length ? candidate.uncoveredFunctions : candidate.functions;
+}
+
+function testTargetClasses(candidate) {
+  return candidate.uncoveredClasses?.length ? candidate.uncoveredClasses : candidate.classes || [];
 }
 
 function splitParams(params) {
@@ -279,7 +398,7 @@ function inferJavaScriptAssertions(text) {
 
 function javaMetadata(text, sourceFile) {
   const packageName = text.match(/^\s*package\s+([\w.]+);/m)?.[1] || "";
-  const className = text.match(/\bclass\s+([A-Z]\w*)/)?.[1] || path.basename(sourceFile, ".java");
+  const className = text.match(/\b(?:class|interface|record|enum)\s+([A-Z]\w*)/)?.[1] || path.basename(sourceFile, ".java");
   return { packageName, className };
 }
 
@@ -289,6 +408,26 @@ function detectJavaScriptModuleSystem(text, sourceFile) {
   if (/\bexport\s+|\bimport\s+/.test(text)) return "esm";
   if (/module\.exports|exports\.|(?:exports|module\.exports)\[['"][^'"]+['"]\]/.test(text)) return "commonjs";
   return "unknown";
+}
+
+function detectDefaultExportedClasses(text) {
+  return uniqueNames([...text.matchAll(/export\s+default\s+class\s+([a-zA-Z_$][\w$]*)\b/g)].map((match) => match[1]));
+}
+
+function detectDirectCommonJsClassExport(text, classes) {
+  const inline = text.match(/module\.exports\s*=\s*class\s+([a-zA-Z_$][\w$]*)\b/);
+  if (inline) return inline[1];
+  const reference = text.match(/module\.exports\s*=\s*([a-zA-Z_$][\w$]*)\b/);
+  return reference && classes.includes(reference[1]) ? reference[1] : null;
+}
+
+function javaScriptMetadata(text, sourceFile, classes) {
+  return {
+    moduleSystem: detectJavaScriptModuleSystem(text, sourceFile),
+    assertionHints: inferJavaScriptAssertions(text),
+    defaultExportedClasses: detectDefaultExportedClasses(text),
+    directCommonJsClassExport: detectDirectCommonJsClassExport(text, classes)
+  };
 }
 
 function candidateTestPath(sourceFile) {
@@ -515,16 +654,30 @@ function jsBehaviorAssertion(hint) {
   return `  assert.equal(${call}, ${jsLiteral(hint.expected)});`;
 }
 
+function jsClassAssertion(name, candidate) {
+  if (candidate.metadata?.directCommonJsClassExport === name) {
+    return "  assert.equal(typeof mod, \"function\");";
+  }
+  if (candidate.metadata?.defaultExportedClasses?.includes(name)) {
+    return `  assert.equal(typeof (mod.${name} || mod.default), "function");`;
+  }
+  return `  assert.equal(typeof mod.${name}, "function");`;
+}
+
 export function generateTestContent(candidate, options = {}) {
   const sourceFile = candidate.sourceFile.replace(/\\/g, "/");
   const testFile = candidate.suggestedTestFile.replace(/\\/g, "/");
   const functions = testTargetFunctions(candidate);
+  const classes = testTargetClasses(candidate);
   const assertionHints = (candidate.metadata?.assertionHints || []).filter((hint) => functions.includes(hint.name));
 
   if (sourceFile.endsWith(".py")) {
     const relativeSource = relativeImport(testFile, sourceFile);
     const sourcePathSetup = Boolean(options.pythonSourcePathSetup);
-    const assertions = functions.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`).join("\n");
+    const assertions = [
+      ...functions.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`),
+      ...classes.map((name) => `        self.assertTrue(hasattr(module, "${name}"))`)
+    ].join("\n") || "        self.assertIsNotNone(module)";
     const behaviorAssertions = assertionHints.map(pythonBehaviorAssertion).join("\n");
     return `import importlib.util
 import pathlib
@@ -546,7 +699,7 @@ ${sourcePathSetup ? `    source_dir = str(source.parent)
 
 
 class GeneratedBehaviorTest(unittest.TestCase):
-    def test_exports_expected_functions(self):
+    def test_exports_expected_symbols(self):
         module = load_module()
 ${assertions}
 ${behaviorAssertions ? `\n    def test_covers_simple_behavior(self):\n        module = load_module()\n${behaviorAssertions}\n` : ""}
@@ -566,7 +719,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class ${className}Test {
     @Test
-    void classCanBeLoaded() {
+    void symbolCanBeLoaded() {
         assertNotNull(${className}.class);
     }
 }
@@ -574,14 +727,17 @@ class ${className}Test {
   }
 
   const importPath = relativeImport(testFile, sourceFile);
-  const assertions = functions.map((name) => `  assert.equal(typeof mod.${name}, "function");`).join("\n");
+  const assertions = [
+    ...functions.map((name) => `  assert.equal(typeof mod.${name}, "function");`),
+    ...classes.map((name) => jsClassAssertion(name, candidate))
+  ].join("\n") || "  assert.ok(mod);";
   const behaviorAssertions = assertionHints.map(jsBehaviorAssertion).join("\n");
   if (candidate.metadata?.moduleSystem === "commonjs") {
     return `const test = require("node:test");
 const assert = require("node:assert/strict");
 const mod = require("${importPath}");
 
-test("exports expected functions", () => {
+test("exports expected functions and classes", () => {
 ${assertions}
 });
 ${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAssertions}\n});\n` : ""}
@@ -592,7 +748,7 @@ ${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAsse
 import assert from "node:assert/strict";
 import * as mod from "${importPath}";
 
-test("exports expected functions", () => {
+test("exports expected functions and classes", () => {
 ${assertions}
 });
 ${behaviorAssertions ? `\ntest("covers simple behavior", () => {\n${behaviorAssertions}\n});\n` : ""}
@@ -895,7 +1051,9 @@ function coverageTargets(candidates) {
       missingLineCount: candidate.coverage.missingLineCount,
       missingLines: candidate.coverage.missingLines,
       percentCovered: candidate.coverage.percentCovered,
-      uncoveredFunctions: candidate.uncoveredFunctions
+      uncoveredFunctions: candidate.uncoveredFunctions,
+      uncoveredClasses: candidate.uncoveredClasses,
+      uncoveredInterfaces: candidate.uncoveredInterfaces
     }));
 }
 
@@ -976,6 +1134,11 @@ function buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine,
   });
 }
 
+function hasRuntimeTestTargets(candidate) {
+  if (candidate.functions?.length > 0 || candidate.classes?.length > 0) return true;
+  return candidate.sourceFile.endsWith(".java") && candidate.interfaces?.length > 0;
+}
+
 export function analyzeTestTargets(options = {}) {
   const root = options.root || process.cwd();
   const files = listRepoFiles(root);
@@ -998,7 +1161,11 @@ export function analyzeTestTargets(options = {}) {
     const isJavaScript = !isPython && !isJava;
     const functions = isPython ? extractPythonFunctions(text) : isJava ? extractJavaMethods(text) : extractJavaScriptFunctions(text);
     const functionRanges = isPython ? extractPythonFunctionRanges(text) : isJava ? extractJavaMethodRanges(text) : extractJavaScriptFunctionRanges(text);
-    if (functions.length === 0) continue;
+    const classes = isPython ? extractPythonClasses(text) : isJava ? extractJavaClasses(text) : extractJavaScriptClasses(text);
+    const classRanges = isPython ? extractPythonClassRanges(text) : isJava ? extractJavaClassRanges(text) : extractJavaScriptClassRanges(text);
+    const interfaces = isJava ? extractJavaInterfaces(text) : file.endsWith(".ts") ? extractTypeScriptInterfaces(text) : [];
+    const interfaceRanges = isJava ? extractJavaInterfaceRanges(text) : file.endsWith(".ts") ? extractTypeScriptInterfaceRanges(text) : [];
+    if (functions.length === 0 && classes.length === 0 && interfaces.length === 0) continue;
     const testPath = candidateTestPath(file);
     const hasLikelyTest = testPath ? files.includes(testPath) : false;
     const fileCoverage = coverageByFile.get(file) || null;
@@ -1007,13 +1174,19 @@ export function analyzeTestTargets(options = {}) {
       functions,
       functionRanges,
       uncoveredFunctions: uncoveredFunctions(functionRanges, fileCoverage),
+      classes,
+      classRanges,
+      uncoveredClasses: uncoveredNames(classRanges, fileCoverage),
+      interfaces,
+      interfaceRanges,
+      uncoveredInterfaces: uncoveredNames(interfaceRanges, fileCoverage),
       suggestedTestFile: testPath,
       hasLikelyTest,
       coverage: fileCoverage,
       metadata: isJava
         ? javaMetadata(text, file)
         : isJavaScript
-          ? { moduleSystem: detectJavaScriptModuleSystem(text, file), assertionHints: inferJavaScriptAssertions(text) }
+          ? javaScriptMetadata(text, file, classes)
           : { assertionHints: inferPythonAssertions(text) }
     });
   }
@@ -1044,7 +1217,9 @@ export function writeSuggestedTests(root, engine, options = {}) {
     coverageAfterText: options.coverageAfterText
   });
   const limit = Number(options.limit || 1);
-  const writable = analysis.candidates.filter((candidate) => candidate.suggestedTestFile && !candidate.hasLikelyTest).slice(0, limit);
+  const writable = analysis.candidates
+    .filter((candidate) => candidate.suggestedTestFile && !candidate.hasLikelyTest && hasRuntimeTestTargets(candidate))
+    .slice(0, limit);
   const written = writable.map((candidate) =>
     writeFileWithPolicy(root, candidate.suggestedTestFile, generateTestContent(candidate), engine, options)
   );
