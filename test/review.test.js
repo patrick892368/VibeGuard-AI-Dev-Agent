@@ -98,6 +98,38 @@ diff --git a/src/jobs.py b/src/jobs.py
   assert.ok(result.actionItems.some((item) => /policy-gated runner/.test(item.action)));
 });
 
+test("analyzeReviewDiff flags SSRF, TLS, weak hash, and insecure randomness risks", () => {
+  const diff = `diff --git a/src/http.js b/src/http.js
+--- a/src/http.js
++++ b/src/http.js
+@@ -1 +1,6 @@
+ export async function proxy(req) {}
++fetch(req.query.url)
++axios.get(req.body.callbackUrl)
++const token = Math.random().toString(36)
++createHash("md5").update(password).digest("hex")
++https.get(target, { rejectUnauthorized: false })
+diff --git a/src/security.py b/src/security.py
+--- a/src/security.py
++++ b/src/security.py
+@@ -1 +1,4 @@
++requests.get(request.args["url"], verify=False)
++hashlib.sha1(password.encode()).hexdigest()
++session_token = random.random()
+`;
+
+  const result = analyzeReviewDiff(diff);
+
+  assert.ok(result.findings.some((finding) => finding.message.includes("Potential SSRF") && finding.severity === "high"));
+  assert.ok(result.findings.some((finding) => finding.message.includes("TLS certificate verification") && finding.severity === "high"));
+  assert.ok(result.findings.some((finding) => finding.message.includes("Weak hash algorithm") && finding.severity === "medium"));
+  assert.ok(result.findings.some((finding) => finding.message.includes("Insecure randomness") && finding.severity === "medium"));
+  assert.ok(result.actionItems.some((item) => /allowlist/.test(item.action)));
+  assert.ok(result.actionItems.some((item) => /certificate verification/.test(item.action)));
+  assert.ok(result.actionItems.some((item) => /cryptographically secure random/.test(item.action)));
+  assert.ok(result.reviewComments.some((comment) => comment.path === "src/http.js" && comment.line === 2 && /SSRF/.test(comment.body)));
+});
+
 test("analyzeReviewDiff flags bug-prone additions", () => {
   const diff = `diff --git a/src/cache.py b/src/cache.py
 --- a/src/cache.py

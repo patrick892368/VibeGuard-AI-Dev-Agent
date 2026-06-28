@@ -43,6 +43,10 @@ function recommendationFor(category, message) {
   if (message.includes("Dynamic code execution")) return "Replace dynamic execution with explicit dispatch or a sandboxed interpreter with strict input validation.";
   if (message.includes("Shell injection risk")) return "Avoid shell execution for dynamic input; pass argv arrays through a policy-gated runner and validate each argument.";
   if (message.includes("Shell/process execution")) return "Route commands through a policy-gated runner and validate every user-controlled argument.";
+  if (message.includes("Potential SSRF")) return "Validate destination URLs against an allowlist, block private/internal networks, and avoid server-side fetches to arbitrary user input.";
+  if (message.includes("TLS certificate verification")) return "Keep certificate verification enabled and configure trusted CAs or certificate pinning instead of disabling TLS checks.";
+  if (message.includes("Weak hash algorithm")) return "Use SHA-256 for non-password integrity checks, or a password hashing/KDF such as argon2, bcrypt, scrypt, or PBKDF2 for credentials.";
+  if (message.includes("Insecure randomness")) return "Use a cryptographically secure random generator such as crypto.randomBytes, crypto.getRandomValues, Python secrets, or Java SecureRandom.";
   if (message.includes("SQL string concatenation")) return "Use parameterized queries or the framework query builder for every dynamic value.";
   if (message.includes("HTML injection")) return "Render text safely or sanitize trusted markup before assigning it to an HTML sink.";
   if (message.includes("Unsafe deserialization")) return "Use safe loaders and reject untrusted serialized input.";
@@ -148,6 +152,24 @@ export function analyzeReviewDiff(diffText, options = {}) {
     }
     if (/\beval\s*\(|new Function\s*\(/.test(value)) {
       findings.push(finding("high", addition.file, "security", "Dynamic code execution introduced. Avoid eval/new Function unless strictly sandboxed.", addition));
+    }
+    const ssrfRisk =
+      /\bfetch\s*\([^)]*(?:req\.|request\.|ctx\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
+      /\baxios\.(?:get|post|put|delete|request)\s*\([^)]*(?:req\.|request\.|ctx\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
+      /\b(?:got|request)\s*\([^)]*(?:req\.|request\.|ctx\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
+      /\brequests\.(?:get|post|put|delete|request)\s*\([^)]*(?:req\.|request\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value) ||
+      /\burllib\.request\.urlopen\s*\([^)]*(?:req\.|request\.|params|query|body|args|callbackUrl|targetUrl|redirectUrl)/i.test(value);
+    if (ssrfRisk) {
+      findings.push(finding("high", addition.file, "security", "Potential SSRF sink introduced. Server-side requests should not fetch arbitrary user-controlled URLs.", addition));
+    }
+    if (/rejectUnauthorized\s*:\s*false|verify\s*=\s*False|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*["']?0/i.test(value)) {
+      findings.push(finding("high", addition.file, "security", "TLS certificate verification disabled. This can allow man-in-the-middle attacks.", addition));
+    }
+    if (/\bcreateHash\s*\(\s*["'](?:md5|sha1)["']|hashlib\.(?:md5|sha1)\s*\(|MessageDigest\.getInstance\s*\(\s*["'](?:MD5|SHA-?1)["']/i.test(value)) {
+      findings.push(finding("medium", addition.file, "security", "Weak hash algorithm introduced. MD5 and SHA-1 are not appropriate for security-sensitive hashing.", addition));
+    }
+    if (/(?:token|secret|password|session|csrf|nonce)\w*\s*[:=].*\bMath\.random\s*\(|(?:token|secret|password|session|csrf|nonce)\w*\s*[:=].*\brandom\.(?:random|randint|choice|choices)\s*\(|(?:token|secret|password|session|csrf|nonce)\w*\s*=\s*new\s+Random\s*\(/i.test(value)) {
+      findings.push(finding("medium", addition.file, "security", "Insecure randomness used for a security-sensitive value.", addition));
     }
     const shellInjectionRisk =
       /\b(exec|execSync)\s*\([^)]*(?:`|\+|\$\{)/.test(value) ||
