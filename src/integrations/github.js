@@ -19,6 +19,7 @@ export function parseGitHubRemote(remoteUrl) {
 }
 
 export function detectGitHubRepository(root = process.cwd(), options = {}) {
+  requireExecutionPolicy(options, "GitHub detection");
   checkOptionalCommandPolicy(root, GITHUB_DETECT_COMMAND, options, "github_detect");
   const remote = execFileSync("git", ["remote", "get-url", "origin"], { cwd: root, encoding: "utf8" }).trim();
   const parsed = parseGitHubRemote(remote);

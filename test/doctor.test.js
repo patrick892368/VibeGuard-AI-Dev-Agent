@@ -1,5 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { runDoctor } from "../src/agents/doctor.js";
 
 test("runDoctor reports readiness without exposing provider secrets", () => {
@@ -53,4 +57,33 @@ test("runDoctor returns next actions for missing provider and GitHub execution a
     "enable_github_execution"
   ]);
   assert.match(result.nextActions[0].command, /XAI_API_KEY|GROK_API_KEY/);
+});
+
+test("runDoctor honors policy before detecting GitHub remotes", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-doctor-github-policy-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), `version: 1
+paths:
+  allow:
+    - "**"
+  deny: []
+  require_confirmation: []
+commands:
+  deny:
+    - "git remote get-url origin"
+  require_confirmation: []
+`, "utf8");
+
+  const result = runDoctor({
+    root,
+    env: { XAI_API_KEY: "secret-value" },
+    toolStatus: {
+      git: { available: true, detail: "git version test" },
+      gh: { available: true, detail: "gh version test" }
+    }
+  });
+
+  assert.equal(result.github.status, "unavailable");
+  assert.match(result.github.error, /Command matches deny policy: git remote get-url origin/);
 });

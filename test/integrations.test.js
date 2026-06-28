@@ -241,6 +241,20 @@ test("GitHub detection honors direct helper prerequisite command policy", () => 
   assert.throws(() => detectGitHubRepository(root, { engine }), /Command matches deny policy: git remote get-url origin/);
 });
 
+test("GitHub detection helpers require a policy engine", () => {
+  const root = tempGitHubRepo();
+
+  assert.throws(() => detectGitHubRepository(root), /GitHub detection requires a PolicyEngine/);
+});
+
+test("GitHub detection succeeds with an allowed policy engine", () => {
+  const root = tempGitHubRepo();
+  const result = detectGitHubRepository(root, { engine: permissivePolicyEngine(root) });
+
+  assert.equal(result.owner, "owner");
+  assert.equal(result.repo, "repo");
+});
+
 test("GitHub PR creation is dry-run by default", async () => {
   assert.deepEqual(buildGhPrArgs({ title: "Fix bug", bodyFile: "pr.md", draft: true }), [
     "pr",

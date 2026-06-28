@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { loadConfig } from "../config/loadConfig.js";
 import { detectGitHubRepository } from "../integrations/github.js";
+import { PolicyEngine } from "../policy/engine.js";
 
 function commandAvailable(command, args = ["--version"]) {
   try {
@@ -97,8 +98,10 @@ export function runDoctor(options = {}) {
   const root = options.root || process.cwd();
   const env = options.env || process.env;
   let policy;
+  let engine = null;
   try {
     const loaded = loadConfig(root);
+    engine = new PolicyEngine(loaded.config, { root });
     policy = {
       status: "loaded",
       path: loaded.configPath || null
@@ -112,9 +115,12 @@ export function runDoctor(options = {}) {
 
   let github;
   try {
+    if (!engine) {
+      throw new Error("Policy config did not load; GitHub remote detection was skipped.");
+    }
     github = {
       status: "detected",
-      ...detectGitHubRepository(root)
+      ...detectGitHubRepository(root, { engine })
     };
   } catch (error) {
     github = {

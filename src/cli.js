@@ -429,7 +429,7 @@ async function githubCommand(parsed, root, subcommand) {
   if (subcommand === "detect") {
     const blocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_detect_policy", Boolean(parsed.confirm));
     if (blocked) return blocked;
-    return detectGitHubRepository(root);
+    return detectGitHubRepository(root, executionPolicyOptions);
   }
   if (subcommand === "pr") {
     const options = {

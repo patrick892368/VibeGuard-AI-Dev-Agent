@@ -554,9 +554,15 @@ async function callTool(name, args, root) {
     return buildPrSummary(diffText);
   }
   if (name === "detect_github") {
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
     const blocked = githubPrerequisitePolicy(root, [GITHUB_DETECT_COMMAND], "github_detect_policy", Boolean(args.confirmed));
     if (blocked) return blocked;
-    return detectGitHubRepository(root);
+    return detectGitHubRepository(root, {
+      engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
   }
   if (name === "github_pr") {
     const env = loadRuntimeEnv(root);
