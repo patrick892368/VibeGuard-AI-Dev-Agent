@@ -8,7 +8,7 @@ import { analyzeDebugLog } from "../agents/debug.js";
 import { runDoctor } from "../agents/doctor.js";
 import { runFixWorkflow } from "../agents/fix.js";
 import { analyzeRepository } from "../agents/onboard.js";
-import { analyzeTestTargets, writeSuggestedTests } from "../agents/testWriter.js";
+import { analyzeTestTargets, writeSuggestedTestsAsync } from "../agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "../agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, listWorkflowRunsWithGh } from "../integrations/github.js";
@@ -102,6 +102,7 @@ const tools = [
       prDryRun: booleanSchema,
       createPr: booleanSchema,
       executeGitPlan: booleanSchema,
+      githubUseApi: booleanSchema,
       branch: stringSchema,
       commitMessage: stringSchema,
       prTitle: stringSchema,
@@ -488,7 +489,7 @@ async function callTool(name, args, root) {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
     if (args.write) {
-      return writeSuggestedTests(root, engine, {
+      return await writeSuggestedTestsAsync(root, engine, {
         limit: args.limit || 1,
         coverageFile: args.coverageFile,
         coverageText: args.coverageText,
@@ -509,7 +510,9 @@ async function callTool(name, args, root) {
         prBodyFile: args.prBodyFile,
         dryRun: Boolean(args.dryRun),
         confirmed: Boolean(args.confirmed),
-        auditLog: args.auditLog
+        auditLog: args.auditLog,
+        env: loadRuntimeEnv(root),
+        githubUseApi: Boolean(args.githubUseApi)
       });
     }
     return analyzeTestTargets({

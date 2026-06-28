@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { PolicyEngine } from "../src/policy/engine.js";
 import { readFileWithPolicy, writeFileWithPolicy } from "../src/policy/safeWrite.js";
-import { writeSuggestedTests } from "../src/agents/testWriter.js";
+import { writeSuggestedTests, writeSuggestedTestsAsync } from "../src/agents/testWriter.js";
 import { writeOnboardingDocs } from "../src/agents/onboard.js";
 import { applyPatchWithPolicy } from "../src/patch/safeApply.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../src/runner/safeCommand.js";
@@ -531,6 +531,65 @@ test("writeSuggestedTests executes confirmed local branch and commit plan after 
   ]);
   assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim(), "codex/add-generated-tests");
   assert.equal(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: root, encoding: "utf8" }).trim(), "test: add generated coverage tests");
+});
+
+test("writeSuggestedTestsAsync can create test PRs through the GitHub REST fallback", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "core.autocrlf", "false"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "math.js"), "export function add(a, b) { return a + b; }\n", "utf8");
+  execFileSync("git", ["add", "."], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["commit", "-m", "initial"], { cwd: root, encoding: "utf8" });
+
+  const engine = new PolicyEngine({
+    paths: { allow: ["src/**"], deny: [".git/**"], require_confirmation: [] },
+    commands: {
+      deny: [],
+      require_confirmation: ["git switch -c", "git commit", "gh pr create"]
+    }
+  }, { root });
+  let request;
+
+  const result = await writeSuggestedTestsAsync(root, engine, {
+    limit: 1,
+    runTests: true,
+    createBranch: true,
+    commit: true,
+    createPr: true,
+    executeGitPlan: true,
+    confirmed: true,
+    githubUseApi: true,
+    env: { GITHUB_TOKEN: "token" },
+    async githubFetch(url, options) {
+      request = { url, options, body: JSON.parse(options.body) };
+      return {
+        ok: true,
+        status: 201,
+        async json() {
+          return { html_url: "https://github.com/owner/repo/pull/8", number: 8 };
+        }
+      };
+    }
+  });
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.equal(result.gitExecution.status, "executed");
+  assert.deepEqual(result.gitExecution.results.map((command) => command.step), [
+    "create_branch",
+    "stage_files",
+    "commit",
+    "create_pr"
+  ]);
+  assert.equal(result.gitExecution.results.at(-1).method, "api");
+  assert.equal(result.gitExecution.results.at(-1).url, "https://github.com/owner/repo/pull/8");
+  assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
+  assert.equal(request.body.head, "codex/add-generated-tests");
+  assert.match(request.body.title, /Add generated tests/);
 });
 
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {

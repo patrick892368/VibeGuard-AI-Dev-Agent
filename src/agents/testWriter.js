@@ -4,7 +4,7 @@ import { listRepoFiles, readTextIfExists } from "../repo/files.js";
 import { scanRepository } from "../repo/scan.js";
 import { readFileWithPolicy, writeFileWithPolicy } from "../policy/safeWrite.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "../runner/safeCommand.js";
-import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan } from "../integrations/gitPlan.js";
+import { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "../integrations/gitPlan.js";
 
 function extractPythonFunctions(text) {
   return [...text.matchAll(/^\s*def\s+([a-zA-Z_]\w*)\s*\(/gm)].map((match) => match[1]);
@@ -1144,7 +1144,7 @@ function buildTestWriterGitPlan(written, testRuns, options = {}) {
   });
 }
 
-function buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine, options = {}) {
+function validateTestWriterGitExecution(gitPlan, gitPolicy, testRuns, options = {}) {
   if (!options.executeGitPlan || !gitPlan) return null;
   if (gitPolicy?.status !== "allow") {
     return {
@@ -1172,8 +1172,28 @@ function buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine,
       results: []
     };
   }
+  return null;
+}
+
+function buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine, options = {}) {
+  const blocked = validateTestWriterGitExecution(gitPlan, gitPolicy, testRuns, options);
+  if (blocked) return blocked;
+  if (!options.executeGitPlan || !gitPlan) return null;
   return executeGitPlan(root, gitPlan, engine, {
     confirmed: Boolean(options.confirmed)
+  });
+}
+
+async function buildTestWriterGitExecutionAsync(root, gitPlan, gitPolicy, testRuns, engine, options = {}) {
+  const blocked = validateTestWriterGitExecution(gitPlan, gitPolicy, testRuns, options);
+  if (blocked) return blocked;
+  if (!options.executeGitPlan || !gitPlan) return null;
+  return executeGitPlanAsync(root, gitPlan, engine, {
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog,
+    env: options.env,
+    fetch: options.githubFetch,
+    useApi: Boolean(options.githubUseApi)
   });
 }
 
@@ -1253,7 +1273,7 @@ export function analyzeTestTargets(options = {}) {
   };
 }
 
-export function writeSuggestedTests(root, engine, options = {}) {
+function buildSuggestedTestsState(root, engine, options = {}) {
   const analysis = analyzeTestTargets({
     root,
     engine,
@@ -1286,18 +1306,42 @@ export function writeSuggestedTests(root, engine, options = {}) {
   const gitPolicy = gitPlan
     ? checkGitPlanPolicy(gitPlan, engine, { confirmed: Boolean(options.confirmed) })
     : null;
-  const gitExecution = buildTestWriterGitExecution(root, gitPlan, gitPolicy, testRuns, engine, options);
-  const result = {
-    ...analysis,
+  return {
+    analysis,
     written,
+    initialTestRuns,
+    repairRuns,
+    hasRepairRuns,
     testRuns,
     gitPlan,
-    gitPolicy,
+    gitPolicy
+  };
+}
+
+function buildSuggestedTestsResult(state, gitExecution) {
+  const result = {
+    ...state.analysis,
+    written: state.written,
+    testRuns: state.testRuns,
+    gitPlan: state.gitPlan,
+    gitPolicy: state.gitPolicy,
     gitExecution
   };
-  if (hasRepairRuns) {
-    result.initialTestRuns = initialTestRuns;
-    result.repairRuns = repairRuns;
+  if (state.hasRepairRuns) {
+    result.initialTestRuns = state.initialTestRuns;
+    result.repairRuns = state.repairRuns;
   }
   return result;
+}
+
+export function writeSuggestedTests(root, engine, options = {}) {
+  const state = buildSuggestedTestsState(root, engine, options);
+  const gitExecution = buildTestWriterGitExecution(root, state.gitPlan, state.gitPolicy, state.testRuns, engine, options);
+  return buildSuggestedTestsResult(state, gitExecution);
+}
+
+export async function writeSuggestedTestsAsync(root, engine, options = {}) {
+  const state = buildSuggestedTestsState(root, engine, options);
+  const gitExecution = await buildTestWriterGitExecutionAsync(root, state.gitPlan, state.gitPolicy, state.testRuns, engine, options);
+  return buildSuggestedTestsResult(state, gitExecution);
 }

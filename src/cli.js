@@ -5,7 +5,7 @@ import { loadRuntimeEnv } from "./config/env.js";
 import { PolicyEngine } from "./policy/engine.js";
 import { analyzeDebugLog } from "./agents/debug.js";
 import { analyzeRepository, writeOnboardingDocs } from "./agents/onboard.js";
-import { analyzeTestTargets, writeSuggestedTests } from "./agents/testWriter.js";
+import { analyzeTestTargets, writeSuggestedTestsAsync } from "./agents/testWriter.js";
 import { analyzeReviewDiff, writeReviewComment } from "./agents/review.js";
 import { buildPrSummary, writePrSummaryBody } from "./agents/pr.js";
 import { runFixWorkflow } from "./agents/fix.js";
@@ -29,7 +29,7 @@ Usage:
   vibeguard debug --log <file> [--ai-patch] [--output-patch <file>]
   vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--github-api]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--github-api]
   vibeguard review [--diff <file>] [--write-comment <file>]
   vibeguard onboard [--write]
   vibeguard patch check --file <patch>
@@ -695,7 +695,7 @@ async function dispatch(parsed) {
     const { config } = loadConfig(root);
     const engine = new PolicyEngine(config, { root });
     if (parsed.write) {
-      return writeSuggestedTests(root, engine, {
+      return await writeSuggestedTestsAsync(root, engine, {
         limit: parsed.limit || 1,
         coverageFile: parsed.coverage,
         coverageAfterFile: parsed["coverage-after"],
@@ -714,7 +714,9 @@ async function dispatch(parsed) {
         prBodyFile: parsed["pr-body-file"],
         dryRun: Boolean(parsed["dry-run"]),
         confirmed: Boolean(parsed.confirm),
-        auditLog: parsed["audit-log"]
+        auditLog: parsed["audit-log"],
+        env: loadRuntimeEnv(root),
+        githubUseApi: Boolean(parsed["github-api"])
       });
     }
     return analyzeTestTargets({
