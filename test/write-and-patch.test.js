@@ -273,6 +273,33 @@ module.exports["normalize"] = async (name) => name.trim();
   assert.match(generated, /assert\.equal\(await mod\.normalize\(" Ada "\), "Ada"\)/);
 });
 
+test("writeSuggestedTests writes JavaScript collection behavior assertions", () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ type: "module" }), "utf8");
+  fs.mkdirSync(path.join(root, "src"));
+  fs.writeFileSync(path.join(root, "src", "users.js"), `export function names(users) {
+  return users.map((user) => user.name);
+}
+
+export function activeUsers(users) {
+  return users.filter((user) => user.active);
+}
+
+export async function ids(users) {
+  return Promise.resolve(users.map((user) => user.id));
+}
+`, "utf8");
+  const engine = engineFor(root);
+
+  const result = writeSuggestedTests(root, engine, { limit: 1, runTests: true });
+  const generated = fs.readFileSync(path.join(root, "src", "users.test.js"), "utf8");
+
+  assert.equal(result.testRuns[0].status, "passed");
+  assert.match(generated, /assert\.deepEqual\(mod\.names\(\[\{"name":"Ada"\},\{"name":"Grace"\}\]\), \["Ada","Grace"\]\)/);
+  assert.match(generated, /assert\.deepEqual\(mod\.activeUsers\(\[\{"active":true\},\{"active":false\}\]\), \[\{"active":true\}\]\)/);
+  assert.match(generated, /assert\.deepEqual\(await mod\.ids\(\[\{"id":123\},\{"id":456\}\]\), \[123,456\]\)/);
+});
+
 test("writeSuggestedTests writes simple Python branch assertions", () => {
   const root = tempRepo();
   fs.mkdirSync(path.join(root, "src"));

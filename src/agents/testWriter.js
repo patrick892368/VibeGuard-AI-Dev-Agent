@@ -248,10 +248,50 @@ function sampleValueForProperty(property) {
   return /(?:^id$|Id$|_id$)/.test(property) ? 123 : "Ada";
 }
 
+function secondSampleValueForProperty(property) {
+  return /(?:^id$|Id$|_id$)/.test(property) ? 456 : "Grace";
+}
+
 function objectSampleForExpression(param, expression) {
   const property = propertyAccess(expression.trim().replace(/;$/, ""), param);
   if (!property) return null;
   return { [property]: sampleValueForProperty(property) };
+}
+
+function collectionMapAssertion(name, param, expression, asyncHint) {
+  const escaped = param.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const mapPattern = new RegExp(`^${escaped}\\.map\\(\\s*\\(?\\s*([a-zA-Z_$][\\w$]*)\\s*\\)?\\s*=>\\s*\\1(?:\\.([a-zA-Z_$][\\w$]*)|\\[['"]([^'"]+)['"]\\])\\s*\\)$`);
+  const match = expression.match(mapPattern);
+  if (!match) return null;
+  const property = match[2] || match[3];
+  const args = [[
+    { [property]: sampleValueForProperty(property) },
+    { [property]: secondSampleValueForProperty(property) }
+  ]];
+  return {
+    name,
+    args,
+    expected: args[0].map((item) => item[property]),
+    async: asyncHint
+  };
+}
+
+function collectionFilterAssertion(name, param, expression, asyncHint) {
+  const escaped = param.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const filterPattern = new RegExp(`^${escaped}\\.filter\\(\\s*\\(?\\s*([a-zA-Z_$][\\w$]*)\\s*\\)?\\s*=>\\s*\\1(?:\\.([a-zA-Z_$][\\w$]*)|\\[['"]([^'"]+)['"]\\])\\s*\\)$`);
+  const match = expression.match(filterPattern);
+  if (!match) return null;
+  const property = match[2] || match[3];
+  const args = [[
+    { [property]: true },
+    { [property]: false }
+  ]];
+  return {
+    name,
+    args,
+    expected: args[0].filter((item) => item[property]),
+    async: asyncHint
+  };
 }
 
 function expectedFromExpression(param, expression, sample) {
@@ -329,8 +369,13 @@ function exceptionAssertions(name, params, condition, errorName) {
 }
 
 function simpleAssertion(name, params, expression, options = {}) {
-  const normalized = expression.trim().replace(/;$/, "").replace(/^await\s+/, "");
-  const asyncHint = Boolean(options.async);
+  let normalized = expression.trim().replace(/;$/, "").replace(/^await\s+/, "");
+  let asyncHint = Boolean(options.async);
+  const promiseResolve = normalized.match(/^Promise\.resolve\((.+)\)$/);
+  if (promiseResolve) {
+    normalized = promiseResolve[1].trim();
+    asyncHint = true;
+  }
   if (params.length === 0) {
     if (normalized === "true" || normalized === "True") return { name, args: [], expected: true, async: asyncHint };
     if (normalized === "false" || normalized === "False") return { name, args: [], expected: false, async: asyncHint };
@@ -349,6 +394,10 @@ function simpleAssertion(name, params, expression, options = {}) {
     if (objectSample) {
       return { name, args: [objectSample], expected: expectedFromExpression(value, normalized, objectSample), async: asyncHint };
     }
+    const mapAssertion = collectionMapAssertion(name, value, normalized, asyncHint);
+    if (mapAssertion) return mapAssertion;
+    const filterAssertion = collectionFilterAssertion(name, value, normalized, asyncHint);
+    if (filterAssertion) return filterAssertion;
   }
   if (params.length === 2) {
     const [left, right] = params;
@@ -705,8 +754,11 @@ function jsBehaviorAssertion(hint) {
   const call = `mod.${hint.name}(${hint.args.map(jsLiteral).join(", ")})`;
   if (hint.throws && hint.async) return `  await assert.rejects(() => ${call}, ${jsErrorConstructor(hint.throws)});`;
   if (hint.throws) return `  assert.throws(() => ${call}, ${jsErrorConstructor(hint.throws)});`;
-  if (hint.async) return `  assert.equal(await ${call}, ${jsLiteral(hint.expected)});`;
-  return `  assert.equal(${call}, ${jsLiteral(hint.expected)});`;
+  const assertion = Array.isArray(hint.expected) || (hint.expected && typeof hint.expected === "object")
+    ? "deepEqual"
+    : "equal";
+  if (hint.async) return `  assert.${assertion}(await ${call}, ${jsLiteral(hint.expected)});`;
+  return `  assert.${assertion}(${call}, ${jsLiteral(hint.expected)});`;
 }
 
 function jsClassAssertion(name, candidate) {
