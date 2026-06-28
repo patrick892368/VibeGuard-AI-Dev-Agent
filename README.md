@@ -238,9 +238,9 @@ Default policy requires confirmation for `git switch -c`, `git commit`, `git pus
 
 GitHub detect and REST fallback prerequisites such as `git remote get-url origin` and `git branch --show-current` are also checked through command policy before execution.
 
-GitHub detect 和 REST fallback 需要的 `git remote get-url origin`、`git branch --show-current` 等 prerequisite 命令，也会在执行前经过 command policy。REST fallback 读取 `bodyFile` 时同样限制在仓库 root 内。
+GitHub detect 和 REST fallback 需要的 `git remote get-url origin`、`git branch --show-current` 等 prerequisite 命令，也会在执行前经过 command policy。REST fallback 读取 `bodyFile` 时同样限制在仓库 root 内；直接调用公开 GitHub helper 时也可以传入 `PolicyEngine`，让 `bodyFile` 读取经过 `read_github_body` path policy。
 
-REST fallback body-file reads are also contained inside the repository root.
+REST fallback body-file reads are also contained inside the repository root; direct GitHub helper calls can pass a `PolicyEngine` so `bodyFile` reads go through `read_github_body` path policy.
 
 ## Policy-as-Code / Policy-as-Code
 
@@ -316,7 +316,7 @@ The test suite covers:
 - Onboarding command checks，用于标注建议命令的依据、缺失 wrapper 或需要确认的依赖。Onboarding command checks for suggested command evidence, missing wrappers, or dependencies that need confirmation.
 - Onboarding dependency extraction from package.json, requirements.txt, pyproject.toml, pom.xml, and Gradle files. / Onboarding 从 package.json、requirements.txt、pyproject.toml、pom.xml 和 Gradle 文件提取依赖。
 - 本地 branch / commit / push 的受保护执行。Confirmed protected local branch / commit / push flows.
-- PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, policy confirmation, and REST fallback.
+- PR 创建调度、普通 PR comment dry-run、单条/批量 review comment dry-run、GitHub detect/PR prerequisite policy、CI checks execute policy、REST fallback bodyFile root containment、direct helper bodyFile path policy、policy confirmation 和 REST fallback。PR creation dispatch, general PR comment dry-runs, single/batched review comment dry-runs, GitHub detect/PR prerequisite policy, CI checks execute policy, REST fallback bodyFile root containment, direct helper bodyFile path policy, policy confirmation, and REST fallback.
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.

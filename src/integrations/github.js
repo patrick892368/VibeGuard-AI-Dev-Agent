@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { appendAuditEvent } from "../policy/audit.js";
+import { assertPolicyAllowed } from "../policy/safeWrite.js";
 
 export const GITHUB_DETECT_COMMAND = "git remote get-url origin";
 export const GITHUB_CURRENT_BRANCH_COMMAND = "git branch --show-current";
@@ -120,9 +122,24 @@ function resolveInsideRoot(root, filePath) {
   return absolute;
 }
 
+function checkBodyFileReadPolicy(root, bodyFile, options = {}) {
+  if (!options.engine) return null;
+  const policy = options.engine.checkPath(bodyFile, "read_github_body");
+  appendAuditEvent(root, options.engine, options.auditLog, {
+    operation: "read_github_body",
+    target: bodyFile,
+    policyStatus: policy.status,
+    outcome: policy.status === "allow" || (policy.status === "require_confirmation" && options.confirmed) ? "allowed" : "blocked",
+    reason: policy.reason
+  }, { confirmed: options.confirmed });
+  assertPolicyAllowed(policy, { confirmed: options.confirmed });
+  return policy;
+}
+
 function readBody(root, options = {}) {
   if (options.body) return options.body;
   if (!options.bodyFile) return "";
+  checkBodyFileReadPolicy(root, options.bodyFile, options);
   const bodyPath = resolveInsideRoot(root, options.bodyFile);
   return fs.readFileSync(bodyPath, "utf8");
 }

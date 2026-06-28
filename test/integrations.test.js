@@ -226,6 +226,27 @@ test("GitHub REST API body files cannot escape the repository root", async () =>
   }), /Path escapes repository root/);
 });
 
+test("GitHub REST API body files honor direct helper path policy", async () => {
+  const root = tempGitHubRepo();
+  fs.writeFileSync(path.join(root, ".env"), "SECRET=1\n", "utf8");
+  const engine = new PolicyEngine({
+    paths: { allow: ["**"], deny: [".env"], require_confirmation: [] },
+    commands: { deny: [], require_confirmation: [] }
+  }, { root });
+
+  await assert.rejects(() => createPullRequestWithGh(root, {
+    title: "Fix bug",
+    bodyFile: ".env",
+    dryRun: false,
+    useApi: true,
+    engine,
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  }), /Path matches deny policy: \.env/);
+});
+
 test("GitHub PR comments are dry-run by default", async () => {
   assert.deepEqual(buildGhPrCommentArgs({ pr: 12, bodyFile: "review.md" }), [
     "pr",
