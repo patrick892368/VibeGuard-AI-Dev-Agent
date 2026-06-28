@@ -521,7 +521,8 @@ test("writeSuggestedTests can prepare a Git and PR dry-run plan", () => {
 
   assert.equal(result.written.length, 1);
   assert.equal(result.gitPlan.status, "dry_run");
-  assert.equal(result.gitPlan.branch, "codex/add-generated-tests");
+  assert.equal(result.gitPlan.branch, "codex/add-tests-math");
+  assert.equal(result.gitPlan.commitMessage, "test: add generated tests for math");
   assert.deepEqual(result.gitPlan.changedFiles, ["src/math.test.js"]);
   assert.deepEqual(result.gitPlan.commands.map((command) => command.step), [
     "create_branch",
@@ -598,8 +599,8 @@ test("writeSuggestedTests executes confirmed local branch and commit plan after 
     "stage_files",
     "commit"
   ]);
-  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim(), "codex/add-generated-tests");
-  assert.equal(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: root, encoding: "utf8" }).trim(), "test: add generated coverage tests");
+  assert.equal(execFileSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).trim(), "codex/add-tests-math");
+  assert.equal(execFileSync("git", ["log", "-1", "--pretty=%s"], { cwd: root, encoding: "utf8" }).trim(), "test: add generated tests for math");
 });
 
 test("writeSuggestedTestsAsync can create test PRs through the GitHub REST fallback", async () => {
@@ -657,8 +658,8 @@ test("writeSuggestedTestsAsync can create test PRs through the GitHub REST fallb
   assert.equal(result.gitExecution.results.at(-1).method, "api");
   assert.equal(result.gitExecution.results.at(-1).url, "https://github.com/owner/repo/pull/8");
   assert.equal(request.url, "https://api.github.com/repos/owner/repo/pulls");
-  assert.equal(request.body.head, "codex/add-generated-tests");
-  assert.match(request.body.title, /Add generated tests/);
+  assert.equal(request.body.head, "codex/add-tests-math");
+  assert.equal(request.body.title, "Add generated tests for math");
 });
 
 test("writeSuggestedTests can run a generated JavaScript test through policy", () => {

@@ -1191,16 +1191,40 @@ ${validation}
 `;
 }
 
+function generatedTestLabel(filePath) {
+  const baseName = path.posix.basename(filePath || "generated-tests")
+    .replace(/^test[_-]/i, "")
+    .replace(/_test\.py$/i, "")
+    .replace(/\.(test|spec)\.[cm]?[jt]sx?$/i, "")
+    .replace(/\.(py|js|mjs|cjs|ts|java)$/i, "");
+  const slug = baseName
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase()
+    .slice(0, 40);
+  return slug || "generated-tests";
+}
+
+function buildTestWriterPlanDefaults(written) {
+  const label = generatedTestLabel(written[0]?.path);
+  return {
+    branch: `codex/add-tests-${label}`,
+    commitMessage: `test: add generated tests for ${label}`,
+    title: `Add generated tests for ${label}`
+  };
+}
+
 function buildTestWriterGitPlan(written, testRuns, options = {}) {
   const changedFiles = written.map((item) => item.path);
   if (changedFiles.length === 0) return null;
   if (!options.createBranch && !options.commit && !options.push && !options.prDryRun && !options.createPr) return null;
+  const defaults = buildTestWriterPlanDefaults(written);
 
   return buildFixGitPlan({
     changedFiles,
-    branch: options.branch || "codex/add-generated-tests",
-    commitMessage: options.commitMessage || "test: add generated coverage tests",
-    title: options.prTitle || "Add generated tests",
+    branch: options.branch || defaults.branch,
+    commitMessage: options.commitMessage || defaults.commitMessage,
+    title: options.prTitle || defaults.title,
     body: options.prBody || buildTestWriterPrBody(written, testRuns),
     bodyFile: options.prBodyFile,
     createBranch: Boolean(options.createBranch),
