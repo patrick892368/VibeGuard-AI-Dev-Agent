@@ -177,6 +177,10 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 
 `github_auth` / `vibeguard github auth` 会为 Codex 返回聚焦的、不泄密的 GitHub 执行预检。它通过 policy-gated 探测检查 GitHub remote、`gh --version`、`gh auth status` 和 token 来源，然后在尝试 PR/comment/review-comment 写操作前返回 `githubAuth.canWrite` 与 `nextActions`。
 
+After installing GitHub CLI with `winget`, an already-open PowerShell session may not see `gh` until PATH is refreshed. Reopen the terminal, run `$env:Path += ";C:\Program Files\GitHub CLI"`, or call `& "C:\Program Files\GitHub CLI\gh.exe" auth login`, then verify with `vibeguard github auth --json`.
+
+使用 `winget` 安装 GitHub CLI 后，已经打开的 PowerShell 可能不会立刻识别 `gh`，直到 PATH 刷新。可以重新打开终端、运行 `$env:Path += ";C:\Program Files\GitHub CLI"`，或直接调用 `& "C:\Program Files\GitHub CLI\gh.exe" auth login`，然后用 `vibeguard github auth --json` 验证。
+
 If execute-mode PR/comment/review-comment writes lack both a token and authenticated `gh`, GitHub helpers return structured `auth_required` with `githubAuth.canWrite: false` and `nextActions`, instead of surfacing an unstructured process or REST error. Read-only PR diff, PR head, and Actions run reads remain available through unauthenticated REST for public repositories.
 
 如果执行型 PR/comment/review-comment 写操作同时缺少 token 和已认证的 `gh`，GitHub helper 会返回结构化 `auth_required`，包含 `githubAuth.canWrite: false` 和 `nextActions`，而不是暴露非结构化进程或 REST 错误。公开仓库的只读 PR diff、PR head 和 Actions run 读取仍可通过无认证 REST 使用。
