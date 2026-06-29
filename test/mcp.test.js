@@ -274,11 +274,66 @@ test("MCP list and utility methods return protocol-compatible results", async ()
   }, root);
 
   assert.ok(tools.result.tools.some((tool) => tool.name === "check_policy"));
-  assert.deepEqual(resources.result.resources, []);
-  assert.deepEqual(resourceTemplates.result.resourceTemplates, []);
-  assert.deepEqual(prompts.result.prompts, []);
+  assert.ok(resources.result.resources.some((resource) => resource.uri === "vibeguard://docs/readme"));
+  assert.ok(resources.result.resources.some((resource) => resource.uri === "vibeguard://policy/config"));
+  assert.ok(resourceTemplates.result.resourceTemplates.some((template) => template.uriTemplate === "vibeguard://docs/{name}"));
+  assert.ok(prompts.result.prompts.some((prompt) => prompt.name === "debug_fix"));
   assert.deepEqual(ping.result, {});
   assert.deepEqual(logging.result, {});
+});
+
+test("MCP resources/read returns policy-gated documentation resources", async () => {
+  const root = tempRepo();
+  fs.writeFileSync(path.join(root, "README.md"), "# Demo\n\nHello from VibeGuard.\n", "utf8");
+  fs.writeFileSync(path.join(root, ".vibeguard.yaml"), "version: 1\n", "utf8");
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 26,
+    method: "resources/read",
+    params: { uri: "vibeguard://docs/readme" }
+  }, root);
+
+  assert.equal(response.result.contents[0].uri, "vibeguard://docs/readme");
+  assert.equal(response.result.contents[0].mimeType, "text/markdown");
+  assert.match(response.result.contents[0].text, /Hello from VibeGuard/);
+});
+
+test("MCP resources/read rejects unknown resources", async () => {
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 27,
+    method: "resources/read",
+    params: { uri: "vibeguard://docs/unknown" }
+  }, tempRepo());
+
+  assert.equal(response.error.code, -32000);
+  assert.match(response.error.message, /Unknown resource/);
+});
+
+test("MCP prompts/get returns workflow prompt messages", async () => {
+  assert.ok(mcpInternals.resources.some((resource) => resource.uri === "vibeguard://docs/codex"));
+  assert.ok(mcpInternals.resourceTemplates.some((template) => template.uriTemplate === "vibeguard://docs/{name}"));
+  assert.ok(mcpInternals.prompts.some((prompt) => prompt.name === "github_pr_loop"));
+
+  const response = await handleMcpRequest({
+    jsonrpc: "2.0",
+    id: 28,
+    method: "prompts/get",
+    params: {
+      name: "debug_fix",
+      arguments: {
+        logFile: "reports/error.log",
+        testCommand: "npm test"
+      }
+    }
+  }, tempRepo());
+
+  assert.equal(response.result.messages[0].role, "user");
+  assert.equal(response.result.messages[0].content.type, "text");
+  assert.match(response.result.messages[0].content.text, /debug_error/);
+  assert.match(response.result.messages[0].content.text, /reports\/error\.log/);
+  assert.match(response.result.messages[0].content.text, /npm test/);
 });
 
 test("MCP tools/call returns text content and structured content", async () => {

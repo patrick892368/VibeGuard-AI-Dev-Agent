@@ -22,6 +22,103 @@ const stringSchema = { type: "string" };
 const booleanSchema = { type: "boolean" };
 const numberSchema = { type: "number" };
 
+const documentationResources = [
+  {
+    uri: "vibeguard://docs/readme",
+    name: "VibeGuard README",
+    description: "Project overview, CLI usage, and current capability status.",
+    mimeType: "text/markdown",
+    path: "README.md"
+  },
+  {
+    uri: "vibeguard://docs/codex",
+    name: "Codex Integration",
+    description: "Codex-oriented workflow guidance for VibeGuard CLI and MCP usage.",
+    mimeType: "text/markdown",
+    path: "docs/CODEX.md"
+  },
+  {
+    uri: "vibeguard://docs/integrations",
+    name: "Integration Guide",
+    description: "CLI, MCP, provider, GitHub, and deferred IDE integration notes.",
+    mimeType: "text/markdown",
+    path: "docs/INTEGRATIONS.md"
+  },
+  {
+    uri: "vibeguard://docs/policy",
+    name: "Policy Guide",
+    description: "Policy-as-Code configuration and safety model.",
+    mimeType: "text/markdown",
+    path: "docs/POLICY.md"
+  }
+];
+
+const policyResources = [
+  {
+    uri: "vibeguard://policy/config",
+    name: "VibeGuard Policy Config",
+    description: "The repository .vibeguard.yaml policy file.",
+    mimeType: "text/yaml",
+    path: ".vibeguard.yaml"
+  }
+];
+
+const resources = [
+  ...documentationResources.map(({ path: _path, ...resource }) => resource),
+  ...policyResources.map(({ path: _path, ...resource }) => resource)
+];
+
+const resourceTemplates = [
+  {
+    uriTemplate: "vibeguard://docs/{name}",
+    name: "VibeGuard documentation",
+    description: "Read one documented workflow by name: readme, codex, integrations, or policy.",
+    mimeType: "text/markdown"
+  }
+];
+
+const prompts = [
+  {
+    name: "debug_fix",
+    description: "Guide a policy-gated Debug Agent workflow from error log to patch, tests, and PR summary.",
+    arguments: [
+      { name: "logFile", description: "Optional path to the error log file.", required: false },
+      { name: "testCommand", description: "Optional validation command to run after applying a patch.", required: false }
+    ]
+  },
+  {
+    name: "repo_onboarding",
+    description: "Guide a Repo Onboarding Agent workflow that explains structure, entry points, tests, and first tasks.",
+    arguments: [
+      { name: "focus", description: "Optional area of the repository to focus on.", required: false }
+    ]
+  },
+  {
+    name: "write_tests",
+    description: "Guide a Test Writer Agent workflow from coverage gaps to generated tests and coverage delta.",
+    arguments: [
+      { name: "coverageFile", description: "Optional coverage report path.", required: false },
+      { name: "testCommand", description: "Optional command for generated test validation.", required: false }
+    ]
+  },
+  {
+    name: "review_pr",
+    description: "Guide a PR Review Agent workflow for summary, bug/security/performance/test findings, and review comments.",
+    arguments: [
+      { name: "githubPr", description: "Optional GitHub PR number or URL.", required: false },
+      { name: "diffFile", description: "Optional path to a unified diff file.", required: false }
+    ]
+  },
+  {
+    name: "github_pr_loop",
+    description: "Guide a protected GitHub PR loop with branch, commit, push, PR body, CI, and comments.",
+    arguments: [
+      { name: "bodyFile", description: "Optional PR body file path.", required: false },
+      { name: "branch", description: "Optional branch name.", required: false }
+    ]
+  }
+];
+
 function objectSchema(properties = {}, required = []) {
   return {
     type: "object",
@@ -437,14 +534,90 @@ function initializeResult(params = {}) {
     protocolVersion: params.protocolVersion || "2024-11-05",
     capabilities: {
       tools: {},
-      resources: {},
-      prompts: {},
+      resources: { listChanged: false },
+      prompts: { listChanged: false },
       logging: {}
     },
     serverInfo: {
       name: "vibeguard-ai-dev-agent",
       version: "0.1.0"
     }
+  };
+}
+
+function findResource(uri) {
+  const candidates = [...documentationResources, ...policyResources];
+  return candidates.find((resource) => resource.uri === uri) || null;
+}
+
+function readMcpResource(root, uri, options = {}) {
+  if (!uri) throw new Error("resources/read requires uri");
+  const resource = findResource(uri);
+  if (!resource) throw new Error(`Unknown resource: ${uri}`);
+  const { config } = loadConfig(root);
+  const engine = new PolicyEngine(config, { root });
+  const read = readFileWithPolicy(root, resource.path, engine, {
+    confirmed: Boolean(options.confirmed),
+    auditLog: options.auditLog
+  });
+  return {
+    contents: [
+      {
+        uri: resource.uri,
+        mimeType: resource.mimeType,
+        text: read.content
+      }
+    ]
+  };
+}
+
+function promptText(name, args = {}) {
+  const logFile = args.logFile ? ` Use log file: ${args.logFile}.` : "";
+  const testCommand = args.testCommand ? ` Validate with: ${args.testCommand}.` : "";
+  const coverageFile = args.coverageFile ? ` Use coverage report: ${args.coverageFile}.` : "";
+  const focus = args.focus ? ` Focus area: ${args.focus}.` : "";
+  const githubPr = args.githubPr ? ` Target PR: ${args.githubPr}.` : "";
+  const diffFile = args.diffFile ? ` Use diff file: ${args.diffFile}.` : "";
+  const bodyFile = args.bodyFile ? ` Use PR body file: ${args.bodyFile}.` : "";
+  const branch = args.branch ? ` Target branch: ${args.branch}.` : "";
+
+  if (name === "debug_fix") {
+    return `Run a VibeGuard Debug Agent workflow in the current repository.${logFile}${testCommand}
+Use debug_error first to explain the failure and identify likely files. If a patch is needed, generate or inspect a unified diff, check it with apply_patch_safely, apply only after policy passes, run the smallest relevant tests, then produce a PR summary or plan_pr result. Prefer structuredContent and stop on deny or unconfirmed policy results.`;
+  }
+  if (name === "repo_onboarding") {
+    return `Run a VibeGuard Repo Onboarding workflow in the current repository.${focus}
+Use onboard_repo to identify language, framework, dependencies, entry points, tests, core modules, and low-risk first tasks. Summarize startup steps and developer docs without reading denied paths. Prefer structuredContent.`;
+  }
+  if (name === "write_tests") {
+    return `Run a VibeGuard Test Writer workflow in the current repository.${coverageFile}${testCommand}
+Use write_tests to identify uncovered or low-risk targets, generate tests only through policy-gated writes, run the selected validation command, repair failing generated tests when appropriate, and report coverage delta plus PR metadata. Prefer structuredContent and stop on deny or unconfirmed policy results.`;
+  }
+  if (name === "review_pr") {
+    return `Run a VibeGuard PR Review workflow in the current repository.${githubPr}${diffFile}
+Use review_pr or summarize_pr to inspect the diff through policy-gated inputs. Report bugs, security risks, performance issues, missing tests, and concrete file-level suggestions. If publishing, run github_auth first and use dry-run comments unless write auth and policy confirmation are present.`;
+  }
+  if (name === "github_pr_loop") {
+    return `Run a protected VibeGuard GitHub PR workflow in the current repository.${bodyFile}${branch}
+Start with github_auth. Use plan_pr or the agent-specific PR options to generate branch, commit message, PR body, push/PR plan, CI checks, and optional comments. Execute only after command, path, and GitHub auth policy gates pass; otherwise return the structured nextActions.`;
+  }
+  throw new Error(`Unknown prompt: ${name}`);
+}
+
+function getPrompt(name, args = {}) {
+  const prompt = prompts.find((item) => item.name === name);
+  if (!prompt) throw new Error(`Unknown prompt: ${name}`);
+  return {
+    description: prompt.description,
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: promptText(name, args)
+        }
+      }
+    ]
   };
 }
 
@@ -1142,9 +1315,23 @@ export async function handleMcpRequest(request, root = process.cwd()) {
   if (request.method === "ping") return ok(request.id, {});
   if (request.method === "initialize") return ok(request.id, initializeResult(request.params || {}));
   if (request.method === "tools/list") return ok(request.id, { tools });
-  if (request.method === "resources/list") return ok(request.id, { resources: [] });
-  if (request.method === "resources/templates/list") return ok(request.id, { resourceTemplates: [] });
-  if (request.method === "prompts/list") return ok(request.id, { prompts: [] });
+  if (request.method === "resources/list") return ok(request.id, { resources });
+  if (request.method === "resources/templates/list") return ok(request.id, { resourceTemplates });
+  if (request.method === "resources/read") {
+    try {
+      return ok(request.id, readMcpResource(root, request.params?.uri, request.params?.arguments || {}));
+    } catch (error) {
+      return fail(request.id, error);
+    }
+  }
+  if (request.method === "prompts/list") return ok(request.id, { prompts });
+  if (request.method === "prompts/get") {
+    try {
+      return ok(request.id, getPrompt(request.params?.name, request.params?.arguments || {}));
+    } catch (error) {
+      return fail(request.id, error);
+    }
+  }
   if (request.method === "logging/setLevel") return ok(request.id, {});
   if (request.method === "tools/call") {
     try {
@@ -1178,9 +1365,14 @@ export async function startMcpServer(options = {}) {
 
 export const mcpInternals = {
   tools,
+  resources,
+  resourceTemplates,
+  prompts,
   initializeResult,
   toolContent,
   toolErrorContent,
+  readMcpResource,
+  getPrompt,
   validateToolArguments,
   callTool
 };
