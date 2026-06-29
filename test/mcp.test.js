@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { handleMcpRequest, mcpInternals } from "../src/mcp/server.js";
 
 function tempRepo() {
@@ -81,6 +81,57 @@ async function startFakePullApi() {
   };
 }
 
+function createStdioJsonClient(child) {
+  let buffer = "";
+  const queue = [];
+  const waiters = [];
+
+  function pushLine(line) {
+    if (!line.trim()) return;
+    const parsed = JSON.parse(line);
+    const waiter = waiters.shift();
+    if (waiter) {
+      waiter.resolve(parsed);
+    } else {
+      queue.push(parsed);
+    }
+  }
+
+  child.stdout.setEncoding("utf8");
+  child.stdout.on("data", (chunk) => {
+    buffer += chunk;
+    let index = buffer.indexOf("\n");
+    while (index !== -1) {
+      pushLine(buffer.slice(0, index));
+      buffer = buffer.slice(index + 1);
+      index = buffer.indexOf("\n");
+    }
+  });
+
+  return {
+    send(message) {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    },
+    next(timeoutMs = 5000) {
+      if (queue.length > 0) return Promise.resolve(queue.shift());
+      return new Promise((resolve, reject) => {
+        const entry = {
+          resolve: (value) => {
+            clearTimeout(timer);
+            resolve(value);
+          }
+        };
+        const timer = setTimeout(() => {
+          const index = waiters.indexOf(entry);
+          if (index !== -1) waiters.splice(index, 1);
+          reject(new Error("Timed out waiting for MCP stdio response"));
+        }, timeoutMs);
+        waiters.push(entry);
+      });
+    }
+  };
+}
+
 test("MCP tools expose input schemas", () => {
   for (const tool of mcpInternals.tools) {
     assert.equal(tool.inputSchema.type, "object");
@@ -114,6 +165,62 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("github_checks").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("detect_github").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("onboard_repo").inputSchema.properties.confirmed.type, "boolean");
+});
+
+test("CLI MCP stdio server handles JSON-RPC initialize list and tool calls", async () => {
+  const child = spawn(process.execPath, [path.join(process.cwd(), "bin", "vibeguard.js"), "mcp"], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      VIBEGUARD_DISABLE_DOTENV: "1"
+    },
+    stdio: ["pipe", "pipe", "pipe"]
+  });
+  let stderr = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+  const client = createStdioJsonClient(child);
+
+  try {
+    client.send({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2024-11-05" }
+    });
+    const initialized = await client.next();
+    assert.equal(initialized.id, 1);
+    assert.equal(initialized.result.serverInfo.name, "vibeguard-ai-dev-agent");
+
+    client.send({
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/list"
+    });
+    const listed = await client.next();
+    assert.equal(listed.id, 2);
+    assert.ok(listed.result.tools.some((tool) => tool.name === "check_policy"));
+
+    client.send({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "check_policy",
+        arguments: { path: ".env" }
+      }
+    });
+    const called = await client.next();
+    assert.equal(called.id, 3);
+    assert.equal(called.result.structuredContent.status, "deny");
+    assert.equal(called.result.structuredContent.path, ".env");
+    assert.equal(stderr, "");
+  } finally {
+    child.kill();
+    await new Promise((resolve) => child.once("close", resolve));
+  }
 });
 
 test("MCP initialize returns server info and tool capabilities", async () => {
