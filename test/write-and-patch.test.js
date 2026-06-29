@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { PolicyEngine } from "../src/policy/engine.js";
 import { readFileWithPolicy, writeFileWithPolicy } from "../src/policy/safeWrite.js";
+import { appendAuditEvent } from "../src/policy/audit.js";
 import { writeSuggestedTests, writeSuggestedTestsAsync } from "../src/agents/testWriter.js";
 import { writeOnboardingDocs } from "../src/agents/onboard.js";
 import { applyPatchWithPolicy } from "../src/patch/safeApply.js";
@@ -81,6 +82,27 @@ test("policy-gated operations can append audit JSONL events", () => {
   assert.deepEqual(events[2].files, ["src/app.js"]);
   assert.equal(events[3].command, "git apply --check");
   assert.equal(events[3].policyStatus, "allow");
+});
+
+test("audit log writes are path-policy gated and root-contained", () => {
+  const root = tempRepo();
+  const engine = engineFor(root);
+  const outsideAuditLog = path.join(os.tmpdir(), `vibeguard-audit-outside-${Date.now()}.jsonl`);
+
+  const directAudit = appendAuditEvent(root, engine, outsideAuditLog, {
+    operation: "direct_audit_test",
+    target: "docs/NOTE.md",
+    policyStatus: "allow",
+    outcome: "allowed"
+  });
+  assert.equal(directAudit.status, "deny");
+
+  const result = writeFileWithPolicy(root, "docs/NOTE.md", "hello", engine, {
+    auditLog: outsideAuditLog
+  });
+  assert.equal(result.auditLog.status, "deny");
+  assert.equal(fs.existsSync(outsideAuditLog), false);
+  assert.equal(fs.readFileSync(path.join(root, "docs", "NOTE.md"), "utf8"), "hello");
 });
 
 test("writeSuggestedTests writes a real JavaScript smoke test through policy", () => {
