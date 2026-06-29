@@ -30,6 +30,12 @@ function objectSchema(properties = {}, required = []) {
   };
 }
 
+function secondsToMs(value) {
+  if (value === undefined || value === null) return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.round(number * 1000)) : undefined;
+}
+
 const tools = [
   {
     name: "check_policy",
@@ -73,6 +79,9 @@ const tools = [
       checkCi: booleanSchema,
       workflow: stringSchema,
       ciLimit: numberSchema,
+      waitCi: booleanSchema,
+      ciWaitTimeout: numberSchema,
+      ciWaitInterval: numberSchema,
       githubUseApi: booleanSchema,
       prBodyFile: stringSchema,
       dryRun: booleanSchema,
@@ -112,6 +121,9 @@ const tools = [
       checkCi: booleanSchema,
       workflow: stringSchema,
       ciLimit: numberSchema,
+      waitCi: booleanSchema,
+      ciWaitTimeout: numberSchema,
+      ciWaitInterval: numberSchema,
       githubUseApi: booleanSchema,
       branch: stringSchema,
       commitMessage: stringSchema,
@@ -182,6 +194,9 @@ const tools = [
       checkCi: booleanSchema,
       workflow: stringSchema,
       ciLimit: numberSchema,
+      waitCi: booleanSchema,
+      ciWaitTimeout: numberSchema,
+      ciWaitInterval: numberSchema,
       githubUseApi: booleanSchema,
       dryRun: booleanSchema,
       confirmed: booleanSchema,
@@ -219,6 +234,9 @@ const tools = [
       branch: stringSchema,
       workflow: stringSchema,
       limit: numberSchema,
+      wait: booleanSchema,
+      waitTimeout: numberSchema,
+      waitInterval: numberSchema,
       useApi: booleanSchema,
       execute: booleanSchema,
       confirmed: booleanSchema,
@@ -622,6 +640,9 @@ async function callTool(name, args, root) {
       checkCi: Boolean(args.checkCi),
       workflow: args.workflow,
       ciLimit: args.ciLimit,
+      waitCi: Boolean(args.waitCi),
+      ciWaitTimeoutMs: secondsToMs(args.ciWaitTimeout),
+      ciWaitIntervalMs: secondsToMs(args.ciWaitInterval),
       prBodyFile: args.prBodyFile,
       dryRun: args.dryRun !== false,
       apply: Boolean(args.apply),
@@ -664,6 +685,9 @@ async function callTool(name, args, root) {
         checkCi: Boolean(args.checkCi),
         workflow: args.workflow,
         ciLimit: args.ciLimit,
+        waitCi: Boolean(args.waitCi),
+        ciWaitTimeoutMs: secondsToMs(args.ciWaitTimeout),
+        ciWaitIntervalMs: secondsToMs(args.ciWaitInterval),
         branch: args.branch,
         commitMessage: args.commitMessage,
         prTitle: args.prTitle,
@@ -757,6 +781,9 @@ async function callTool(name, args, root) {
       checkCi: Boolean(args.checkCi),
       workflow: args.workflow,
       ciLimit: args.ciLimit,
+      waitCi: Boolean(args.waitCi),
+      ciWaitTimeoutMs: secondsToMs(args.ciWaitTimeout),
+      ciWaitIntervalMs: secondsToMs(args.ciWaitInterval),
       confirmed: Boolean(args.confirmed),
       auditLog: args.auditLog,
       env: loadRuntimeEnv(root),
@@ -985,6 +1012,9 @@ async function callTool(name, args, root) {
       branch: args.branch,
       workflow: args.workflow,
       limit: args.limit,
+      wait: Boolean(args.wait),
+      waitTimeoutMs: secondsToMs(args.waitTimeout),
+      waitIntervalMs: secondsToMs(args.waitInterval),
       useApi: Boolean(args.useApi),
       env: loadRuntimeEnv(root),
       dryRun: true

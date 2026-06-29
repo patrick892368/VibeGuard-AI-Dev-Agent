@@ -92,9 +92,11 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("fix_error").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("fix_error").inputSchema.properties.checkCi.type, "boolean");
   assert.equal(byName.get("fix_error").inputSchema.properties.ciLimit.type, "number");
+  assert.equal(byName.get("fix_error").inputSchema.properties.waitCi.type, "boolean");
   assert.equal(byName.get("write_tests").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("write_tests").inputSchema.properties.checkCi.type, "boolean");
   assert.equal(byName.get("write_tests").inputSchema.properties.ciLimit.type, "number");
+  assert.equal(byName.get("write_tests").inputSchema.properties.waitCi.type, "boolean");
   assert.equal(byName.get("write_tests").inputSchema.properties.coverageCommand.type, "string");
   assert.equal(byName.get("review_pr").inputSchema.properties.githubPr.type, "string");
   assert.equal(byName.get("review_pr").inputSchema.properties.publishComment.type, "boolean");
@@ -103,9 +105,12 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("plan_pr").inputSchema.properties.executeGitPlan.type, "boolean");
   assert.equal(byName.get("plan_pr").inputSchema.properties.checkCi.type, "boolean");
   assert.equal(byName.get("plan_pr").inputSchema.properties.ciLimit.type, "number");
+  assert.equal(byName.get("plan_pr").inputSchema.properties.waitCi.type, "boolean");
   assert.equal(byName.get("plan_pr").inputSchema.properties.githubUseApi.type, "boolean");
   assert.equal(byName.get("github_pr").inputSchema.properties.useApi.type, "boolean");
   assert.equal(byName.get("github_checks").inputSchema.properties.confirmed.type, "boolean");
+  assert.equal(byName.get("github_checks").inputSchema.properties.wait.type, "boolean");
+  assert.equal(byName.get("github_checks").inputSchema.properties.waitTimeout.type, "number");
   assert.equal(byName.get("github_checks").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("detect_github").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("onboard_repo").inputSchema.properties.confirmed.type, "boolean");
@@ -427,6 +432,9 @@ test("MCP plan_pr prepares a policy-gated Git and PR plan", async () => {
         diffFile: "reports/change.diff",
         writeBody: "reports/pr-body.md",
         checkCi: true,
+        waitCi: true,
+        ciWaitTimeout: 1,
+        ciWaitInterval: 0,
         ciLimit: 2
       }
     }
@@ -449,6 +457,7 @@ test("MCP plan_pr prepares a policy-gated Git and PR plan", async () => {
   assert.equal(result.ciStatus.status, "dry_run");
   assert.match(result.ciStatus.command, /gh run list --limit 2/);
   assert.match(result.ciStatus.command, /--branch codex\/add-tests-app/);
+  assert.equal(result.ciStatus.wait.status, "dry_run");
 });
 
 test("MCP github_pr returns a dry-run PR command", async () => {
@@ -659,7 +668,10 @@ commands:
       name: "github_checks",
       arguments: {
         branch: "main",
-        execute: true
+        execute: true,
+        wait: true,
+        waitTimeout: 1,
+        waitInterval: 0
       }
     }
   }, root);
@@ -669,6 +681,7 @@ commands:
   assert.equal(result.stage, "github_checks_policy");
   assert.match(result.command, /gh run list/);
   assert.equal(result.dryRun.status, "dry_run");
+  assert.equal(result.dryRun.wait.status, "dry_run");
 });
 
 test("MCP github_checks returns a normalized CI summary through REST fallback", async () => {

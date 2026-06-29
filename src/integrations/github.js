@@ -185,6 +185,40 @@ export function summarizeWorkflowRuns(runs = []) {
   };
 }
 
+function waitForTerminalGate(summary = {}) {
+  return summary.gate === "pass" || summary.gate === "fail";
+}
+
+function normalizeWaitOptions(options = {}) {
+  const wait = Boolean(options.wait);
+  const timeoutMs = Number.isFinite(Number(options.waitTimeoutMs)) ? Math.max(0, Number(options.waitTimeoutMs)) : 10 * 60 * 1000;
+  const intervalMs = Number.isFinite(Number(options.waitIntervalMs)) ? Math.max(0, Number(options.waitIntervalMs)) : 10 * 1000;
+  const maxAttempts = Number.isInteger(Number(options.waitMaxAttempts)) && Number(options.waitMaxAttempts) > 0
+    ? Number(options.waitMaxAttempts)
+    : null;
+  return { wait, timeoutMs, intervalMs, maxAttempts };
+}
+
+function withWaitStatus(result, waitOptions, status, attempts, startedAt) {
+  if (!waitOptions.wait) return result;
+  return {
+    ...result,
+    wait: {
+      enabled: true,
+      status,
+      attempts,
+      elapsedMs: Date.now() - startedAt,
+      timeoutMs: waitOptions.timeoutMs,
+      intervalMs: waitOptions.intervalMs,
+      gate: result.summary?.gate || null
+    }
+  };
+}
+
+function defaultSleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeLimit(limit, total) {
   if (limit === undefined || limit === null || limit === true) return total;
   const value = Number(limit);
@@ -695,14 +729,24 @@ export function checkGitHubCommandsPolicy(items = [], engine, options = {}) {
   };
 }
 
-export async function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
+async function listWorkflowRunsOnceWithGh(root = process.cwd(), options = {}) {
   const args = buildGhRunListArgs(options);
   const command = `gh ${args.join(" ")}`;
   if (options.dryRun !== false) {
-    return {
+    const waitOptions = normalizeWaitOptions(options);
+    const result = {
       status: "dry_run",
       command
     };
+    if (waitOptions.wait) {
+      result.wait = {
+        enabled: true,
+        status: "dry_run",
+        timeoutMs: waitOptions.timeoutMs,
+        intervalMs: waitOptions.intervalMs
+      };
+    }
+    return result;
   }
   requireExecutionPolicy(options, "GitHub checks");
   if (options.useApi) {
@@ -732,4 +776,28 @@ export async function listWorkflowRunsWithGh(root = process.cwd(), options = {})
     };
   }
   requirePassedStdout(result, "GitHub checks");
+}
+
+export async function listWorkflowRunsWithGh(root = process.cwd(), options = {}) {
+  const waitOptions = normalizeWaitOptions(options);
+  if (!waitOptions.wait || options.dryRun !== false) {
+    return listWorkflowRunsOnceWithGh(root, options);
+  }
+
+  const sleep = options.sleep || defaultSleep;
+  const startedAt = Date.now();
+  let attempts = 0;
+  while (true) {
+    attempts += 1;
+    const result = await listWorkflowRunsOnceWithGh(root, options);
+    if (waitForTerminalGate(result.summary)) {
+      return withWaitStatus(result, waitOptions, "completed", attempts, startedAt);
+    }
+
+    const elapsedMs = Date.now() - startedAt;
+    if ((waitOptions.maxAttempts && attempts >= waitOptions.maxAttempts) || elapsedMs >= waitOptions.timeoutMs) {
+      return withWaitStatus(result, waitOptions, "timeout", attempts, startedAt);
+    }
+    await sleep(waitOptions.intervalMs);
+  }
 }

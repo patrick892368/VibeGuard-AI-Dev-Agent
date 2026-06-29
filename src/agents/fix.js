@@ -561,7 +561,12 @@ export async function runFixWorkflow(options = {}) {
       useApi: Boolean(options.githubUseApi),
       checkCi: Boolean(options.checkCi),
       workflow: options.workflow,
-      ciLimit: options.ciLimit
+      ciLimit: options.ciLimit,
+      waitCi: Boolean(options.waitCi),
+      ciWaitTimeoutMs: options.ciWaitTimeoutMs,
+      ciWaitIntervalMs: options.ciWaitIntervalMs,
+      ciWaitMaxAttempts: options.ciWaitMaxAttempts,
+      sleep: options.sleep
     });
     if (gitExecution.status !== "executed") {
       status = gitExecution.status === "deny" || gitExecution.status === "require_confirmation"

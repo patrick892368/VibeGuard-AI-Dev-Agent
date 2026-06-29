@@ -1026,6 +1026,92 @@ test("GitHub checks can use REST API fallback", async () => {
   });
 });
 
+test("GitHub checks can wait until CI reaches a terminal gate", async () => {
+  const root = tempGitHubRepo();
+  let calls = 0;
+  const result = await listWorkflowRunsWithGh(root, {
+    branch: "codex/fix-bug",
+    limit: 5,
+    dryRun: false,
+    useApi: true,
+    wait: true,
+    waitIntervalMs: 0,
+    waitMaxAttempts: 3,
+    sleep: async () => {},
+    engine: permissivePolicyEngine(root),
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            workflow_runs: [{
+              id: 123,
+              status: calls === 1 ? "queued" : "completed",
+              conclusion: calls === 1 ? null : "success",
+              name: "CI",
+              head_branch: "codex/fix-bug",
+              event: "pull_request",
+              workflow_name: "CI",
+              html_url: "https://github.com/owner/repo/actions/runs/123"
+            }]
+          };
+        }
+      };
+    }
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(result.summary.gate, "pass");
+  assert.equal(result.wait.status, "completed");
+  assert.equal(result.wait.attempts, 2);
+});
+
+test("GitHub checks wait reports timeout while CI is not terminal", async () => {
+  const root = tempGitHubRepo();
+  let calls = 0;
+  const result = await listWorkflowRunsWithGh(root, {
+    branch: "codex/fix-bug",
+    limit: 5,
+    dryRun: false,
+    useApi: true,
+    wait: true,
+    waitIntervalMs: 0,
+    waitMaxAttempts: 2,
+    sleep: async () => {},
+    engine: permissivePolicyEngine(root),
+    env: { GITHUB_TOKEN: "token" },
+    async fetch() {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            workflow_runs: [{
+              id: 124,
+              status: "in_progress",
+              conclusion: null,
+              name: "CI",
+              head_branch: "codex/fix-bug",
+              event: "pull_request",
+              workflow_name: "CI",
+              html_url: "https://github.com/owner/repo/actions/runs/124"
+            }]
+          };
+        }
+      };
+    }
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(result.summary.gate, "wait");
+  assert.equal(result.wait.status, "timeout");
+  assert.equal(result.wait.attempts, 2);
+});
+
 test("GitHub checks can use unauthenticated REST API fallback for public repositories", async () => {
   const root = tempGitHubRepo();
   let request;

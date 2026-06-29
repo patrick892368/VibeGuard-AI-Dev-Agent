@@ -147,6 +147,11 @@ async function buildPrPlanCiStatus(root, branch, gitExecution, engine, options =
     fetch: options.fetch,
     useApi: Boolean(options.githubUseApi),
     dryRun: !options.executeGitPlan,
+    wait: Boolean(options.waitCi),
+    waitTimeoutMs: options.ciWaitTimeoutMs,
+    waitIntervalMs: options.ciWaitIntervalMs,
+    waitMaxAttempts: options.ciWaitMaxAttempts,
+    sleep: options.sleep,
     engine,
     confirmed: Boolean(options.confirmed),
     auditLog: options.auditLog
@@ -191,7 +196,12 @@ export async function buildPrPlanWorkflow(root, diffText, engine, options = {}) 
       dryRun: Boolean(options.dryRun),
       checkCi: Boolean(options.checkCi),
       workflow: options.workflow,
-      ciLimit: options.ciLimit
+      ciLimit: options.ciLimit,
+      waitCi: Boolean(options.waitCi),
+      ciWaitTimeoutMs: options.ciWaitTimeoutMs,
+      ciWaitIntervalMs: options.ciWaitIntervalMs,
+      ciWaitMaxAttempts: options.ciWaitMaxAttempts,
+      sleep: options.sleep
     })
     : null;
   const ciStatus = await buildPrPlanCiStatus(root, branch, gitExecution, engine, options);

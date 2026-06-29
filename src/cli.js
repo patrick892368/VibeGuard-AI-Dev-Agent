@@ -27,9 +27,9 @@ function printHelp() {
 Usage:
   vibeguard policy check [--path <file>] [--command <cmd>] [--patch <file>]
   vibeguard debug --log <file> [--ai-patch] [--output-patch <file>]
-  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--check-ci] [--workflow <name>] [--ci-limit <n>] [--github-api]
+  vibeguard fix --log <file> [--patch <file>] [--test <cmd>] [--auto-test] [--dry-run] [--apply] [--output-patch <file>] [--write-pr-body <file>] [--execute-git-plan] [--check-ci] [--wait-ci] [--workflow <name>] [--ci-limit <n>] [--ci-timeout <seconds>] [--ci-interval <seconds>] [--github-api]
   vibeguard test [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>]
-  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--coverage-command <cmd>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--check-ci] [--workflow <name>] [--ci-limit <n>] [--github-api]
+  vibeguard test --write [--coverage <coverage.json|lcov.info>] [--coverage-after <coverage.json|lcov.info>] [--coverage-command <cmd>] [--run] [--repair] [--test-command <cmd>] [--create-branch] [--commit] [--pr-dry-run] [--execute-git-plan] [--check-ci] [--wait-ci] [--workflow <name>] [--ci-limit <n>] [--ci-timeout <seconds>] [--ci-interval <seconds>] [--github-api]
   vibeguard review [--diff <file>] [--github-pr <number>] [--write-comment <file>] [--publish-comment|--comment-pr <number>] [--execute] [--confirm] [--github-api]
   vibeguard onboard [--write] [--confirm]
   vibeguard patch check --file <patch>
@@ -38,13 +38,13 @@ Usage:
   vibeguard hooks print <pre-commit|pre-push|commit-msg>
   vibeguard hooks install <hook> --allow-git-dir
   vibeguard pr summary [--diff <file>] [--github-pr <number>] [--write-body <file>] [--github-api]
-  vibeguard pr plan [--diff <file>] [--github-pr <number>] [--write-body <file>|--body-file <file>] [--branch <name>] [--commit-message <msg>] [--title <title>] [--push] [--no-branch] [--no-commit] [--no-pr] [--execute-git-plan] [--check-ci] [--workflow <name>] [--ci-limit <n>] [--confirm] [--github-api]
+  vibeguard pr plan [--diff <file>] [--github-pr <number>] [--write-body <file>|--body-file <file>] [--branch <name>] [--commit-message <msg>] [--title <title>] [--push] [--no-branch] [--no-commit] [--no-pr] [--execute-git-plan] [--check-ci] [--wait-ci] [--workflow <name>] [--ci-limit <n>] [--ci-timeout <seconds>] [--ci-interval <seconds>] [--confirm] [--github-api]
   vibeguard github detect
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
   vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
   vibeguard github review-comments --pr <number> [--commit <sha>] [--diff <file>] [--github-pr <number>] [--limit <n>] [--execute] [--confirm] [--github-api]
-  vibeguard github checks [--branch <branch>] [--limit <n>] [--execute] [--github-api]
+  vibeguard github checks [--branch <branch>] [--limit <n>] [--wait] [--wait-timeout <seconds>] [--wait-interval <seconds>] [--execute] [--github-api]
   vibeguard run --command <cmd> [--dry-run] [--confirm]
   vibeguard eval fixtures [--fixture <id>] [--repeat <n>] [--apply] [--output <file>] [--history <file>]
   vibeguard eval history [--file <file>]
@@ -78,6 +78,12 @@ function parseArgs(args) {
     }
   }
   return parsed;
+}
+
+function secondsToMs(value) {
+  if (value === undefined || value === null || value === true) return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.round(number * 1000)) : undefined;
 }
 
 function printResult(result, asJson = false) {
@@ -239,6 +245,9 @@ async function fixCommand(parsed, root) {
     checkCi: Boolean(parsed["check-ci"]),
     workflow: parsed.workflow,
     ciLimit: parsed["ci-limit"] ? Number(parsed["ci-limit"]) : undefined,
+    waitCi: Boolean(parsed["wait-ci"]),
+    ciWaitTimeoutMs: secondsToMs(parsed["ci-timeout"]),
+    ciWaitIntervalMs: secondsToMs(parsed["ci-interval"]),
     prBodyFile: parsed["pr-body-file"],
     dryRun: Boolean(parsed["dry-run"]),
     apply: Boolean(parsed.apply),
@@ -714,6 +723,9 @@ async function githubCommand(parsed, root, subcommand) {
       branch: parsed.branch,
       workflow: parsed.workflow,
       limit: parsed.limit,
+      wait: Boolean(parsed.wait),
+      waitTimeoutMs: secondsToMs(parsed["wait-timeout"]),
+      waitIntervalMs: secondsToMs(parsed["wait-interval"]),
       env,
       useApi: Boolean(parsed["github-api"]),
       dryRun: true
@@ -841,6 +853,9 @@ async function dispatch(parsed) {
         checkCi: Boolean(parsed["check-ci"]),
         workflow: parsed.workflow,
         ciLimit: parsed["ci-limit"] ? Number(parsed["ci-limit"]) : undefined,
+        waitCi: Boolean(parsed["wait-ci"]),
+        ciWaitTimeoutMs: secondsToMs(parsed["ci-timeout"]),
+        ciWaitIntervalMs: secondsToMs(parsed["ci-interval"]),
         branch: parsed.branch,
         commitMessage: parsed["commit-message"],
         prTitle: parsed["pr-title"],
@@ -914,6 +929,9 @@ async function dispatch(parsed) {
       checkCi: Boolean(parsed["check-ci"]),
       workflow: parsed.workflow,
       ciLimit: parsed["ci-limit"] ? Number(parsed["ci-limit"]) : undefined,
+      waitCi: Boolean(parsed["wait-ci"]),
+      ciWaitTimeoutMs: secondsToMs(parsed["ci-timeout"]),
+      ciWaitIntervalMs: secondsToMs(parsed["ci-interval"]),
       confirmed: Boolean(parsed.confirm),
       auditLog: parsed["audit-log"],
       env: loadRuntimeEnv(root),

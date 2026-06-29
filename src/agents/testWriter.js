@@ -1522,7 +1522,12 @@ async function buildTestWriterGitExecutionAsync(root, gitPlan, gitPolicy, testRu
     useApi: Boolean(options.githubUseApi),
     checkCi: Boolean(options.checkCi),
     workflow: options.workflow,
-    ciLimit: options.ciLimit
+    ciLimit: options.ciLimit,
+    waitCi: Boolean(options.waitCi),
+    ciWaitTimeoutMs: options.ciWaitTimeoutMs,
+    ciWaitIntervalMs: options.ciWaitIntervalMs,
+    ciWaitMaxAttempts: options.ciWaitMaxAttempts,
+    sleep: options.sleep
   });
 }
 

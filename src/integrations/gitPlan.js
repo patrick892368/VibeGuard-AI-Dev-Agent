@@ -162,6 +162,11 @@ async function readCiStatusAfterGitPlan(root, gitPlan, engine, options = {}) {
       fetch: options.fetch,
       useApi: Boolean(options.useApi),
       dryRun: Boolean(options.dryRun),
+      wait: Boolean(options.waitCi),
+      waitTimeoutMs: options.ciWaitTimeoutMs,
+      waitIntervalMs: options.ciWaitIntervalMs,
+      waitMaxAttempts: options.ciWaitMaxAttempts,
+      sleep: options.sleep,
       engine,
       confirmed: Boolean(options.confirmed),
       auditLog: options.auditLog

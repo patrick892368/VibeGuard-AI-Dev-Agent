@@ -927,6 +927,11 @@ test("CLI GitHub checks returns a normalized CI summary through REST fallback", 
       "main",
       "--limit",
       "5",
+      "--wait",
+      "--wait-timeout",
+      "1",
+      "--wait-interval",
+      "0",
       "--execute",
       "--confirm",
       "--github-api",
@@ -951,6 +956,8 @@ test("CLI GitHub checks returns a normalized CI summary through REST fallback", 
   assert.equal(parsed.summary.status, "failing");
   assert.equal(parsed.summary.gate, "fail");
   assert.equal(parsed.summary.failingRuns[0].name, "CI");
+  assert.equal(parsed.wait.status, "completed");
+  assert.equal(parsed.wait.attempts, 1);
 });
 
 test("CLI GitHub detect is gated by command policy", () => {
@@ -1093,6 +1100,11 @@ test("CLI pr summary can write a policy-gated body file", () => {
     "--write-body",
     "reports/pr-body.md",
     "--check-ci",
+    "--wait-ci",
+    "--ci-timeout",
+    "1",
+    "--ci-interval",
+    "0",
     "--ci-limit",
     "3",
     "--json"
@@ -1134,6 +1146,11 @@ test("CLI pr plan returns a policy-gated branch commit and PR dry-run plan", () 
     "--write-body",
     "reports/pr-body.md",
     "--check-ci",
+    "--wait-ci",
+    "--ci-timeout",
+    "1",
+    "--ci-interval",
+    "0",
     "--ci-limit",
     "3",
     "--json"
@@ -1157,6 +1174,7 @@ test("CLI pr plan returns a policy-gated branch commit and PR dry-run plan", () 
   assert.equal(parsed.ciStatus.status, "dry_run");
   assert.match(parsed.ciStatus.command, /gh run list --limit 3/);
   assert.match(parsed.ciStatus.command, /--branch codex\/add-tests-app/);
+  assert.equal(parsed.ciStatus.wait.status, "dry_run");
 });
 
 test("CLI pr summary checks git diff command policy before default diff reads", () => {
