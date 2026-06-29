@@ -38,6 +38,26 @@ test("PolicyEngine requires confirmation for configured paths", () => {
   assert.equal(engine.checkPath(".github/workflows/ci.yml").status, "require_confirmation");
 });
 
+test("default policy requires confirmation for sensitive project control paths", () => {
+  const engine = new PolicyEngine(defaultConfig, { root: process.cwd() });
+  for (const filePath of [
+    ".github/workflows/ci.yml",
+    "Dockerfile",
+    "docker-compose.yml",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "poetry.lock",
+    "requirements.txt",
+    "migrations/0001_init.py",
+    "db/migrate/001_create_users.rb",
+    "terraform/main.tf",
+    "k8s/deployment.yaml"
+  ]) {
+    assert.equal(engine.checkPath(filePath).status, "require_confirmation", filePath);
+  }
+});
+
 test("PolicyEngine denies paths outside allow list", () => {
   const engine = new PolicyEngine(config, { root: process.cwd() });
   assert.equal(engine.checkPath("scripts/deploy.sh").status, "deny");

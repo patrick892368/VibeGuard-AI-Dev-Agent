@@ -359,6 +359,7 @@ The test suite covers:
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
 - MCP stdio JSON-RPC smoke test，真实启动 `vibeguard mcp` 并调用 initialize/list/tool。MCP stdio JSON-RPC smoke test that starts `vibeguard mcp` and calls initialize/list/tool.
 - Policy-gated JSONL 审计日志和仓库 root 边界检查。Policy-gated JSONL audit logs and repository-root containment checks.
+- 默认策略对 CI/CD、migration、lockfile、部署和基础设施配置的人工确认门禁。Default-policy confirmation gates for CI/CD, migrations, lockfiles, deployment, and infrastructure config.
 - Markdown 审计报告写出。Markdown audit report generation.
 - Repo metadata 读取的 path policy gate、`metadataReadPolicy` / `skippedMetadataFiles` 输出、Test Writer 候选源码读取和 coverage.py JSON / LCOV 输入文件的 path policy 读取、仓库 root containment、未覆盖文件排序、missing line 到函数/类/接口映射、before/after coverage delta、`coverageDeltaStatus`、生成测试后的 policy-gated test run，以及写测试前后的 policy-gated coverage command 组合测试。Path-policy gates for repository metadata reads with `metadataReadPolicy` / `skippedMetadataFiles`, Test Writer candidate source files, and coverage.py JSON / LCOV inputs, repository-root containment, uncovered file prioritization, missing-line-to-function/class/interface mapping, before/after coverage deltas, `coverageDeltaStatus`, policy-gated test runs after generating tests, and integration coverage for policy-gated coverage commands before and after writing tests.
 - Python `unittest` 风格测试生成和运行。Python `unittest`-style test generation and execution.
