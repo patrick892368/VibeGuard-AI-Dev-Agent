@@ -1109,6 +1109,41 @@ test("CLI GitHub PR can force REST API fallback with --github-api", async () => 
   assert.equal(parsed.number, 7);
 });
 
+test("CLI GitHub PR dry-run includes a compare URL when remote is available", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-compare-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "pr",
+    "--title",
+    "Fix bug",
+    "--body",
+    "body",
+    "--base",
+    "main",
+    "--head",
+    "codex/fix-bug",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VIBEGUARD_DISABLE_DOTENV: "1"
+    }
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "dry_run");
+  assert.equal(parsed.compare.status, "available");
+  assert.equal(parsed.compareUrl, "https://github.com/owner/repo/compare/main...codex%2Ffix-bug?expand=1");
+});
+
 test("CLI GitHub PR REST execute returns structured auth_required without a token", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-auth-"));
   execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
@@ -1146,6 +1181,8 @@ test("CLI GitHub PR REST execute returns structured auth_required without a toke
   assert.equal(parsed.stage, "github_auth");
   assert.equal(parsed.operation, "github_pr");
   assert.equal(parsed.githubAuth.canWrite, false);
+  assert.equal(parsed.compare.status, "available");
+  assert.equal(parsed.compareUrl, "https://github.com/owner/repo/compare/main...codex%2Ffix-bug?expand=1");
   assert.equal(parsed.nextActions[0].id, "enable_github_execution");
 });
 

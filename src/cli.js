@@ -594,7 +594,7 @@ async function githubCommand(parsed, root, subcommand) {
       ...options,
       env,
       dryRun: !parsed.execute,
-      ...(parsed.execute ? executionPolicyOptions : {})
+      ...executionPolicyOptions
     });
   }
   if (subcommand === "comment") {

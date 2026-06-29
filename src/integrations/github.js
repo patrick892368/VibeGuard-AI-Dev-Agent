@@ -263,7 +263,7 @@ function resolveToken(env = process.env) {
   return env.GITHUB_TOKEN || env.GH_TOKEN || null;
 }
 
-function githubWriteAuthRequired(operation, env = process.env, detail = null) {
+function githubWriteAuthRequired(operation, env = process.env, detail = null, compare = null) {
   const tokenSources = [
     { name: "GITHUB_TOKEN", present: Boolean(env.GITHUB_TOKEN) },
     { name: "GH_TOKEN", present: Boolean(env.GH_TOKEN) }
@@ -279,6 +279,7 @@ function githubWriteAuthRequired(operation, env = process.env, detail = null) {
       tokenSources,
       canWrite: false
     },
+    ...(compare ? { compare, ...(compare.url ? { compareUrl: compare.url } : {}) } : {}),
     nextActions: [
       {
         id: "enable_github_execution",
@@ -286,6 +287,49 @@ function githubWriteAuthRequired(operation, env = process.env, detail = null) {
         command: "Install and authenticate gh with `gh auth login`, or set GITHUB_TOKEN/GH_TOKEN"
       }
     ]
+  };
+}
+
+function buildGitHubCompareUrl(repository, base, head) {
+  if (!repository?.url || !head) return null;
+  const encodedBase = encodeURIComponent(base || "main");
+  const encodedHead = encodeURIComponent(head);
+  return `${repository.url}/compare/${encodedBase}...${encodedHead}?expand=1`;
+}
+
+function githubPrCompareInfo(root, options = {}) {
+  if (!options.engine) return null;
+  try {
+    const repository = options.repository || detectGitHubRepository(root, options);
+    const head = options.head || currentBranch(root, options);
+    const base = options.base || "main";
+    const url = buildGitHubCompareUrl(repository, base, head);
+    if (!url) return { status: "unavailable", reason: "GitHub compare URL requires a repository and head branch." };
+    return {
+      status: "available",
+      url,
+      repository: {
+        owner: repository.owner,
+        repo: repository.repo,
+        url: repository.url
+      },
+      base,
+      head
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      reason: error.message || String(error)
+    };
+  }
+}
+
+function withCompareInfo(result, compare) {
+  if (!compare) return result;
+  return {
+    ...result,
+    compare,
+    ...(compare.url ? { compareUrl: compare.url } : {})
   };
 }
 
@@ -532,17 +576,18 @@ async function listWorkflowRunsWithApi(root, options = {}) {
 export async function createPullRequestWithGh(root = process.cwd(), options = {}) {
   const args = buildGhPrArgs(options);
   const command = `gh ${args.join(" ")}`;
+  const compare = githubPrCompareInfo(root, options);
   if (options.dryRun !== false) {
-    return {
+    return withCompareInfo({
       status: "dry_run",
       command
-    };
+    }, compare);
   }
   requireExecutionPolicy(options, "GitHub PR creation");
   if (options.useApi) {
     checkOptionalCommandPolicy(root, command, options, "github_pr");
     if (!resolveToken(options.env)) {
-      return githubWriteAuthRequired("github_pr", options.env, "GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback.");
+      return githubWriteAuthRequired("github_pr", options.env, "GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback.", compare);
     }
     return createPullRequestWithApi(root, options);
   }
@@ -558,10 +603,10 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
     return createPullRequestWithApi(root, options);
   }
   if (isMissingGhResult(result)) {
-    return githubWriteAuthRequired("github_pr", options.env, "gh CLI is unavailable and no GitHub token is set.");
+    return githubWriteAuthRequired("github_pr", options.env, "gh CLI is unavailable and no GitHub token is set.", compare);
   }
   if (isGitHubAuthFailureResult(result)) {
-    return githubWriteAuthRequired("github_pr", options.env, firstLine(result.stderr, result.stdout, result.error));
+    return githubWriteAuthRequired("github_pr", options.env, firstLine(result.stderr, result.stdout, result.error), compare);
   }
   requirePassedStdout(result, "GitHub PR creation");
 }

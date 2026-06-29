@@ -156,6 +156,10 @@ GitHub detect and PR fallback prerequisites are command-policy gated. If reposit
 
 GitHub detect 和 PR fallback prerequisite 会经过 command policy。如果仓库策略要求确认 `git remote get-url origin` 或 `git branch --show-current`，Codex 必须停在返回的 policy 结果，直到已有确认。
 
+`github pr` dry-runs and missing-auth `auth_required` PR results include `compareUrl` when policy allows reading the GitHub remote and head branch. Codex should show that URL as a manual fallback when real PR creation is blocked by missing `gh` authentication or missing `GITHUB_TOKEN` / `GH_TOKEN`.
+
+当 policy 允许读取 GitHub remote 和 head branch 时，`github pr` dry-run 和缺认证的 `auth_required` PR 结果会包含 `compareUrl`。如果真实 PR 创建因为缺少 `gh` 认证或 `GITHUB_TOKEN` / `GH_TOKEN` 被阻塞，Codex 应把这个 URL 展示为人工 fallback。
+
 CLI and MCP GitHub paths pass the repository `PolicyEngine` into the helpers. Direct public GitHub helper calls must pass a `PolicyEngine` for remote detection and `dryRun:false` execution; otherwise VibeGuard rejects the GitHub operation before reaching `git`, `gh`, or the REST API fallback.
 
 CLI 和 MCP 的 GitHub 路径会把仓库 `PolicyEngine` 传给 helper。直接调用公开 GitHub helper 时，remote 检测和 `dryRun:false` 真实执行都必须传入 `PolicyEngine`；否则 VibeGuard 会在调用 `git`、`gh` 或 REST API fallback 前拒绝 GitHub 操作。

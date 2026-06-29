@@ -169,9 +169,9 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 
 `plan_pr` 接收和 `summarize_pr` 相同的 diff 来源，可用 `writeBody` 经过 policy 写出 PR body，并返回 `gitPlan`、`gitPolicy` 和可选 `gitExecution`，让 Codex 可以继续执行受保护的 branch、commit、push、PR 创建流程，而不绕过 `.vibeguard.yaml`。`gitPolicy.pathResults` 会包含 PR body 文件检查，以及每个将被 `git add` 暂存的文件。传入 `checkCi` 和 `waitCi` 后，执行型 plan 可以等待生成分支的 CI gate，并返回 `wait.status`、attempts 和 elapsed time。
 
-`github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
+`github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. When policy allows reading the GitHub remote and head branch, dry-runs include `compareUrl`; missing-auth `auth_required` PR results include the same compare URL so Codex can present a manual fallback link. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 
-`github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。`bodyFile` / `--body-file` 输入会先经过 path policy 检查，然后才进入 dry-run 或执行。
+`github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。当 policy 允许读取 GitHub remote 和 head branch 时，dry-run 会包含 `compareUrl`；缺认证的 `auth_required` PR 结果也会包含同一 compare URL，方便 Codex 展示人工 fallback 链接。`bodyFile` / `--body-file` 输入会先经过 path policy 检查，然后才进入 dry-run 或执行。
 
 `github_auth` / `vibeguard github auth` returns a focused, secret-safe GitHub execution preflight for Codex. It checks the GitHub remote, `gh --version`, `gh auth status`, and token source presence through policy-gated probes, then returns `githubAuth.canWrite` and `nextActions` before PR/comment/review-comment writes are attempted.
 

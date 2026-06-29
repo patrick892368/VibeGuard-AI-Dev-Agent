@@ -436,9 +436,19 @@ test("GitHub PR creation is dry-run by default", async () => {
     "pr.md",
     "--draft"
   ]);
-  const result = await createPullRequestWithGh(process.cwd(), { title: "Fix bug" });
+  const root = tempGitHubRepo();
+  const result = await createPullRequestWithGh(root, {
+    title: "Fix bug",
+    base: "main",
+    head: "codex/fix-bug",
+    engine: permissivePolicyEngine(root)
+  });
   assert.equal(result.status, "dry_run");
   assert.match(result.command, /gh pr create/);
+  assert.equal(result.compare.status, "available");
+  assert.equal(result.compare.base, "main");
+  assert.equal(result.compare.head, "codex/fix-bug");
+  assert.equal(result.compareUrl, "https://github.com/owner/repo/compare/main...codex%2Ffix-bug?expand=1");
 });
 
 test("GitHub PR creation can use REST API fallback", async () => {
@@ -501,6 +511,8 @@ test("GitHub REST API write fallback returns structured auth_required without a 
   assert.equal(result.stage, "github_auth");
   assert.equal(result.operation, "github_pr");
   assert.equal(result.githubAuth.canWrite, false);
+  assert.equal(result.compare.status, "available");
+  assert.equal(result.compareUrl, "https://github.com/owner/repo/compare/main...codex%2Ffix-bug?expand=1");
   assert.equal(result.nextActions[0].id, "enable_github_execution");
 });
 

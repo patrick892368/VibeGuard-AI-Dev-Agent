@@ -666,6 +666,9 @@ test("MCP plan_pr prepares a policy-gated Git and PR plan", async () => {
 });
 
 test("MCP github_pr returns a dry-run PR command", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
   const response = await handleMcpRequest({
     jsonrpc: "2.0",
     id: 3,
@@ -675,14 +678,18 @@ test("MCP github_pr returns a dry-run PR command", async () => {
       arguments: {
         title: "Fix bug",
         body: "body",
+        base: "main",
+        head: "codex/fix-bug",
         draft: true
       }
     }
-  }, tempRepo());
+  }, root);
 
   assert.equal(response.result.structuredContent.status, "dry_run");
   assert.match(response.result.structuredContent.command, /gh pr create/);
   assert.match(response.result.structuredContent.command, /--draft/);
+  assert.equal(response.result.structuredContent.compare.status, "available");
+  assert.equal(response.result.structuredContent.compareUrl, "https://github.com/owner/repo/compare/main...codex%2Ffix-bug?expand=1");
 });
 
 test("MCP github_comment blocks denied body files before dry-run", async () => {

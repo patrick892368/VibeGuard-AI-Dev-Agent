@@ -996,6 +996,13 @@ async function callTool(name, args, root) {
     const env = loadRuntimeEnv(root);
     const bodyFileBlocked = githubBodyFilePolicy(root, args.bodyFile, "github_pr_body_file_policy", Boolean(args.confirmed));
     if (bodyFileBlocked) return bodyFileBlocked;
+    const { config } = loadConfig(root);
+    const engine = new PolicyEngine(config, { root });
+    const executionPolicyOptions = {
+      engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    };
     const dryRun = await createPullRequestWithGh(root, {
       title: args.title,
       bodyFile: args.bodyFile,
@@ -1007,13 +1014,7 @@ async function callTool(name, args, root) {
       env,
       dryRun: true
     });
-    const executionPolicyOptions = {};
     if (args.execute === true) {
-      const { config } = loadConfig(root);
-      const engine = new PolicyEngine(config, { root });
-      executionPolicyOptions.engine = engine;
-      executionPolicyOptions.confirmed = Boolean(args.confirmed);
-      executionPolicyOptions.auditLog = args.auditLog;
       const policy = engine.checkCommand(dryRun.command);
       if (policy.status !== "allow" && !(policy.status === "require_confirmation" && args.confirmed)) {
         return {
