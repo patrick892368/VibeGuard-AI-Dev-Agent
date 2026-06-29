@@ -16,6 +16,10 @@ Core rule: every agent must pass through `.vibeguard.yaml` policy checks before 
 
 The current priority is Codex + Grok. Cursor, Claude Code, Cline, and deeper VS Code integration are deferred.
 
+当前能力状态见 [docs/STATUS.md](docs/STATUS.md)。
+
+Current capability status is tracked in [docs/STATUS.md](docs/STATUS.md).
+
 ## 当前能力 / Current Capabilities
 
 - `vibeguard policy check`: 检查路径、命令和 unified diff patch。Checks paths, commands, and unified diff patches.
