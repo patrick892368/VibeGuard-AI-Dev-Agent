@@ -381,6 +381,10 @@ Before real PR/comment/review-comment writes, use `github auth` or MCP `github_a
 
 真实 PR/comment/review-comment 写操作前，先使用 `github auth` 或 MCP `github_auth`。它会通过 policy-gated 探测检查 remote detection、`gh --version`、`gh auth status` 和 token 来源，并返回 `githubAuth.canWrite` 与 `nextActions`，不会打印 token。
 
+If Codex still attempts an execute-mode GitHub write without token or authenticated `gh`, treat `status: "auth_required"` as a controlled stop for that write path. Keep the local code/test work, report `nextActions`, and do not retry the write until `githubAuth.canWrite` is true.
+
+如果 Codex 仍在没有 token 或已认证 `gh` 的情况下尝试执行型 GitHub 写操作，应把 `status: "auth_required"` 当作该写路径的受控停止状态。保留本地代码/测试工作，报告 `nextActions`，直到 `githubAuth.canWrite` 为 true 前不要重复尝试写操作。
+
 For one file-line PR review comment, use `github review-comment` or MCP `github_review_comment` with the PR head commit SHA, file path, and diff line. For all generated diff findings, use `github review-comments` or MCP `github_review_comments`; `commitId` can be explicit, or inferred from `githubPr` through policy-checked `gh pr view` / REST fallback. Each generated `gh api` command is checked by command policy before execution.
 
 对于单条文件行级 PR review comment，使用 `github review-comment` 或 MCP `github_review_comment`，并传入 PR head commit SHA、文件路径和 diff line。对于 diff 中生成的全部 findings，使用 `github review-comments` 或 MCP `github_review_comments`；`commitId` 可以显式传入，也可以通过 `githubPr` 经过 policy 检查后的 `gh pr view` / REST fallback 推断。每条生成的 `gh api` 命令都会在执行前经过 command policy。

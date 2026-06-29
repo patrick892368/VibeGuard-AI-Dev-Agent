@@ -480,10 +480,10 @@ test("GitHub PR creation can use REST API fallback", async () => {
   });
 });
 
-test("GitHub REST API write fallback still requires a token", async () => {
+test("GitHub REST API write fallback returns structured auth_required without a token", async () => {
   const root = tempGitHubRepo();
 
-  await assert.rejects(() => createPullRequestWithGh(root, {
+  const result = await createPullRequestWithGh(root, {
     title: "Fix bug",
     body: "body",
     base: "main",
@@ -495,7 +495,13 @@ test("GitHub REST API write fallback still requires a token", async () => {
     async fetch() {
       throw new Error("fetch should not be called");
     }
-  }), /GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback/);
+  });
+
+  assert.equal(result.status, "auth_required");
+  assert.equal(result.stage, "github_auth");
+  assert.equal(result.operation, "github_pr");
+  assert.equal(result.githubAuth.canWrite, false);
+  assert.equal(result.nextActions[0].id, "enable_github_execution");
 });
 
 test("GitHub PR diff can use REST API fallback", async () => {
@@ -696,6 +702,26 @@ test("GitHub PR comments can use REST API fallback", async () => {
   assert.deepEqual(request.body, { body: "review" });
 });
 
+test("GitHub PR comment REST fallback returns structured auth_required without a token", async () => {
+  const root = tempGitHubRepo();
+  const result = await commentPullRequestWithGh(root, {
+    pr: 12,
+    body: "review",
+    dryRun: false,
+    useApi: true,
+    engine: permissivePolicyEngine(root),
+    env: {},
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  });
+
+  assert.equal(result.status, "auth_required");
+  assert.equal(result.stage, "github_auth");
+  assert.equal(result.operation, "github_comment");
+  assert.equal(result.githubAuth.canWrite, false);
+});
+
 test("GitHub execution helpers require a policy engine", async () => {
   const root = tempGitHubRepo();
 
@@ -822,6 +848,29 @@ test("GitHub PR review comments can use REST API fallback", async () => {
     line: 10,
     side: "RIGHT"
   });
+});
+
+test("GitHub PR review comment REST fallback returns structured auth_required without a token", async () => {
+  const root = tempGitHubRepo();
+  const result = await createReviewCommentWithGh(root, {
+    pr: 12,
+    body: "review",
+    commitId: "abc123",
+    path: "src/app.js",
+    line: 10,
+    dryRun: false,
+    useApi: true,
+    engine: permissivePolicyEngine(root),
+    env: {},
+    async fetch() {
+      throw new Error("fetch should not be called");
+    }
+  });
+
+  assert.equal(result.status, "auth_required");
+  assert.equal(result.stage, "github_auth");
+  assert.equal(result.operation, "github_review_comment");
+  assert.equal(result.githubAuth.canWrite, false);
 });
 
 test("GitHub PR review comments can be published as a policy-checkable batch dry-run", async () => {

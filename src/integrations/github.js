@@ -238,6 +238,12 @@ function isMissingGhResult(result) {
   return /ENOENT|not recognized|not found/i.test(`${result?.error || ""}\n${result?.stderr || ""}`);
 }
 
+function isGitHubAuthFailureResult(result) {
+  return /authentication required|not logged in|gh auth login|bad credentials|HTTP 401|requires authentication/i.test(
+    `${result?.stdout || ""}\n${result?.stderr || ""}\n${result?.error || ""}`
+  );
+}
+
 function runProtectedArgv(root, argv, options = {}) {
   return runArgvWithPolicy(root, argv, options.engine, {
     confirmed: options.confirmed,
@@ -255,6 +261,32 @@ function requirePassedStdout(result, operation) {
 
 function resolveToken(env = process.env) {
   return env.GITHUB_TOKEN || env.GH_TOKEN || null;
+}
+
+function githubWriteAuthRequired(operation, env = process.env, detail = null) {
+  const tokenSources = [
+    { name: "GITHUB_TOKEN", present: Boolean(env.GITHUB_TOKEN) },
+    { name: "GH_TOKEN", present: Boolean(env.GH_TOKEN) }
+  ];
+  return {
+    status: "auth_required",
+    stage: "github_auth",
+    operation,
+    reason: "GitHub write execution requires GITHUB_TOKEN/GH_TOKEN or an authenticated gh CLI.",
+    detail,
+    githubAuth: {
+      hasToken: tokenSources.some((source) => source.present),
+      tokenSources,
+      canWrite: false
+    },
+    nextActions: [
+      {
+        id: "enable_github_execution",
+        reason: "Neither an authenticated gh CLI nor GITHUB_TOKEN/GH_TOKEN is available for real GitHub PR/comment/review-comment writes.",
+        command: "Install and authenticate gh with `gh auth login`, or set GITHUB_TOKEN/GH_TOKEN"
+      }
+    ]
+  };
 }
 
 function isReadOnlyApiMethod(method) {
@@ -509,6 +541,9 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
   requireExecutionPolicy(options, "GitHub PR creation");
   if (options.useApi) {
     checkOptionalCommandPolicy(root, command, options, "github_pr");
+    if (!resolveToken(options.env)) {
+      return githubWriteAuthRequired("github_pr", options.env, "GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback.");
+    }
     return createPullRequestWithApi(root, options);
   }
   const result = runProtectedArgv(root, ["gh", ...args], options);
@@ -521,6 +556,12 @@ export async function createPullRequestWithGh(root = process.cwd(), options = {}
   }
   if (isMissingGhResult(result) && resolveToken(options.env)) {
     return createPullRequestWithApi(root, options);
+  }
+  if (isMissingGhResult(result)) {
+    return githubWriteAuthRequired("github_pr", options.env, "gh CLI is unavailable and no GitHub token is set.");
+  }
+  if (isGitHubAuthFailureResult(result)) {
+    return githubWriteAuthRequired("github_pr", options.env, firstLine(result.stderr, result.stdout, result.error));
   }
   requirePassedStdout(result, "GitHub PR creation");
 }
@@ -599,6 +640,9 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
   requireExecutionPolicy(options, "GitHub PR comment");
   if (options.useApi) {
     checkOptionalCommandPolicy(root, command, options, "github_comment");
+    if (!resolveToken(options.env)) {
+      return githubWriteAuthRequired("github_comment", options.env, "GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback.");
+    }
     return commentPullRequestWithApi(root, options);
   }
   const result = runProtectedArgv(root, ["gh", ...args], options);
@@ -611,6 +655,12 @@ export async function commentPullRequestWithGh(root = process.cwd(), options = {
   }
   if (isMissingGhResult(result) && resolveToken(options.env)) {
     return commentPullRequestWithApi(root, options);
+  }
+  if (isMissingGhResult(result)) {
+    return githubWriteAuthRequired("github_comment", options.env, "gh CLI is unavailable and no GitHub token is set.");
+  }
+  if (isGitHubAuthFailureResult(result)) {
+    return githubWriteAuthRequired("github_comment", options.env, firstLine(result.stderr, result.stdout, result.error));
   }
   requirePassedStdout(result, "GitHub PR comment");
 }
@@ -627,6 +677,9 @@ export async function createReviewCommentWithGh(root = process.cwd(), options = 
   requireExecutionPolicy(options, "GitHub PR review comment");
   if (options.useApi) {
     checkOptionalCommandPolicy(root, command, options, "github_review_comment");
+    if (!resolveToken(options.env)) {
+      return githubWriteAuthRequired("github_review_comment", options.env, "GITHUB_TOKEN or GH_TOKEN is required for GitHub REST API write fallback.");
+    }
     return createReviewCommentWithApi(root, options);
   }
   const result = runProtectedArgv(root, ["gh", ...args], options);
@@ -639,6 +692,12 @@ export async function createReviewCommentWithGh(root = process.cwd(), options = 
   }
   if (isMissingGhResult(result) && resolveToken(options.env)) {
     return createReviewCommentWithApi(root, options);
+  }
+  if (isMissingGhResult(result)) {
+    return githubWriteAuthRequired("github_review_comment", options.env, "gh CLI is unavailable and no GitHub token is set.");
+  }
+  if (isGitHubAuthFailureResult(result)) {
+    return githubWriteAuthRequired("github_review_comment", options.env, firstLine(result.stderr, result.stdout, result.error));
   }
   requirePassedStdout(result, "GitHub PR review comment");
 }
@@ -692,7 +751,9 @@ export async function createReviewCommentsWithGh(root = process.cwd(), options =
   }
 
   return {
-    status: options.dryRun === false ? "review_comments_published" : "dry_run",
+    status: options.dryRun === false
+      ? results.find((result) => result.status === "auth_required")?.status || "review_comments_published"
+      : "dry_run",
     count: results.length,
     totalReviewComments: options.comments.length,
     skipped: options.comments.length - results.length,

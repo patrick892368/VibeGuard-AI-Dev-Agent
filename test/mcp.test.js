@@ -611,6 +611,44 @@ test("MCP github_comment blocks denied body files before dry-run", async () => {
   assert.equal(result.policy.path, ".env");
 });
 
+test("MCP github_comment REST execute returns structured auth_required without a token", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  const oldToken = process.env.GITHUB_TOKEN;
+  const oldGhToken = process.env.GH_TOKEN;
+  try {
+    process.env.GITHUB_TOKEN = "";
+    process.env.GH_TOKEN = "";
+    const response = await handleMcpRequest({
+      jsonrpc: "2.0",
+      id: 23,
+      method: "tools/call",
+      params: {
+        name: "github_comment",
+        arguments: {
+          pr: "12",
+          body: "review",
+          execute: true,
+          confirmed: true,
+          useApi: true
+        }
+      }
+    }, root);
+    const result = response.result.structuredContent;
+
+    assert.equal(result.status, "auth_required");
+    assert.equal(result.stage, "github_auth");
+    assert.equal(result.operation, "github_comment");
+    assert.equal(result.githubAuth.canWrite, false);
+  } finally {
+    if (oldToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = oldToken;
+    if (oldGhToken === undefined) delete process.env.GH_TOKEN;
+    else process.env.GH_TOKEN = oldGhToken;
+  }
+});
+
 test("MCP github_review_comment returns a dry-run review comment command", async () => {
   const response = await handleMcpRequest({
     jsonrpc: "2.0",
