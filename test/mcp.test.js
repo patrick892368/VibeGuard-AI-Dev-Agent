@@ -168,7 +168,7 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("onboard_repo").inputSchema.properties.confirmed.type, "boolean");
 });
 
-test("CLI MCP stdio server handles JSON-RPC initialize list and tool calls", async () => {
+test("CLI MCP stdio server handles JSON-RPC initialize lists resources prompts and tool calls", async () => {
   const child = spawn(process.execPath, [path.join(process.cwd(), "bin", "vibeguard.js"), "mcp"], {
     cwd: process.cwd(),
     env: {
@@ -203,6 +203,48 @@ test("CLI MCP stdio server handles JSON-RPC initialize list and tool calls", asy
     const listed = await client.next();
     assert.equal(listed.id, 2);
     assert.ok(listed.result.tools.some((tool) => tool.name === "check_policy"));
+
+    client.send({
+      jsonrpc: "2.0",
+      id: 30,
+      method: "resources/list"
+    });
+    const listedResources = await client.next();
+    assert.equal(listedResources.id, 30);
+    assert.ok(listedResources.result.resources.some((resource) => resource.uri === "vibeguard://docs/readme"));
+
+    client.send({
+      jsonrpc: "2.0",
+      id: 31,
+      method: "resources/read",
+      params: { uri: "vibeguard://docs/readme" }
+    });
+    const readResource = await client.next();
+    assert.equal(readResource.id, 31);
+    assert.match(readResource.result.contents[0].text, /VibeGuard/);
+
+    client.send({
+      jsonrpc: "2.0",
+      id: 32,
+      method: "prompts/list"
+    });
+    const listedPrompts = await client.next();
+    assert.equal(listedPrompts.id, 32);
+    assert.ok(listedPrompts.result.prompts.some((prompt) => prompt.name === "debug_fix"));
+
+    client.send({
+      jsonrpc: "2.0",
+      id: 33,
+      method: "prompts/get",
+      params: {
+        name: "github_pr_loop",
+        arguments: { branch: "codex/example" }
+      }
+    });
+    const prompt = await client.next();
+    assert.equal(prompt.id, 33);
+    assert.match(prompt.result.messages[0].content.text, /github_auth/);
+    assert.match(prompt.result.messages[0].content.text, /codex\/example/);
 
     client.send({
       jsonrpc: "2.0",

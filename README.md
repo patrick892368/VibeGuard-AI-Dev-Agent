@@ -358,7 +358,7 @@ The test suite covers:
 - `--auto-test` 测试命令选择。`--auto-test` command selection.
 - 评测历史 JSONL 和趋势汇总。Evaluation history JSONL and trend summary.
 - fixture 级评测历史 outcome 汇总。Per-fixture evaluation history outcome summaries.
-- MCP stdio JSON-RPC smoke test，真实启动 `vibeguard mcp` 并调用 initialize/list/tool；单元测试覆盖 non-empty resources/prompts、policy-gated `resources/read` 和 `prompts/get`。MCP stdio JSON-RPC smoke test starts `vibeguard mcp` and calls initialize/list/tool; unit tests cover non-empty resources/prompts, policy-gated `resources/read`, and `prompts/get`.
+- MCP stdio JSON-RPC smoke test，真实启动 `vibeguard mcp` 并调用 initialize、tools/list、resources/list、resources/read、prompts/list、prompts/get 和 tools/call；单元测试覆盖 non-empty resources/prompts、policy-gated `resources/read` 和 `prompts/get`。MCP stdio JSON-RPC smoke test starts `vibeguard mcp` and calls initialize, tools/list, resources/list, resources/read, prompts/list, prompts/get, and tools/call; unit tests cover non-empty resources/prompts, policy-gated `resources/read`, and `prompts/get`.
 - Policy-gated JSONL 审计日志和仓库 root 边界检查。Policy-gated JSONL audit logs and repository-root containment checks.
 - 默认策略对 CI/CD、migration、lockfile、部署和基础设施配置的人工确认门禁。Default-policy confirmation gates for CI/CD, migrations, lockfiles, deployment, and infrastructure config.
 - Markdown 审计报告写出。Markdown audit report generation.
