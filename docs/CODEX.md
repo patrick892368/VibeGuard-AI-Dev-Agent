@@ -39,9 +39,9 @@ node ./bin/vibeguard.js policy check --command "npm test" --json
 node ./bin/vibeguard.js policy check --path src/index.js --audit-log reports/audit.jsonl --json
 ```
 
-`doctor` reports provider presence, readiness, the effective default model, machine-readable `capabilityReadiness` for the final VibeGuard capability loop, and `nextActions` without exposing API keys.
+`doctor` reports provider presence, readiness, the effective default model, GitHub auth readiness, machine-readable `capabilityReadiness` for the final VibeGuard capability loop, and `nextActions` without exposing API keys. Codex should treat `githubAuth.canWrite: true` as the prerequisite for real PR/comment/review-comment writes; it is true when either `GITHUB_TOKEN` / `GH_TOKEN` exists or `gh auth status` is authenticated.
 
-`doctor` 会报告 provider 是否存在、是否 ready、实际默认模型、面向最终能力闭环的机器可读 `capabilityReadiness`，以及 `nextActions`，但不会暴露 API key。
+`doctor` 会报告 provider 是否存在、是否 ready、实际默认模型、GitHub auth 是否具备写权限、面向最终能力闭环的机器可读 `capabilityReadiness`，以及 `nextActions`，但不会暴露 API key。Codex 应把 `githubAuth.canWrite: true` 作为真实 PR/comment/review-comment 写操作的前置条件；当存在 `GITHUB_TOKEN` / `GH_TOKEN`，或 `gh auth status` 已认证时，该值为 true。
 
 Analyze an error log:
 

@@ -38,6 +38,57 @@ function commandAvailable(root, argv, engine) {
   }
 }
 
+function probeGhAuth(root, tools, engine) {
+  const command = commandDisplay(["gh", "auth", "status"]);
+  if (!tools.gh.available) {
+    return {
+      available: false,
+      authenticated: false,
+      command,
+      detail: "gh CLI is not available."
+    };
+  }
+  if (!engine) {
+    return {
+      available: true,
+      authenticated: false,
+      command,
+      detail: "Policy config did not load; gh auth probe skipped."
+    };
+  }
+  try {
+    const result = runArgvWithPolicy(root, ["gh", "auth", "status"], engine);
+    return {
+      available: true,
+      authenticated: result.exitCode === 0,
+      command,
+      detail: firstLine(result.stdout, result.stderr, result.error) || (result.exitCode === 0 ? "authenticated" : "not authenticated"),
+      policyStatus: result.policy.status
+    };
+  } catch (error) {
+    return {
+      available: true,
+      authenticated: false,
+      command,
+      detail: error.message
+    };
+  }
+}
+
+function githubAuthStatus(env, ghAuth) {
+  const tokenSources = [
+    { name: "GITHUB_TOKEN", present: Boolean(env.GITHUB_TOKEN) },
+    { name: "GH_TOKEN", present: Boolean(env.GH_TOKEN) }
+  ];
+  const hasToken = tokenSources.some((source) => source.present);
+  return {
+    hasToken,
+    tokenSources,
+    gh: ghAuth,
+    canWrite: hasToken || Boolean(ghAuth.authenticated)
+  };
+}
+
 function providerStatus(env) {
   const provider = env.VIBEGUARD_LLM_PROVIDER || ((env.XAI_API_KEY || env.GROK_API_KEY) ? "grok" : "unset");
   const model = provider === "grok" || provider === "xai"
@@ -96,11 +147,11 @@ function buildNextActions({ policy, github, githubAuth, provider, tools }) {
       command: "git remote add origin https://github.com/<owner>/<repo>.git"
     });
   }
-  if (!tools.gh.available && !githubAuth.hasToken) {
+  if (!githubAuth.canWrite) {
     actions.push({
       id: "enable_github_execution",
-      reason: "Neither gh CLI nor GITHUB_TOKEN/GH_TOKEN is available for real GitHub PR/comment/review-comment writes.",
-      command: "Install and authenticate gh, or set GITHUB_TOKEN/GH_TOKEN"
+      reason: "Neither an authenticated gh CLI nor GITHUB_TOKEN/GH_TOKEN is available for real GitHub PR/comment/review-comment writes.",
+      command: "Install and authenticate gh with `gh auth login`, or set GITHUB_TOKEN/GH_TOKEN"
     });
   }
   return actions;
@@ -122,7 +173,7 @@ function buildCapabilityReadiness({ policy, github, githubAuth, provider, tools 
   const policyReady = policy.status === "loaded";
   const providerReady = provider.ready;
   const githubRemoteReady = github.status === "detected";
-  const githubExecutionReady = githubRemoteReady && (tools.gh.available || githubAuth.hasToken);
+  const githubExecutionReady = githubRemoteReady && githubAuth.canWrite;
   const grokProvider = provider.provider === "grok" || provider.provider === "xai";
   const capabilities = [
     capability(
@@ -189,7 +240,9 @@ function buildCapabilityReadiness({ policy, github, githubAuth, provider, tools 
       {
         hasRemote: githubRemoteReady,
         hasGh: Boolean(tools.gh.available),
-        hasToken: Boolean(githubAuth.hasToken)
+        ghAuthenticated: Boolean(githubAuth.gh?.authenticated),
+        hasToken: Boolean(githubAuth.hasToken),
+        canWrite: Boolean(githubAuth.canWrite)
       }
     )
   ];
@@ -243,9 +296,7 @@ export function runDoctor(options = {}) {
     git: commandAvailable(root, ["git", "--version"], engine),
     gh: commandAvailable(root, ["gh", "--version"], engine)
   };
-  const githubAuth = {
-    hasToken: Boolean(env.GITHUB_TOKEN || env.GH_TOKEN)
-  };
+  const githubAuth = githubAuthStatus(env, options.ghAuthStatus || probeGhAuth(root, tools, engine));
   const provider = providerStatus(env);
   const result = {
     status: "completed",

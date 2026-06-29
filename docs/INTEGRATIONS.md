@@ -184,9 +184,9 @@ The MCP `write_tests` tool exposes the same `repair` boolean as the CLI.
 
 MCP `write_tests` tool 暴露与 CLI 相同的 `repair` 布尔参数。
 
-`doctor` checks local policy, provider, proxy, Git, GitHub remote, and `gh` readiness without exposing secrets. Tool probes such as `git --version` and `gh --version` pass command policy first, and doctor returns `capabilityReadiness` for Debug, Onboarding, Test Writer, PR Review, Policy, Codex+Grok, and GitHub PR loop, plus `nextActions` for missing provider or GitHub execution prerequisites.
+`doctor` checks local policy, provider, proxy, Git, GitHub remote, `gh` availability, `gh auth status`, and GitHub token source presence without exposing secrets. Tool probes such as `git --version`, `gh --version`, and `gh auth status` pass command policy first. Doctor returns `githubAuth.tokenSources`, `githubAuth.gh.authenticated`, `githubAuth.canWrite`, `capabilityReadiness` for Debug, Onboarding, Test Writer, PR Review, Policy, Codex+Grok, and GitHub PR loop, plus `nextActions` for missing provider or GitHub execution prerequisites.
 
-`doctor` 检查本地 policy、provider、proxy、Git、GitHub remote 和 `gh` 是否就绪，且不会暴露密钥；`git --version`、`gh --version` 等工具探测会先经过 command policy；同时返回 Debug、Onboarding、Test Writer、PR Review、Policy、Codex+Grok、GitHub PR loop 的 `capabilityReadiness`，如果缺少 provider 或 GitHub 执行前置条件，还会返回 `nextActions`。
+`doctor` 检查本地 policy、provider、proxy、Git、GitHub remote、`gh` 可用性、`gh auth status` 和 GitHub token 来源，且不会暴露密钥；`git --version`、`gh --version`、`gh auth status` 等工具探测会先经过 command policy；同时返回 `githubAuth.tokenSources`、`githubAuth.gh.authenticated`、`githubAuth.canWrite`，以及 Debug、Onboarding、Test Writer、PR Review、Policy、Codex+Grok、GitHub PR loop 的 `capabilityReadiness`。如果缺少 provider 或 GitHub 执行前置条件，还会返回 `nextActions`。
 
 Provider proxy fallback reads Git `http.proxy` / `https.proxy` by parsing `.git/config`; it does not shell out to `git config --get`.
 

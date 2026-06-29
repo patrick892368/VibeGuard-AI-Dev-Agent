@@ -24,6 +24,11 @@ test("runDoctor reports readiness without exposing provider secrets", () => {
   assert.equal(result.provider.model, "grok-test");
   assert.equal(result.provider.ready, true);
   assert.equal(result.githubAuth.hasToken, true);
+  assert.deepEqual(result.githubAuth.tokenSources, [
+    { name: "GITHUB_TOKEN", present: true },
+    { name: "GH_TOKEN", present: false }
+  ]);
+  assert.equal(result.githubAuth.canWrite, true);
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
   assert.equal(JSON.stringify(result).includes("github-secret"), false);
 });
@@ -70,8 +75,74 @@ test("runDoctor reports final capability readiness", () => {
   assert.equal(readiness.get("codex_grok_integration").provider, "grok");
   assert.equal(readiness.get("github_pr_loop").hasToken, true);
   assert.equal(readiness.get("github_pr_loop").hasGh, false);
+  assert.equal(readiness.get("github_pr_loop").canWrite, true);
   assert.equal(JSON.stringify(result).includes("secret-value"), false);
   assert.equal(JSON.stringify(result).includes("github-secret"), false);
+});
+
+test("runDoctor requires gh authentication when no GitHub token is present", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-doctor-gh-auth-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+
+  const result = runDoctor({
+    root,
+    env: {
+      XAI_API_KEY: "secret-value"
+    },
+    toolStatus: {
+      git: { available: true, detail: "git version test" },
+      gh: { available: true, detail: "gh version test" }
+    },
+    ghAuthStatus: {
+      available: true,
+      authenticated: false,
+      command: "gh auth status",
+      detail: "not logged in"
+    }
+  });
+  const readiness = new Map(result.capabilityReadiness.capabilities.map((item) => [item.id, item]));
+
+  assert.equal(result.githubAuth.hasToken, false);
+  assert.equal(result.githubAuth.gh.authenticated, false);
+  assert.equal(result.githubAuth.canWrite, false);
+  assert.equal(readiness.get("github_pr_loop").status, "partial");
+  assert.equal(readiness.get("github_pr_loop").hasGh, true);
+  assert.equal(readiness.get("github_pr_loop").ghAuthenticated, false);
+  assert.equal(result.nextActions.find((action) => action.id === "enable_github_execution").command.includes("gh auth login"), true);
+  assert.equal(JSON.stringify(result).includes("secret-value"), false);
+});
+
+test("runDoctor treats authenticated gh as GitHub write-ready without token", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-doctor-gh-ready-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+
+  const result = runDoctor({
+    root,
+    env: {
+      XAI_API_KEY: "secret-value"
+    },
+    toolStatus: {
+      git: { available: true, detail: "git version test" },
+      gh: { available: true, detail: "gh version test" }
+    },
+    ghAuthStatus: {
+      available: true,
+      authenticated: true,
+      command: "gh auth status",
+      detail: "Logged in to github.com"
+    }
+  });
+  const readiness = new Map(result.capabilityReadiness.capabilities.map((item) => [item.id, item]));
+
+  assert.equal(result.githubAuth.hasToken, false);
+  assert.equal(result.githubAuth.gh.authenticated, true);
+  assert.equal(result.githubAuth.canWrite, true);
+  assert.equal(readiness.get("github_pr_loop").status, "ready");
+  assert.equal(readiness.get("github_pr_loop").ghAuthenticated, true);
+  assert.equal(result.nextActions.some((action) => action.id === "enable_github_execution"), false);
+  assert.equal(JSON.stringify(result).includes("secret-value"), false);
 });
 
 test("runDoctor returns next actions for missing provider and GitHub execution auth", () => {
@@ -91,6 +162,7 @@ test("runDoctor returns next actions for missing provider and GitHub execution a
   ]);
   assert.match(result.nextActions[0].command, /XAI_API_KEY|GROK_API_KEY/);
   assert.match(result.nextActions[1].reason, /PR\/comment\/review-comment writes/);
+  assert.match(result.nextActions[1].reason, /authenticated gh/);
   assert.doesNotMatch(result.nextActions[1].reason, /check execution/);
 });
 
