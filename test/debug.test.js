@@ -110,9 +110,11 @@ test("analyzeDebugLog adds Django context for template errors", () => {
   fs.writeFileSync(path.join(root, "manage.py"), "from django.core.management import execute_from_command_line\n", "utf8");
   fs.mkdirSync(path.join(root, "project"), { recursive: true });
   fs.mkdirSync(path.join(root, "blog"), { recursive: true });
+  fs.mkdirSync(path.join(root, "blog", "templates", "blog"), { recursive: true });
   fs.writeFileSync(path.join(root, "project", "settings.py"), "INSTALLED_APPS = ['blog']\n", "utf8");
   fs.writeFileSync(path.join(root, "project", "urls.py"), "urlpatterns = []\n", "utf8");
   fs.writeFileSync(path.join(root, "blog", "views.py"), "def home(request):\n    return render(request, 'home.html')\n", "utf8");
+  fs.writeFileSync(path.join(root, "blog", "templates", "blog", "list.html"), "<h1>List</h1>\n", "utf8");
   const log = `Traceback (most recent call last):
   File "${path.join(root, "blog", "views.py")}", line 2, in home
     return render(request, 'home.html')
@@ -124,9 +126,11 @@ django.template.exceptions.TemplateDoesNotExist: home.html`;
   assert.ok(result.explanation.evidence.includes("framework=Django"));
   assert.equal(result.frameworkContext.framework, "Django");
   assert.ok(result.likelyFiles.includes("blog/views.py"));
+  assert.ok(result.likelyFiles.includes("project/urls.py"));
   assert.ok(result.likelyFiles.includes("project/settings.py"));
+  assert.ok(result.likelyFiles.includes("blog/templates/blog/list.html"));
   assert.ok(result.suggestedTestCommands.includes("python manage.py check"));
-  assert.ok(result.hints.some((hint) => hint.includes("TemplateDoesNotExist")));
+  assert.ok(result.hints.some((hint) => hint.includes("URL route") && hint.includes("TemplateDoesNotExist")));
   assert.ok(!result.frameworkContext.hints.some((hint) => hint.includes("model/query")));
 });
 

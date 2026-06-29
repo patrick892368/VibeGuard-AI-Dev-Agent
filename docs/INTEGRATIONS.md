@@ -227,9 +227,9 @@ Grok is the current priority model provider. Other agent/provider integrations a
 
 Grok 是当前优先模型 provider。其他 agent/provider 集成等 Codex + Grok 稳定后再做。
 
-Django support is exposed through the same CLI and MCP-style paths; integrations should inspect `frameworkContext` and must still honor `.vibeguard.yaml`.
+Django support is exposed through the same CLI and MCP-style paths; integrations should inspect `frameworkContext` and must still honor `.vibeguard.yaml`. For `TemplateDoesNotExist`, likely files include URL configuration, views, existing template candidates, and settings when available.
 
-Django 支持通过同一套 CLI 和 MCP-style 路径暴露；集成侧应检查 `frameworkContext`，并且仍必须遵守 `.vibeguard.yaml`。
+Django 支持通过同一套 CLI 和 MCP-style 路径暴露；集成侧应检查 `frameworkContext`，并且仍必须遵守 `.vibeguard.yaml`。对于 `TemplateDoesNotExist`，likely files 会在可用时包含 URL 配置、views、已有 template 候选和 settings。
 
 Spring Boot support uses the same flow and returns Spring-specific `frameworkContext` / `frameworkContexts` for dependency injection, configuration, web, and data-layer failures.
 

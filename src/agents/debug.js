@@ -149,8 +149,9 @@ function djangoDebugContext(summary, logText, repo) {
   if (/TemplateDoesNotExist/.test(summary.type)) {
     const templateName = summary.message.trim().split(/\s+/)[0];
     const matchingTemplates = projectFiles.templates.filter((file) => file.endsWith(`/${templateName}`) || file.endsWith(templateName));
-    likelyFiles.push(...matchingTemplates, ...firstFew(projectFiles.views), ...firstFew(projectFiles.settings, 2));
-    hints.push("For Django TemplateDoesNotExist, verify the template path, app template directory, and TEMPLATES DIRS/APP_DIRS settings.");
+    const templateCandidates = matchingTemplates.length > 0 ? matchingTemplates : firstFew(projectFiles.templates);
+    likelyFiles.push(...templateCandidates, ...firstFew(projectFiles.views), ...firstFew(projectFiles.urls), ...firstFew(projectFiles.settings, 2));
+    hints.push("For Django TemplateDoesNotExist, verify the URL route, view render call, template path, app template directory, and TEMPLATES DIRS/APP_DIRS settings.");
   }
   if (/NoReverseMatch/.test(summary.type)) {
     likelyFiles.push(...firstFew(projectFiles.urls), ...firstFew(projectFiles.views));

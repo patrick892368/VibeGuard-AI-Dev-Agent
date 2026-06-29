@@ -57,9 +57,9 @@ node ./bin/vibeguard.js debug --log error.log --ai-patch --output-patch reports/
 
 `debug --log <file>` 和 `fix --log <file>` 会先经过路径 policy 读取日志文件，然后才解析内容。
 
-For Django tracebacks, Codex should inspect `frameworkContext`, `likelyFiles`, `hints`, and `suggestedTestCommands`. Django projects can include `python manage.py check` and `python manage.py test` when policy allows those commands.
+For Django tracebacks, Codex should inspect `frameworkContext`, `likelyFiles`, `hints`, and `suggestedTestCommands`. `TemplateDoesNotExist` context includes URL files, view files, existing template candidates, and settings files when present. Django projects can include `python manage.py check` and `python manage.py test` when policy allows those commands.
 
-Django traceback 场景下，Codex 应检查 `frameworkContext`、`likelyFiles`、`hints` 和 `suggestedTestCommands`。Django 项目会在 policy 允许时给出 `python manage.py check` 和 `python manage.py test`。
+Django traceback 场景下，Codex 应检查 `frameworkContext`、`likelyFiles`、`hints` 和 `suggestedTestCommands`。`TemplateDoesNotExist` context 会在存在时包含 URL 文件、view 文件、已有 template 候选和 settings 文件。Django 项目会在 policy 允许时给出 `python manage.py check` 和 `python manage.py test`。
 
 For any debug result, Codex should show or reuse `explanation.message`, `explanation.likelyCause`, and `explanation.evidence` before asking for or applying a patch.
 
