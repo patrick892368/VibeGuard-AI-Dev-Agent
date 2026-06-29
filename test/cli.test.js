@@ -994,6 +994,38 @@ commands:
   assert.equal(parsed.command, "git remote get-url origin");
 });
 
+test("CLI GitHub auth reports secret-safe write readiness", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-auth-"));
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+
+  const output = execFileSync(process.execPath, [
+    bin,
+    "--root",
+    root,
+    "github",
+    "auth",
+    "--json"
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      VIBEGUARD_DISABLE_DOTENV: "1",
+      GITHUB_TOKEN: "cli-secret",
+      GH_TOKEN: ""
+    }
+  });
+  const parsed = JSON.parse(output);
+
+  assert.equal(parsed.status, "completed");
+  assert.equal(parsed.github.status, "detected");
+  assert.equal(parsed.githubAuth.hasToken, true);
+  assert.equal(parsed.githubAuth.canWrite, true);
+  assert.equal(parsed.nextActions.some((action) => action.id === "enable_github_execution"), false);
+  assert.equal(output.includes("cli-secret"), false);
+});
+
 test("CLI GitHub PR execute checks branch prerequisite policy", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "vibeguard-cli-pr-branch-policy-"));
   execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });

@@ -5,6 +5,7 @@ coverage/
 .env.*
 reports/*.json
 reports/*.jsonl
+reports/*.patch
 __pycache__/
 .DS_Store
 Thumbs.db

@@ -16,6 +16,7 @@ import { generateDebugPatch } from "./llm/provider.js";
 import { appendAuditEvent, buildAuditMarkdown, summarizeAuditEvents } from "./policy/audit.js";
 import { hookTemplate, installHook, listHooks } from "./integrations/hooks.js";
 import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, getPullRequestHeadWithGh, listWorkflowRunsWithGh } from "./integrations/github.js";
+import { inspectGithubAuth } from "./integrations/githubAuth.js";
 import { commandDisplay, runArgvWithPolicy, runCommandWithPolicy } from "./runner/safeCommand.js";
 import { startMcpServer } from "./mcp/server.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "./eval/fixtures.js";
@@ -40,6 +41,7 @@ Usage:
   vibeguard pr summary [--diff <file>] [--github-pr <number>] [--write-body <file>] [--github-api]
   vibeguard pr plan [--diff <file>] [--github-pr <number>] [--write-body <file>|--body-file <file>] [--branch <name>] [--commit-message <msg>] [--title <title>] [--push] [--no-branch] [--no-commit] [--no-pr] [--execute-git-plan] [--check-ci] [--wait-ci] [--workflow <name>] [--ci-limit <n>] [--ci-timeout <seconds>] [--ci-interval <seconds>] [--confirm] [--github-api]
   vibeguard github detect
+  vibeguard github auth
   vibeguard github pr --title <title> [--body-file <file>] [--base <branch>] [--draft] [--execute] [--confirm] [--github-api]
   vibeguard github comment --pr <number> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
   vibeguard github review-comment --pr <number> --commit <sha> --path <file> --line <line> [--body-file <file>] [--body <text>] [--execute] [--confirm] [--github-api]
@@ -543,6 +545,14 @@ function githubPrerequisitePolicy(root, commands, stage, confirmed) {
 
 async function githubCommand(parsed, root, subcommand) {
   const env = loadRuntimeEnv(root);
+  if (subcommand === "auth") {
+    return inspectGithubAuth({
+      root,
+      env,
+      confirmed: Boolean(parsed.confirm),
+      auditLog: parsed["audit-log"]
+    });
+  }
   const { config } = loadConfig(root);
   const engine = new PolicyEngine(config, { root });
   const executionPolicyOptions = {

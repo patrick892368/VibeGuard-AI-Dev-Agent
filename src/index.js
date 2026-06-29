@@ -31,5 +31,6 @@ export {
   listWorkflowRunsWithGh,
   summarizeWorkflowRuns
 } from "./integrations/github.js";
+export { inspectGithubAuth } from "./integrations/githubAuth.js";
 export { buildFixGitPlan, checkGitPlanPolicy, executeGitPlan, executeGitPlanAsync } from "./integrations/gitPlan.js";
 export { evaluateFixFixtures } from "./eval/fixtures.js";

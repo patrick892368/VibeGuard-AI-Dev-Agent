@@ -164,6 +164,7 @@ test("MCP tools expose input schemas", () => {
   assert.equal(byName.get("github_checks").inputSchema.properties.waitTimeout.type, "number");
   assert.equal(byName.get("github_checks").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("detect_github").inputSchema.properties.auditLog.type, "string");
+  assert.equal(byName.get("github_auth").inputSchema.properties.auditLog.type, "string");
   assert.equal(byName.get("onboard_repo").inputSchema.properties.confirmed.type, "boolean");
 });
 
@@ -872,6 +873,39 @@ commands:
   assert.equal(result.status, "require_confirmation");
   assert.equal(result.stage, "github_detect_policy");
   assert.equal(result.command, "git remote get-url origin");
+});
+
+test("MCP github_auth reports secret-safe write readiness", async () => {
+  const root = tempRepo();
+  execFileSync("git", ["init"], { cwd: root, encoding: "utf8" });
+  execFileSync("git", ["remote", "add", "origin", "https://github.com/owner/repo.git"], { cwd: root, encoding: "utf8" });
+  const oldToken = process.env.GITHUB_TOKEN;
+  const oldGhToken = process.env.GH_TOKEN;
+  try {
+    process.env.GITHUB_TOKEN = "mcp-secret";
+    process.env.GH_TOKEN = "";
+    const response = await handleMcpRequest({
+      jsonrpc: "2.0",
+      id: 22,
+      method: "tools/call",
+      params: {
+        name: "github_auth",
+        arguments: {}
+      }
+    }, root);
+    const result = response.result.structuredContent;
+
+    assert.equal(result.status, "completed");
+    assert.equal(result.github.status, "detected");
+    assert.equal(result.githubAuth.hasToken, true);
+    assert.equal(result.githubAuth.canWrite, true);
+    assert.equal(JSON.stringify(result).includes("mcp-secret"), false);
+  } finally {
+    if (oldToken === undefined) delete process.env.GITHUB_TOKEN;
+    else process.env.GITHUB_TOKEN = oldToken;
+    if (oldGhToken === undefined) delete process.env.GH_TOKEN;
+    else process.env.GH_TOKEN = oldGhToken;
+  }
 });
 
 test("MCP github_pr execute checks branch prerequisite policy", async () => {

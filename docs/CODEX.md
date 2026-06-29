@@ -34,14 +34,15 @@ Check local readiness and policy:
 
 ```bash
 node ./bin/vibeguard.js doctor --json
+node ./bin/vibeguard.js github auth --json
 node ./bin/vibeguard.js policy check --path src/index.js --json
 node ./bin/vibeguard.js policy check --command "npm test" --json
 node ./bin/vibeguard.js policy check --path src/index.js --audit-log reports/audit.jsonl --json
 ```
 
-`doctor` reports provider presence, readiness, the effective default model, GitHub auth readiness, machine-readable `capabilityReadiness` for the final VibeGuard capability loop, and `nextActions` without exposing API keys. Codex should treat `githubAuth.canWrite: true` as the prerequisite for real PR/comment/review-comment writes; it is true when either `GITHUB_TOKEN` / `GH_TOKEN` exists or `gh auth status` is authenticated.
+`doctor` reports provider presence, readiness, the effective default model, GitHub auth readiness, machine-readable `capabilityReadiness` for the final VibeGuard capability loop, and `nextActions` without exposing API keys. `github auth` / MCP `github_auth` returns the focused GitHub write-auth preflight only. Codex should treat `githubAuth.canWrite: true` as the prerequisite for real PR/comment/review-comment writes; it is true when either `GITHUB_TOKEN` / `GH_TOKEN` exists or `gh auth status` is authenticated.
 
-`doctor` 会报告 provider 是否存在、是否 ready、实际默认模型、GitHub auth 是否具备写权限、面向最终能力闭环的机器可读 `capabilityReadiness`，以及 `nextActions`，但不会暴露 API key。Codex 应把 `githubAuth.canWrite: true` 作为真实 PR/comment/review-comment 写操作的前置条件；当存在 `GITHUB_TOKEN` / `GH_TOKEN`，或 `gh auth status` 已认证时，该值为 true。
+`doctor` 会报告 provider 是否存在、是否 ready、实际默认模型、GitHub auth 是否具备写权限、面向最终能力闭环的机器可读 `capabilityReadiness`，以及 `nextActions`，但不会暴露 API key。`github auth` / MCP `github_auth` 只返回聚焦的 GitHub 写权限预检。Codex 应把 `githubAuth.canWrite: true` 作为真实 PR/comment/review-comment 写操作的前置条件；当存在 `GITHUB_TOKEN` / `GH_TOKEN`，或 `gh auth status` 已认证时，该值为 true。
 
 Analyze an error log:
 
@@ -375,6 +376,10 @@ node ./bin/vibeguard.js github review-comments --pr 12 --commit abc123 --diff re
 The MCP-style server exposes the same GitHub PR path as `github_pr`, which returns a dry-run `gh pr create` command unless `execute` is true and policy confirmation is present. Pass `useApi` on GitHub MCP tools to force token REST fallback.
 
 MCP-style server 也通过 `github_pr` 暴露同一条 GitHub PR 路径；默认返回 dry-run 的 `gh pr create` 命令，只有 `execute` 为 true 且通过 policy 确认时才执行。GitHub MCP 工具可传 `useApi` 强制使用 token REST fallback。
+
+Before real PR/comment/review-comment writes, use `github auth` or MCP `github_auth`. It checks remote detection, `gh --version`, `gh auth status`, and token source presence through policy-gated probes and returns `githubAuth.canWrite` plus `nextActions` without printing tokens.
+
+真实 PR/comment/review-comment 写操作前，先使用 `github auth` 或 MCP `github_auth`。它会通过 policy-gated 探测检查 remote detection、`gh --version`、`gh auth status` 和 token 来源，并返回 `githubAuth.canWrite` 与 `nextActions`，不会打印 token。
 
 For one file-line PR review comment, use `github review-comment` or MCP `github_review_comment` with the PR head commit SHA, file path, and diff line. For all generated diff findings, use `github review-comments` or MCP `github_review_comments`; `commitId` can be explicit, or inferred from `githubPr` through policy-checked `gh pr view` / REST fallback. Each generated `gh api` command is checked by command policy before execution.
 

@@ -12,6 +12,7 @@ import { analyzeTestTargets, writeSuggestedTestsAsync } from "../agents/testWrit
 import { analyzeReviewDiff, publishReviewComment, writeReviewComment } from "../agents/review.js";
 import { buildPrPlanWorkflow, buildPrSummary, writePrSummaryBody } from "../agents/pr.js";
 import { GITHUB_CURRENT_BRANCH_COMMAND, GITHUB_DETECT_COMMAND, checkGitHubCommandsPolicy, commentPullRequestWithGh, createPullRequestWithGh, createReviewCommentWithGh, createReviewCommentsWithGh, detectGitHubRepository, getPullRequestDiffWithGh, getPullRequestHeadWithGh, listWorkflowRunsWithGh } from "../integrations/github.js";
+import { inspectGithubAuth } from "../integrations/githubAuth.js";
 import { evaluateFixFixtures, summarizeEvalHistory } from "../eval/fixtures.js";
 import { applyPatchWithPolicy } from "../patch/safeApply.js";
 import { normalizeUnifiedDiff, validateUnifiedDiff } from "../patch/validatePatch.js";
@@ -206,6 +207,14 @@ const tools = [
   {
     name: "detect_github",
     description: "Detect the GitHub origin repository for the current repo.",
+    inputSchema: objectSchema({
+      confirmed: booleanSchema,
+      auditLog: stringSchema
+    })
+  },
+  {
+    name: "github_auth",
+    description: "Check GitHub remote and write-auth readiness for PR/comment/review-comment execution without exposing tokens.",
     inputSchema: objectSchema({
       confirmed: booleanSchema,
       auditLog: stringSchema
@@ -798,6 +807,14 @@ async function callTool(name, args, root) {
     if (blocked) return blocked;
     return detectGitHubRepository(root, {
       engine,
+      confirmed: Boolean(args.confirmed),
+      auditLog: args.auditLog
+    });
+  }
+  if (name === "github_auth") {
+    return inspectGithubAuth({
+      root,
+      env: loadRuntimeEnv(root),
       confirmed: Boolean(args.confirmed),
       auditLog: args.auditLog
     });

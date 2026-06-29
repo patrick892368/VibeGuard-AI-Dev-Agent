@@ -117,6 +117,7 @@ Available tools:
 - `summarize_pr`
 - `plan_pr`
 - `detect_github`
+- `github_auth`
 - `github_pr`
 - `github_checks`
 - `github_comment`
@@ -171,6 +172,10 @@ CLI patch 输入文件，包括 `policy check --patch`、`patch check/apply --fi
 `github_pr` returns a dry-run `gh pr create` command by default and requires policy confirmation for execution. `bodyFile` / `--body-file` inputs are checked through path policy before dry-run or execution.
 
 `github_pr` 默认返回 dry-run 的 `gh pr create` 命令；执行真实创建时需要经过 policy 确认。`bodyFile` / `--body-file` 输入会先经过 path policy 检查，然后才进入 dry-run 或执行。
+
+`github_auth` / `vibeguard github auth` returns a focused, secret-safe GitHub execution preflight for Codex. It checks the GitHub remote, `gh --version`, `gh auth status`, and token source presence through policy-gated probes, then returns `githubAuth.canWrite` and `nextActions` before PR/comment/review-comment writes are attempted.
+
+`github_auth` / `vibeguard github auth` 会为 Codex 返回聚焦的、不泄密的 GitHub 执行预检。它通过 policy-gated 探测检查 GitHub remote、`gh --version`、`gh auth status` 和 token 来源，然后在尝试 PR/comment/review-comment 写操作前返回 `githubAuth.canWrite` 与 `nextActions`。
 
 `github_review_comments` accepts pasted `diff`, a `diffFile` read through path policy, or a remote `githubPr`, analyzes review findings, and builds a batch of file-line review comment commands. When `githubPr` is provided and `commitId` / `--commit` is omitted, it reads the PR head SHA through policy-checked `gh pr view` or REST fallback. Dry-run is the default; execute mode requires command policy confirmation for every generated `gh api` command.
 
