@@ -11,6 +11,7 @@ export const defaultEvalFixtures = [
   {
     id: "python-bug",
     language: "python",
+    framework: null,
     root: "fixtures/python-bug",
     log: "error.log",
     testCommand: "python -m unittest discover -s tests"
@@ -18,6 +19,7 @@ export const defaultEvalFixtures = [
   {
     id: "node-bug",
     language: "node",
+    framework: null,
     root: "fixtures/node-bug",
     log: "error.log",
     testCommand: "npm test"
@@ -25,16 +27,18 @@ export const defaultEvalFixtures = [
   {
     id: "django-bug",
     language: "django",
+    framework: "Django",
     root: "fixtures/django-bug",
     log: "error.log",
-    testCommand: "python -m unittest tests/test_views.py"
+    testCommand: "python manage.py test"
   },
   {
     id: "spring-boot-bug",
     language: "spring-boot",
+    framework: "Spring Boot",
     root: "fixtures/spring-boot-bug",
     log: "error.log",
-    testCommand: "node --test tests/UserService.test.js"
+    testCommand: "node --test tests/UserService.test.cjs"
   }
 ];
 
@@ -71,6 +75,8 @@ function summarizeFixture(fixture, tempRoot, result, apply, run = 1) {
   return {
     id: fixture.id,
     language: fixture.language,
+    framework: fixture.framework || null,
+    testCommand: fixture.testCommand,
     run,
     outcome,
     status: result.status,
@@ -156,6 +162,8 @@ function buildHistoryEntry(report) {
     results: report.results.map((result) => ({
       id: result.id,
       language: result.language,
+      framework: result.framework,
+      testCommand: result.testCommand,
       run: result.run,
       outcome: result.outcome,
       status: result.status,

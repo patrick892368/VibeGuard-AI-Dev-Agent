@@ -633,7 +633,7 @@ test("fix CLI applies Spring Boot-style fixture patch and runs focused smoke tes
   assert.equal(result.status, "passed");
   assert.equal(result.debug.frameworkContext.framework, "Spring Boot");
   assert.ok(result.debug.hints.some((hint) => hint.includes("dependency injection")));
-  assert.equal(result.selectedTestCommand, "node --test tests/UserService.test.js");
+  assert.equal(result.selectedTestCommand, "node --test tests/UserService.test.cjs");
   assert.equal(result.tests.status, "passed");
   assert.match(fs.readFileSync(path.join(root, "src", "main", "java", "com", "example", "UserService.java"), "utf8"), /@Service/);
 });

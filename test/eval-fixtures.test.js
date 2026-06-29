@@ -77,6 +77,11 @@ test("evaluateFixFixtures passes both fixtures with fixture provider patch map",
   assert.equal(result.summary.successRate, 1);
   assert.deepEqual(result.results.map((item) => item.outcome), ["passed", "passed", "passed", "passed"]);
   assert.ok(result.results.every((item) => item.policyStatus === "allow"));
+  const byId = new Map(result.results.map((item) => [item.id, item]));
+  assert.equal(byId.get("django-bug").framework, "Django");
+  assert.equal(byId.get("django-bug").testCommand, "python manage.py test");
+  assert.equal(byId.get("spring-boot-bug").framework, "Spring Boot");
+  assert.equal(byId.get("spring-boot-bug").testCommand, "node --test tests/UserService.test.cjs");
 });
 
 test("evaluateFixFixtures can repeat selected fixture runs", async () => {
@@ -113,6 +118,7 @@ test("evaluateFixFixtures applies all fixture provider patches and runs tests", 
   assert.equal(result.summary.counts.passed, 4);
   assert.equal(result.summary.successRate, 1);
   assert.ok(result.results.every((item) => item.testStatus === "passed"));
+  assert.equal(result.results.find((item) => item.id === "django-bug").testCommand, "python manage.py test");
 });
 
 test("evaluateFixFixtures recovers a stale generated Django template patch", async () => {
@@ -198,6 +204,8 @@ test("CLI eval fixtures appends compact history through policy", () => {
   assert.equal(history.summary.successRate, 1);
   assert.equal(history.results.length, 4);
   assert.equal(history.results[0].run, 1);
+  assert.equal(history.results.find((item) => item.id === "django-bug").framework, "Django");
+  assert.equal(history.results.find((item) => item.id === "django-bug").testCommand, "python manage.py test");
   assert.equal(JSON.stringify(history).includes("tempRoot"), false);
 });
 

@@ -191,9 +191,9 @@ node ./bin/vibeguard.js eval fixtures --history reports/eval-history.jsonl --jso
 node ./bin/vibeguard.js eval history --file reports/eval-history.jsonl --json
 ```
 
-The baseline fixture set covers Python, Node, Django-style, and Spring Boot-style repair flows.
+The baseline fixture set covers Python, Node, Django-style, and Spring Boot-style repair flows. Fixture results include `framework` and `testCommand`; Django uses the fixture `manage.py test` shim, and Spring Boot includes config plus JUnit-style smoke source while staying runnable through a dependency-light Node smoke test.
 
-baseline fixture 集合覆盖 Python、Node、Django-style 和 Spring Boot-style 修复流程。
+baseline fixture 集合覆盖 Python、Node、Django-style 和 Spring Boot-style 修复流程。fixture 结果会包含 `framework` 和 `testCommand`；Django 使用 fixture 的 `manage.py test` shim，Spring Boot 包含配置和 JUnit-style smoke source，同时仍可通过轻量 Node smoke test 运行。
 
 Use `--repeat <n>` to measure provider stability across repeated fixture runs; each result includes `run`.
 
@@ -222,9 +222,9 @@ If a provider request returns HTTP 4xx/5xx, `patchSourceReason` includes a bound
 
 如果 provider 请求返回 HTTP 4xx/5xx，`patchSourceReason` 会包含长度受限的 provider 错误摘要，不包含 API key。
 
-Codex should inspect `summary.successRate`, fixture `outcome`, `policyStatus`, `stage`, `patchSourceReason`, `patchRecoveryStatus`, and `patchRecoveryStrategy` before applying generated patches.
+Codex should inspect `summary.successRate`, fixture `outcome`, `framework`, `testCommand`, `policyStatus`, `stage`, `patchSourceReason`, `patchRecoveryStatus`, and `patchRecoveryStrategy` before applying generated patches.
 
-Codex 应该先检查 `summary.successRate`、fixture `outcome`、`policyStatus`、`stage`、`patchSourceReason`、`patchRecoveryStatus` 和 `patchRecoveryStrategy`，再决定是否应用生成的 patch。
+Codex 应该先检查 `summary.successRate`、fixture `outcome`、`framework`、`testCommand`、`policyStatus`、`stage`、`patchSourceReason`、`patchRecoveryStatus` 和 `patchRecoveryStrategy`，再决定是否应用生成的 patch。
 
 For trend checks, inspect `summary.fixtureOutcomeCounts` from `eval history` to identify which fixture is regressing.
 
