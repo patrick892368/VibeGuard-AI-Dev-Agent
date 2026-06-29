@@ -147,7 +147,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class DemoApplication {}
 `, "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "AccountService.java"), "class AccountService {}\n", "utf8");
   fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "UserService.java"), "class UserService {}\n", "utf8");
+  fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "AuditRepository.java"), "interface AuditRepository {}\n", "utf8");
   fs.writeFileSync(path.join(root, "src", "main", "java", "com", "example", "UserRepository.java"), "interface UserRepository {}\n", "utf8");
   const log = `org.springframework.beans.factory.UnsatisfiedDependencyException: Error creating bean with name 'userService'
     at com.example.UserService.<init>(UserService.java:12)
@@ -159,8 +161,11 @@ Caused by: org.springframework.beans.factory.NoSuchBeanDefinitionException: No q
   assert.ok(result.explanation.evidence.includes("framework=Spring Boot"));
   assert.equal(result.frames[0].file, "src/main/java/com/example/UserService.java");
   assert.equal(result.frameworkContext.framework, "Spring Boot");
+  assert.deepEqual(result.frameworkContext.referencedClasses, ["UserService", "UserRepository"]);
   assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserService.java"));
   assert.ok(result.likelyFiles.includes("src/main/java/com/example/UserRepository.java"));
+  assert.ok(result.likelyFiles.indexOf("src/main/java/com/example/UserService.java") < result.likelyFiles.indexOf("src/main/java/com/example/AccountService.java"));
+  assert.ok(result.likelyFiles.indexOf("src/main/java/com/example/UserRepository.java") < result.likelyFiles.indexOf("src/main/java/com/example/AuditRepository.java"));
   assert.ok(result.likelyFiles.includes("src/main/resources/application.properties"));
   assert.ok(result.snippets.some((snippet) => snippet.file.endsWith("UserService.java")));
   assert.ok(result.suggestedTestCommands.includes("mvn test"));

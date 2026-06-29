@@ -231,9 +231,9 @@ Django support is exposed through the same CLI and MCP-style paths; integrations
 
 Django 支持通过同一套 CLI 和 MCP-style 路径暴露；集成侧应检查 `frameworkContext`，并且仍必须遵守 `.vibeguard.yaml`。对于 `TemplateDoesNotExist`，likely files 会在可用时包含 URL 配置、views、已有 template 候选和 settings。
 
-Spring Boot support uses the same flow and returns Spring-specific `frameworkContext` / `frameworkContexts` for dependency injection, configuration, web, and data-layer failures.
+Spring Boot support uses the same flow and returns Spring-specific `frameworkContext` / `frameworkContexts` for dependency injection, configuration, web, and data-layer failures. Dependency-injection context includes `referencedClasses` parsed from bean names and missing types, and matching service/repository files are prioritized in `likelyFiles`.
 
-Spring Boot 支持也使用同一流程，并针对依赖注入、配置、Web 和数据层失败返回 Spring 专用的 `frameworkContext` / `frameworkContexts`。
+Spring Boot 支持也使用同一流程，并针对依赖注入、配置、Web 和数据层失败返回 Spring 专用的 `frameworkContext` / `frameworkContexts`。依赖注入 context 会包含从 bean name 和 missing type 解析出的 `referencedClasses`，并在 `likelyFiles` 中优先排序匹配的 service/repository 文件。
 
 The current Codex flow supports patch artifact output, stack-trace based minimal test selection, Git/PR dry-run planning, confirmed branch/commit/push/PR execution, fixture evaluation history, and environment diagnosis.
 

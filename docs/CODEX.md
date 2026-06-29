@@ -81,9 +81,9 @@ Debug snippets are read only when the target file is allowed by path policy; den
 
 Debug snippets 只有在目标文件通过 path policy 时才会读取；denied 文件仍可能作为 stack metadata 出现，但源码文本不会进入 snippets 或 AI context。Debug/Fix 的仓库元数据读取也会返回 `metadataReadPolicy` 和 `skippedMetadataFiles`。
 
-For Spring Boot stack traces, Codex should inspect `frameworkContext`, `frameworkContexts`, controller/service/repository/config likely files, and Maven/Gradle test commands before asking for a patch.
+For Spring Boot stack traces, Codex should inspect `frameworkContext`, `frameworkContexts`, `referencedClasses`, controller/service/repository/config likely files, and Maven/Gradle test commands before asking for a patch. Dependency-injection failures parse bean names and missing types so matching services and repositories are prioritized when multiple candidates exist.
 
-Spring Boot stack trace 场景下，Codex 应检查 `frameworkContext`、`frameworkContexts`、controller/service/repository/config 相关文件，以及 Maven/Gradle 测试命令，再决定是否要求生成 patch。
+Spring Boot stack trace 场景下，Codex 应检查 `frameworkContext`、`frameworkContexts`、`referencedClasses`、controller/service/repository/config 相关文件，以及 Maven/Gradle 测试命令，再决定是否要求生成 patch。依赖注入失败会解析 bean name 和 missing type；当存在多个候选时，会优先排序匹配的 service 和 repository。
 
 Run the safe fix workflow:
 

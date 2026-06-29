@@ -134,6 +134,38 @@ function springProjectFiles(repoFiles) {
   };
 }
 
+function springReferencedClassNames(logText) {
+  const classNames = [];
+  for (const match of logText.matchAll(/bean with name '([^']+)'/gi)) {
+    const className = beanNameToClassName(match[1]);
+    if (className) classNames.push(className);
+  }
+  for (const match of logText.matchAll(/\b(?:type|class) '([\w.$]+)'/gi)) {
+    const className = String(match[1]).split(".").filter(Boolean).at(-1);
+    if (className) classNames.push(className);
+  }
+  return [...new Set(classNames)];
+}
+
+function beanNameToClassName(beanName) {
+  const cleaned = String(beanName || "").replace(/^&/, "").split(/[.$]/).filter(Boolean).at(-1);
+  if (!cleaned) return null;
+  return `${cleaned.charAt(0).toUpperCase()}${cleaned.slice(1)}`;
+}
+
+function prioritizeJavaFiles(files, classNames) {
+  if (classNames.length === 0) return files;
+  const classSet = new Set(classNames);
+  const matching = [];
+  const rest = [];
+  for (const file of files) {
+    const basename = path.basename(file, ".java");
+    if (classSet.has(basename)) matching.push(file);
+    else rest.push(file);
+  }
+  return [...matching, ...rest];
+}
+
 function firstFew(values, limit = 5) {
   return values.slice(0, limit);
 }
@@ -186,28 +218,35 @@ function springDebugContext(summary, logText, repo) {
   if (!isSpring) return null;
 
   const projectFiles = springProjectFiles(repo.files);
+  const referencedClasses = springReferencedClassNames(logText);
+  const configs = projectFiles.configs;
+  const controllers = prioritizeJavaFiles(projectFiles.controllers, referencedClasses);
+  const services = prioritizeJavaFiles(projectFiles.services, referencedClasses);
+  const repositories = prioritizeJavaFiles(projectFiles.repositories, referencedClasses);
+  const entities = prioritizeJavaFiles(projectFiles.entities, referencedClasses);
+  const entrypoints = projectFiles.entrypoints;
   const likelyFiles = [];
   const hints = [];
 
   if (/NoSuchBeanDefinitionException|UnsatisfiedDependencyException|BeanCreationException/.test(summary.type)) {
-    likelyFiles.push(...firstFew(projectFiles.services), ...firstFew(projectFiles.repositories), ...firstFew(projectFiles.configs), ...firstFew(projectFiles.entrypoints, 2));
+    likelyFiles.push(...firstFew(services), ...firstFew(repositories), ...firstFew(configs), ...firstFew(entrypoints, 2));
     hints.push("For Spring dependency injection failures, inspect bean annotations, constructor dependencies, component scanning, profiles, and configuration classes.");
   }
   if (/BindException|ConfigurationProperties|IllegalStateException/.test(summary.type)) {
-    likelyFiles.push(...firstFew(projectFiles.configs), ...firstFew(projectFiles.entrypoints, 2));
+    likelyFiles.push(...firstFew(configs), ...firstFew(entrypoints, 2));
     hints.push("For Spring configuration binding or startup failures, verify application properties, active profiles, and configuration property names/types.");
   }
   if (/HttpMessageNotReadableException|MethodArgument|MissingServletRequest|ServletException/.test(summary.type)) {
-    likelyFiles.push(...firstFew(projectFiles.controllers), ...firstFew(projectFiles.services));
+    likelyFiles.push(...firstFew(controllers), ...firstFew(services));
     hints.push("For Spring web request failures, inspect controller method signatures, request body DTOs, validation annotations, and route mappings.");
   }
   if (/DataIntegrityViolationException|JpaSystemException|ConstraintViolationException|SQL|SQLException/.test(summary.type)) {
-    likelyFiles.push(...firstFew(projectFiles.repositories), ...firstFew(projectFiles.entities), ...firstFew(projectFiles.configs, 2));
+    likelyFiles.push(...firstFew(repositories), ...firstFew(entities), ...firstFew(configs, 2));
     hints.push("For Spring data failures, inspect entity mappings, repository queries, transaction boundaries, and datasource configuration.");
   }
 
   if (likelyFiles.length === 0) {
-    likelyFiles.push(...firstFew(projectFiles.controllers), ...firstFew(projectFiles.services), ...firstFew(projectFiles.configs), ...firstFew(projectFiles.entrypoints, 2));
+    likelyFiles.push(...firstFew(controllers), ...firstFew(services), ...firstFew(configs), ...firstFew(entrypoints, 2));
   }
   if (hints.length === 0) {
     hints.push("Start with the first in-repository Spring frame, then inspect the related controller, service, repository, configuration, or application entrypoint.");
@@ -215,6 +254,7 @@ function springDebugContext(summary, logText, repo) {
 
   return {
     framework: "Spring Boot",
+    referencedClasses,
     likelyFiles: [...new Set(likelyFiles)],
     hints,
     suggestedCommands: repo.suggestedCommands.filter((command) => command === "mvn test" || command === "./gradlew test")
